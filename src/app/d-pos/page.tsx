@@ -392,19 +392,16 @@ export default function BbCafeDesktopPos() {
   const [showPurchaseDropdown, setShowPurchaseDropdown] = useState(false); // 👉 NEW: Dropdown visibility
   const [purchaseItemList, setPurchaseItemList] = useState<any[]>([]); // 👉 NEW: Bulk लिस्ट के लिए
   // 👉 NEW: Purchase History States & Function (माल का खाता)
-const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(false);
+  const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(false);
   const [purchaseHistoryList, setPurchaseHistoryList] = useState<any[]>([]);
   const [isPurchaseHistoryLoading, setIsPurchaseHistoryLoading] = useState(false);
-  
-  // 👉 NEW: Custom Dates for Purchase History
-  const [phStartDate, setPhStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
-  const [phEndDate, setPhEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     try {
-      const q = query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(500));
+      // फायरबेस से सारा खरीदा हुआ माल मंगा रहे हैं (सबसे नया पहले)
+      const q = query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(200));
       const snap = await getDocs(q);
       setPurchaseHistoryList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
@@ -413,22 +410,20 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
       setIsPurchaseHistoryLoading(false);
     }
   };
-
-  // 👉 NEW: Month End Stock Report States & Functions
+  // 👉 NEW: Month End Stock Report States & Function
   const [isStockReportModalOpen, setIsStockReportModalOpen] = useState(false);
   
-  const handleDownloadStockReport = () => {
+ const handleDownloadStockReport = () => {
     let csv = "Item Name (माल का नाम),Opening Stock (प्रारंभिक),Received/Purchase (नई खरीद),Total Available (कुल उपलब्ध),Consumed/Used (खपत),Closing Stock (अंतिम स्टॉक),Physical Stock (असली गोदाम स्टॉक),Rate (भाव),Total Amount (कुल कीमत)\n";
     rawMaterials.forEach(r => {
-      const opening = Number(r.openingStock) || 0; 
       const totalIn = Number(r.totalReceived) || 0;
       const totalOut = Number(r.totalConsumed) || 0;
-      const expected = opening + totalIn - totalOut;
+      const expected = totalIn - totalOut;
       const actual = Number(r.stock) || 0;
-      const rate = Number(r.lastRate) || 0; 
-      const amount = actual * rate;         
+      const rate = Number(r.lastRate) || 0; // 👉 NEW: भाव निकाला
+      const amount = actual * rate;         // 👉 NEW: स्टॉक x भाव = कीमत
       
-      csv += `"${r.name}","${opening} ${r.unit}",${totalIn} ${r.unit},${(opening + totalIn)} ${r.unit},${totalOut} ${r.unit},${expected} ${r.unit},${actual} ${r.unit},Rs.${rate},Rs.${amount.toFixed(2)}\n`;
+      csv += `"${r.name}","0 ${r.unit}",${totalIn} ${r.unit},${totalIn} ${r.unit},${totalOut} ${r.unit},${expected} ${r.unit},${actual} ${r.unit},Rs.${rate},Rs.${amount.toFixed(2)}\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
@@ -436,36 +431,6 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
     link.download = `Month_End_Stock_Report_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     toast.success("स्टॉक रिपोर्ट डाउनलोड हो गई! 📥");
-  };
-
-  // 👉 NEW: Close Month Function (महीना बंद करने का कोड)
-  const handleCloseMonth = async () => {
-    if (!window.confirm("⚠️ चेतावनी: क्या आपने गोदाम में सारा असली माल गिन लिया है और उसे 'Update' बटन से 'सीधा लिखें' कर दिया है?\n\nयह बटन दबाने से 'मिसमैच (Mismatch)' ख़त्म हो जाएगा और आज का बचा हुआ माल (Physical Stock) अगले महीने का 'प्रारंभिक (Opening) स्टॉक' बन जाएगा। क्या आप सच में इस महीने का खाता क्लोज करना चाहते हैं?")) return;
-    
-    const toastId = toast.loading("इस महीने का खाता क्लोज हो रहा है...");
-    try {
-      let batch = writeBatch(db);
-      let count = 0;
-      
-      rawMaterials.forEach(r => {
-        const rawRef = doc(db, "raw_materials", r.id);
-        const currentPhysicalStock = Number(r.stock) || 0;
-        
-        batch.update(rawRef, {
-          openingStock: currentPhysicalStock, 
-          totalReceived: 0,                   
-          totalConsumed: 0                    
-        });
-        count++;
-      });
-      
-      await batch.commit();
-      toast.dismiss(toastId);
-      toast.success(`खाता क्लोज्ड! 🎉 सभी ${count} आइटम्स का नया महीना शुरू हो गया!`);
-    } catch (error) {
-      toast.dismiss(toastId);
-      toast.error("महीना क्लोज करने में समस्या आई!");
-    }
   };
   // 👉 NEW: Raw Material History & Stock Actions
   const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
@@ -3950,7 +3915,11 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
     e.target.value = '';
   };
 
- 
+  const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#121212] text-neutral-100" : "bg-[#f4f5f7] text-neutral-900");
+
+  return (
+    <div className={mainClass}>
+      <Toaster position="top-right" />
 
       {/* TERMINAL LOCK / LOGIN */}
       {!isLoggedIn ? (
@@ -8008,98 +7977,84 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
 
             </motion.div>
           </div>
-        )}{/* 👉 NEW POPUP: PURCHASE HISTORY MODAL (माल का खाता) */}
+        )}
+      </AnimatePresence>
+      {/* 👉 NEW POPUP: PURCHASE HISTORY MODAL (माल का खाता) */}
       <AnimatePresence>
         {isPurchaseHistoryModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-4xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-3xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
               
               <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
                 <div>
                   <h3 className="font-black text-sm uppercase text-indigo-600 flex items-center gap-2">
                     <History size={18} /> Raw Material Purchase History
                   </h3>
-                  <p className="text-[10px] text-neutral-500 font-bold mt-1">अपनी आज़ादी से (Custom Date) चुनें और माल की आवक देखें।</p>
+                  <p className="text-[10px] text-neutral-500 font-bold mt-1">अब तक खरीदे गए माल का पूरा हिसाब</p>
                 </div>
-                
-                {/* 👉 NEW: Custom Date Picker */}
-                <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-300 dark:border-neutral-700 shadow-sm">
-                  <span className="text-[10px] font-black uppercase text-neutral-500 px-1">From</span>
-                  <input type="date" value={phStartDate} onChange={e => setPhStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer" />
-                  <span className="text-[10px] font-black uppercase text-neutral-500 px-1">To</span>
-                  <input type="date" value={phEndDate} onChange={e => setPhEndDate(e.target.value)} min={phStartDate} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer" />
-                  <button onClick={() => setIsPurchaseHistoryModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-200 dark:bg-neutral-700 p-1.5 rounded-full ml-2"><X size={16} /></button>
-                </div>
+                <button onClick={() => setIsPurchaseHistoryModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
               </div>
 
               {isPurchaseHistoryLoading ? (
                 <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>
               ) : (
-                (() => {
-                  // 👉 NEW: Filter list based on selected dates
-                  const filteredHistory = purchaseHistoryList.filter(item => {
-                    if (!item.date) return true;
-                    return item.date >= phStartDate && item.date <= phEndDate;
-                  });
+                <>
+                  {/* SUMMARY BOX: यहाँ दिखेगा कि कुल कितने का माल आया है */}
+                  <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 p-4 rounded-2xl shrink-0 flex justify-between items-center shadow-sm">
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">Total Purchase Amount (कुल खरीदा हुआ माल)</p>
+                      <p className="text-2xl font-black font-mono text-indigo-700 dark:text-indigo-300 mt-1">
+                        ₹{purchaseHistoryList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black uppercase text-neutral-500">Total Entries</p>
+                      <p className="text-lg font-black text-neutral-800 dark:text-neutral-200">{purchaseHistoryList.length}</p>
+                    </div>
+                  </div>
 
-                  return (
-                    <>
-                      <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 p-4 rounded-2xl shrink-0 flex justify-between items-center shadow-sm">
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">Total Purchase Amount (चुनी गई तारीखों में)</p>
-                          <p className="text-2xl font-black font-mono text-indigo-700 dark:text-indigo-300 mt-1">
-                            ₹{filteredHistory.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-black uppercase text-neutral-500">Total Entries</p>
-                          <p className="text-lg font-black text-neutral-800 dark:text-neutral-200">{filteredHistory.length}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0">
-                            <tr>
-                              <th className="py-2.5 px-3 font-black">Date (तारीख)</th>
-                              <th className="py-2.5 px-3 font-black">Item Name</th>
-                              <th className="py-2.5 px-3 font-black text-center">Qty (मात्रा)</th>
-                              <th className="py-2.5 px-3 font-black text-right">Rate (भाव)</th>
-                              <th className="py-2.5 px-3 font-black text-right">Total (₹)</th>
+                  {/* TABLE: यहाँ लिस्ट दिखेगी कि कौन सा माल, कब, कितना और कितने का आया */}
+                  <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0">
+                        <tr>
+                          <th className="py-2.5 px-3 font-black">Date (तारीख)</th>
+                          <th className="py-2.5 px-3 font-black">Item Name</th>
+                          <th className="py-2.5 px-3 font-black text-center">Qty (मात्रा)</th>
+                          <th className="py-2.5 px-3 font-black text-right">Rate (भाव)</th>
+                          <th className="py-2.5 px-3 font-black text-right">Total (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        {purchaseHistoryList.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">कोई भी पुरानी एंट्री नहीं मिली।</td>
+                          </tr>
+                        ) : (
+                          purchaseHistoryList.map((item) => (
+                            <tr key={item.id} className="bg-white dark:bg-neutral-900 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+                              <td className="py-2.5 px-3 font-bold text-neutral-700 dark:text-neutral-300">{item.date}</td>
+                              <td className="py-2.5 px-3 font-bold">{item.name}</td>
+                              <td className="py-2.5 px-3 text-center font-mono">{item.qty} <span className="text-[9px] text-neutral-500">{item.unit}</span></td>
+                              <td className="py-2.5 px-3 text-right font-mono text-neutral-500">₹{item.rate}</td>
+                              <td className="py-2.5 px-3 text-right font-mono font-black text-indigo-600 dark:text-indigo-400">₹{item.amount?.toFixed(2)}</td>
                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
-                            {filteredHistory.length === 0 ? (
-                              <tr>
-                                <td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">इन तारीखों के बीच कोई एंट्री नहीं मिली।</td>
-                              </tr>
-                            ) : (
-                              filteredHistory.map((item) => (
-                                <tr key={item.id} className="bg-white dark:bg-neutral-900 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
-                                  <td className="py-2.5 px-3 font-bold text-neutral-700 dark:text-neutral-300">{item.date}</td>
-                                  <td className="py-2.5 px-3 font-bold">{item.name}</td>
-                                  <td className="py-2.5 px-3 text-center font-mono">{item.qty} <span className="text-[9px] text-neutral-500">{item.unit}</span></td>
-                                  <td className="py-2.5 px-3 text-right font-mono text-neutral-500">₹{item.rate}</td>
-                                  <td className="py-2.5 px-3 text-right font-mono font-black text-indigo-600 dark:text-indigo-400">₹{item.amount?.toFixed(2)}</td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </>
-                  );
-                })()
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-     {/* 👉 NEW POPUP: MONTH END STOCK REPORT MODAL */}
+      {/* 👉 NEW POPUP: MONTH END STOCK REPORT MODAL */}
       <AnimatePresence>
         {isStockReportModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-5xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-4xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
               
               <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
                 <div>
@@ -8112,20 +8067,13 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
                   <button onClick={handleDownloadStockReport} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
                     📥 Download Excel
                   </button>
-                  <button onClick={handleCloseMonth} className="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
-                    🔒 Close Month (महीना बंद करें)
-                  </button>
                   <button onClick={() => setIsStockReportModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
                 </div>
               </div>
 
-              {/* TOTALS SUMMARY CARDS */}
+              {/* 👉 NEW: TOTALS SUMMARY CARDS (टेबल के ऊपर) */}
               {(() => {
-                const totalExpectedVal = rawMaterials.reduce((sum, r) => {
-                  const opening = Number(r.openingStock) || 0;
-                  const expected = opening + (Number(r.totalReceived) || 0) - (Number(r.totalConsumed) || 0);
-                  return sum + (expected * (Number(r.lastRate) || 0));
-                }, 0);
+                const totalExpectedVal = rawMaterials.reduce((sum, r) => sum + ((Number(r.totalReceived) || 0) - (Number(r.totalConsumed) || 0)) * (Number(r.lastRate) || 0), 0);
                 const totalActualVal = rawMaterials.reduce((sum, r) => sum + ((Number(r.stock) || 0) * (Number(r.lastRate) || 0)), 0);
                 const diffVal = totalExpectedVal - totalActualVal;
                 
@@ -8173,20 +8121,17 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
                       <tr><td colSpan={9} className="py-10 text-center text-neutral-400 font-bold">कोई माल नहीं है।</td></tr>
                     ) : (
                       <>
-                        {/* GRAND TOTAL ROW INSIDE TABLE */}
+                        {/* 👉 NEW: GRAND TOTAL ROW INSIDE TABLE (टेबल के अंदर सबसे ऊपर की लाइन) */}
                         <tr className="bg-yellow-100 dark:bg-yellow-900/30 font-black text-neutral-900 dark:text-white sticky top-[45px] z-10 shadow-sm border-b-2 border-yellow-300 dark:border-yellow-700">
                           <td className="py-2.5 px-3 border-r border-yellow-300 dark:border-yellow-700/50">GRAND TOTAL (कुल)</td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50">--</td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50">--</td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50">--</td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
                           <td className="py-2.5 px-3 text-center text-purple-700 dark:text-purple-400 border-r border-yellow-300 dark:border-yellow-700/50">
-                            ₹{rawMaterials.reduce((sum, r) => {
-                               const expected = (Number(r.openingStock) || 0) + (Number(r.totalReceived) || 0) - (Number(r.totalConsumed) || 0);
-                               return sum + (expected * (Number(r.lastRate) || 0));
-                            }, 0).toFixed(2)}
+                            ₹{rawMaterials.reduce((sum, r) => sum + ((Number(r.totalReceived || 0) - Number(r.totalConsumed || 0)) * (Number(r.lastRate) || 0)), 0).toFixed(2)}
                           </td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
                           <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50">--</td>
                           <td className="py-2.5 px-3 text-right text-green-700 dark:text-green-400 bg-green-500/10">
                             ₹{rawMaterials.reduce((sum, r) => sum + ((Number(r.stock) || 0) * (Number(r.lastRate) || 0)), 0).toFixed(2)}
@@ -8195,22 +8140,20 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
                         
                         {/* MAP ROWS */}
                         {rawMaterials.map((r) => {
-                          const opening = Number(r.openingStock) || 0;
                           const totalIn = Number(r.totalReceived) || 0;
                           const totalOut = Number(r.totalConsumed) || 0;
-                          const expected = opening + totalIn - totalOut; 
+                          const expected = totalIn - totalOut; 
                           const actual = Number(r.stock) || 0;
-                          const rate = Number(r.lastRate) || 0; 
-                          const amount = actual * rate;         
-                          const diff = expected - actual;
-                          const isMismatch = Math.abs(diff) > 0.1; 
+                          const rate = Number(r.lastRate) || 0; // 👉 NEW: भाव 
+                          const amount = actual * rate;         // 👉 NEW: कुल कीमत 
+                          const isMismatch = Math.abs(expected - actual) > 0.1; 
 
                           return (
                             <tr key={r.id} className="bg-white dark:bg-neutral-900 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                               <td className="py-3 px-3 font-bold text-neutral-900 dark:text-neutral-100 border-r border-neutral-100 dark:border-neutral-800">{r.name}</td>
                               
                               <td className="py-3 px-3 text-center font-mono font-bold text-neutral-400 border-r border-neutral-100 dark:border-neutral-800">
-                                {opening.toFixed(2)} <span className="text-[9px]">{r.unit}</span>
+                                0.00 <span className="text-[9px]">{r.unit}</span>
                               </td>
                               
                               <td className="py-3 px-3 text-center font-mono font-bold text-blue-600 border-r border-neutral-100 dark:border-neutral-800">
@@ -8218,7 +8161,7 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
                               </td>
 
                               <td className="py-3 px-3 text-center font-mono font-black text-neutral-800 dark:text-neutral-200 bg-neutral-50 dark:bg-neutral-800/50 border-r border-neutral-100 dark:border-neutral-800">
-                                {(opening + totalIn).toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
+                                {totalIn.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
                               </td>
 
                               <td className="py-3 px-3 text-center font-mono font-bold text-red-500 border-r border-neutral-100 dark:border-neutral-800">
@@ -8229,46 +8172,17 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
                                 {expected.toFixed(2)} <span className="text-[9px] text-purple-400">{r.unit}</span>
                               </td>
 
-                              <td className={`py-3 px-3 text-center font-mono font-black border-r border-neutral-100 dark:border-neutral-800 ${isMismatch ? 'text-red-600 bg-red-500/10 align-top' : 'text-green-600'}`}>
+                              <td className={`py-3 px-3 text-center font-mono font-black border-r border-neutral-100 dark:border-neutral-800 ${isMismatch ? 'text-red-600 bg-red-500/10' : 'text-green-600'}`}>
                                 {actual.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
-                                
-                                {/* 👉 NEW: WASTAGE / FIX BUTTON */}
-                                {isMismatch && (
-                                  <div className="mt-1.5 flex flex-col items-center gap-1 w-28 mx-auto">
-                                    <span className="block text-[8px] text-red-500 bg-red-100 dark:bg-red-900/40 px-1 rounded uppercase">⚠️ Mismatch</span>
-                                    <button 
-                                      onClick={async () => {
-                                        const msg = diff > 0 
-                                          ? `सिस्टम में स्टॉक ${diff.toFixed(2)} ${r.unit} ज़्यादा बता रहा है। क्या आप इसे 'Wastage (खराब/फेंका गया)' में डालकर हिसाब बराबर करना चाहते हैं?` 
-                                          : `गोदाम में स्टॉक ${Math.abs(diff).toFixed(2)} ${r.unit} ज़्यादा है। क्या आप इसे 'Extra Received (एक्स्ट्रा माल)' में डालकर हिसाब बराबर करना चाहते हैं?`;
-                                        
-                                        if(!window.confirm(`⚠️ गड़बड़ी ठीक करें:\n\n${msg}`)) return;
-
-                                        try {
-                                          let updateObj: any = {};
-                                          if (diff > 0) {
-                                            updateObj.totalConsumed = increment(diff); // Add to wastage
-                                          } else {
-                                            updateObj.totalReceived = increment(Math.abs(diff)); // Add to extra received
-                                          }
-                                          await updateDoc(doc(db, "raw_materials", r.id), updateObj);
-                                          toast.success(`${r.name} का स्टॉक मैच कर दिया गया! ✅`);
-                                        } catch(e) {
-                                          toast.error("अपडेट फेल हो गया!");
-                                        }
-                                      }}
-                                      className="bg-red-600 hover:bg-red-500 text-white text-[9px] px-2 py-1 rounded shadow-md w-full font-black uppercase transition-colors flex items-center justify-center gap-1"
-                                    >
-                                      🛠️ ठीक करें
-                                    </button>
-                                  </div>
-                                )}
+                                {isMismatch && <span className="block text-[8px] text-red-500 mt-0.5">⚠️ Mismatch</span>}
                               </td>
 
+                              {/* 👉 NEW: Rate Column */}
                               <td className="py-3 px-3 text-center font-mono font-bold text-neutral-600 dark:text-neutral-400 border-r border-neutral-100 dark:border-neutral-800">
                                 ₹{rate} <span className="text-[9px] text-neutral-400">/{r.unit}</span>
                               </td>
 
+                              {/* 👉 NEW: Amount Column */}
                               <td className="py-3 px-3 text-right font-mono font-black text-green-700 dark:text-green-400 bg-green-500/10">
                                 ₹{amount.toFixed(2)}
                               </td>
@@ -8283,7 +8197,7 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
               
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-xl shrink-0">
                 <p className="text-[10px] font-bold text-yellow-800 dark:text-yellow-400">
-                  💡 <strong>टिप:</strong> "🛠️ ठीक करें" बटन दबाने से सिस्टम खुद-ब-खुद अंतर (Difference) को 'Wastage' या 'Extra' मानकर स्टॉक को 100% मैच कर देगा!
+                  💡 <strong>टिप:</strong> महीने के आख़िर में "Download Excel" बटन दबाएं। फिर उस कागज़ को लेकर गोदाम में जाएँ और असली माल गिनें। अगर 'Expected (बचना चाहिए)' और असलियत में फर्क है, तो इसका मतलब कहीं वेस्टेज (Wastage) या गड़बड़ी हुई है!
                 </p>
               </div>
 
