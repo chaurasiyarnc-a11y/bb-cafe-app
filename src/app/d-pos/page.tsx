@@ -4930,10 +4930,11 @@ export default function BbCafeDesktopPos() {
                   <div className="flex gap-2">
                     {currentUser?.role === 'admin' && (
                       <>
-                        {/* सब-टैब बटन (Menu vs Raw) */}
+                        {/* सब-टैब बटन (Menu vs Raw vs Vendors) */}
                         <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl mr-2 shadow-inner">
                           <button onClick={() => setInventorySubTab('menu')} className={`px-4 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${inventorySubTab === 'menu' ? 'bg-orange-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'}`}>Menu Items</button>
                           <button onClick={() => setInventorySubTab('raw')} className={`px-4 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${inventorySubTab === 'raw' ? 'bg-orange-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'}`}>Raw Materials</button>
+                          <button onClick={() => setInventorySubTab('vendors')} className={`px-4 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${inventorySubTab === 'vendors' ? 'bg-orange-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'}`}>Vendors (वेंडर खाता)</button>
                         </div>
                         
                        {inventorySubTab === 'menu' ? (
