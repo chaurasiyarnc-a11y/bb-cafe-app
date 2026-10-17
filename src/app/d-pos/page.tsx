@@ -7900,81 +7900,122 @@ export default function BbCafeDesktopPos() {
                 )}
               </div>
 
-              {/* BOTTOM: Grand Total & Save */}
-              <div className="flex justify-between items-center pt-2 border-t border-neutral-200 dark:border-neutral-800 shrink-0">
-                <div>
-                  <p className="text-[10px] font-black uppercase text-neutral-500">Grand Total ({purchaseItemList.length} Items)</p>
-                  <p className="text-xl font-black font-mono text-blue-700 dark:text-blue-400">
-                    ₹{purchaseItemList.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
-                  </p>
+         {/* BOTTOM: Grand Total, Vendor Due & Save */}
+              <div className="flex flex-col gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800 shrink-0">
+                
+                {/* 👉 NEW: VENDOR & PARTIAL PAYMENT SECTION */}
+                <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-xl border border-blue-200 dark:border-blue-800/50">
+                   <div className="flex-1">
+                     <label className="text-[10px] font-black uppercase text-blue-600">वेंडर / दुकानदार का नाम *</label>
+                     <input type="text" value={purchaseVendorName} onChange={e => setPurchaseVendorName(e.target.value)} placeholder="जैसे: गुप्ता डेयरी..." className="w-full bg-white dark:bg-neutral-900 border border-blue-200 dark:border-blue-700/50 rounded-lg px-2 py-1.5 text-xs font-bold outline-none focus:border-blue-500" />
+                   </div>
+                   
+                   <div className="w-1/4">
+                     <label className="text-[10px] font-black uppercase text-green-600">कितने पैसे दिए (Paid)</label>
+                     <input type="number" value={purchasePaidAmount} onChange={e => setPurchasePaidAmount(e.target.value === '' ? '' : Number(e.target.value))} placeholder="₹" className="w-full bg-white dark:bg-neutral-900 border border-green-200 dark:border-green-700/50 rounded-lg px-2 py-1.5 text-xs font-mono font-bold outline-none focus:border-green-500 text-green-700" />
+                   </div>
+                   
+                   <div className="w-1/4">
+                     <label className="text-[10px] font-black uppercase text-red-500">कितने बाकी हैं (Due)</label>
+                     <div className="w-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg px-2 py-1.5 text-xs font-mono font-black text-red-600 text-right">
+                       ₹{Math.max(0, purchaseItemList.reduce((sum, item) => sum + item.amount, 0) - (Number(purchasePaidAmount) || 0)).toFixed(2)}
+                     </div>
+                   </div>
                 </div>
 
-                <button 
-                  onClick={async () => {
-                    if (purchaseItemList.length === 0) return toast.error("सेव करने के लिए लिस्ट में कम से कम 1 आइटम होना चाहिए!");
-                    
-                    const grandTotal = purchaseItemList.reduce((sum, item) => sum + item.amount, 0);
-                    const toastId = toast.loading("सारा माल डेटाबेस में चढ़ाया जा रहा है...");
-                    
-                    try {
-                      // Firebase Batch का इस्तेमाल (ताकि 25 आइटम एक ही सेकंड में सेव हो जाएँ)
-                      const batch = writeBatch(db);
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-neutral-500">Grand Total ({purchaseItemList.length} Items)</p>
+                    <p className="text-xl font-black font-mono text-blue-700 dark:text-blue-400">
+                      ₹{purchaseItemList.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
+                    </p>
+                  </div>
 
-                     purchaseItemList.forEach((item) => {
-                         // 1. स्टॉक अपडेट करें (increment का इस्तेमाल ताकि पुराना स्टॉक अपने आप जुड़ जाए)
-                         const rawRef = doc(db, "raw_materials", item.rawId);
-                         batch.update(rawRef, {
-                           stock: increment(item.qty),
-                           totalReceived: increment(item.qty),
-                           lastRate: Number(item.rate) // 👉 NEW: सिस्टम अब भाव (Rate) भी याद रखेगा!
-                         });
-                         // 2. परचेस हिस्ट्री सेव करें
-                         const purchaseRef = doc(collection(db, "raw_purchases"));
-                         batch.set(purchaseRef, {
-                           rawId: item.rawId,
-                           name: item.name,
-                           unit: item.unit,
-                           qty: item.qty,
-                           rate: item.rate,
-                           amount: item.amount,
-                           date: purchaseDate,
-                           timestamp: new Date()
-                         });
-                      });
+                  <button 
+                    onClick={async () => {
+                      if (purchaseItemList.length === 0) return toast.error("सेव करने के लिए लिस्ट में कम से कम 1 आइटम होना चाहिए!");
+                      if (!purchaseVendorName.trim()) return toast.error("कृपया वेंडर (दुकानदार) का नाम लिखें!");
+                      
+                      const grandTotal = purchaseItemList.reduce((sum, item) => sum + item.amount, 0);
+                      const paidAmt = Number(purchasePaidAmount) || 0;
+                      const dueAmt = grandTotal - paidAmt;
+                      
+                      const toastId = toast.loading("माल चढ़ाया जा रहा है...");
+                      
+                      try {
+                        const batch = writeBatch(db);
+                        
+                        // वेंडर का ID बनाने के लिए नाम के स्पेस हटा दिए
+                        const vendorId = purchaseVendorName.trim().toLowerCase().replace(/\s+/g, '_');
 
-                      // 3. गल्ले के खर्चे (Expense) में जोड़ें (पूरे बिल का एक खर्चा)
-                      if (window.confirm(`क्या पूरे बिल (₹${grandTotal.toFixed(2)}) को आज के गल्ले के खर्च (Daily Expense) में भी जोड़ना है?`)) {
-                         const expenseRef = doc(collection(db, "daily_expenses"));
-                         batch.set(expenseRef, {
-                            title: `Bulk Purchase Invoice (${purchaseItemList.length} Items)`,
-                            amount: grandTotal,
-                            category: 'Raw Material',
-                            timestamp: new Date(),
-                            enteredBy: currentUser?.name || 'Staff'
-                         });
+                        purchaseItemList.forEach((item) => {
+                           // स्टॉक बढ़ाएं
+                           const rawRef = doc(db, "raw_materials", item.rawId);
+                           batch.update(rawRef, {
+                             stock: increment(item.qty),
+                             totalReceived: increment(item.qty),
+                             lastRate: Number(item.rate) 
+                           });
+                           
+                           // परचेस हिस्ट्री सेव करें
+                           const purchaseRef = doc(collection(db, "raw_purchases"));
+                           batch.set(purchaseRef, {
+                             rawId: item.rawId, name: item.name, unit: item.unit, qty: item.qty, rate: item.rate, amount: item.amount,
+                             vendorName: purchaseVendorName.trim(), // 👉 नया
+                             date: purchaseDate, timestamp: new Date()
+                           });
+                        });
+
+                        // 👉 NEW: वेंडर के उधार खाते में जोड़ें (Vendor Ledger)
+                        const vendorRef = doc(db, "vendors", vendorId);
+                        batch.set(vendorRef, {
+                           name: purchaseVendorName.trim(),
+                           totalPurchased: increment(grandTotal),
+                           totalPaid: increment(paidAmt),
+                           totalDue: increment(dueAmt),
+                           lastPurchaseDate: purchaseDate,
+                           updatedAt: new Date()
+                        }, { merge: true });
+
+                        // 👉 NEW: गल्ले का खर्च (सिर्फ उतना ही कटेगा जितने नकद पैसे दिए हैं)
+                        if (paidAmt > 0) {
+                           const expenseRef = doc(collection(db, "daily_expenses"));
+                           batch.set(expenseRef, {
+                              title: `Paid to ${purchaseVendorName.trim()} (Purchase)`,
+                              amount: paidAmt,
+                              category: 'Raw Material',
+                              timestamp: new Date(),
+                              enteredBy: currentUser?.name || 'Staff'
+                           });
+                        }
+
+                        await batch.commit();
+
+                        toast.dismiss(toastId);
+                        if (dueAmt > 0) {
+                          toast.success(`माल जुड़ गया! ₹${dueAmt} ${purchaseVendorName} के खाते में उधार चढ़ गया। 📕`);
+                        } else {
+                          toast.success(`माल जुड़ गया! पूरा पेमेंट हो गया। ✅`);
+                        }
+                        
+                        // फॉर्म क्लियर करें
+                        setPurchaseItemList([]);
+                        setPurchaseVendorName('');
+                        setPurchasePaidAmount('');
+                        setIsPurchaseModalOpen(false);
+                        
+                      } catch (err) {
+                        toast.dismiss(toastId);
+                        toast.error("एंट्री सेव करने में समस्या आई!");
+                        console.error(err);
                       }
-
-                      // सब कुछ एक साथ फायरबेस में भेजें
-                      await batch.commit();
-
-                      toast.dismiss(toastId);
-                      toast.success(`सभी ${purchaseItemList.length} आइटम सफलतापूर्वक जुड़ गए! ✅`);
-                      
-                      // फॉर्म क्लियर करें
-                      setPurchaseItemList([]);
-                      setIsPurchaseModalOpen(false);
-                      
-                    } catch (err) {
-                      toast.dismiss(toastId);
-                      toast.error("एंट्री सेव करने में समस्या आई!");
-                      console.error(err);
-                    }
-                  }} 
-                  disabled={purchaseItemList.length === 0}
-                  className="py-3 px-8 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-400 text-white font-black uppercase text-sm rounded-xl shadow-lg transition-all"
-                >
-                  Save All Invoice (सारा माल सेव करें)
-                </button>
+                    }} 
+                    disabled={purchaseItemList.length === 0}
+                    className="py-3 px-8 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-400 text-white font-black uppercase text-sm rounded-xl shadow-lg transition-all"
+                  >
+                    Save Invoice (सेव करें)
+                  </button>
+                </div>
               </div>
 
             </motion.div>
