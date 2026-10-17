@@ -5212,7 +5212,77 @@ export default function BbCafeDesktopPos() {
                             </div>
                           </div>
                         )
-                      })
+                   })
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* 👉 NEW: VENDORS KHATA DASHBOARD & UI */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-300 dark:border-neutral-800 shadow-sm flex flex-col justify-center">
+                       <p className="text-[10px] font-black uppercase text-neutral-500">कुल व्यापारी (Total Vendors)</p>
+                       <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white">{vendorsList.length}</p>
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-200 dark:border-blue-800/50 shadow-sm flex flex-col justify-center">
+                       <p className="text-[10px] font-black uppercase text-blue-600">कुल माल ख़रीदा (Total Purchased)</p>
+                       <p className="text-2xl font-black font-mono text-blue-600">₹{vendorsList.reduce((acc, v) => acc + (Number(v.totalPurchased) || 0), 0).toFixed(2)}</p>
+                    </div>
+                    <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-2xl border border-red-200 dark:border-red-800/50 shadow-sm flex flex-col justify-center">
+                       <p className="text-[10px] font-black uppercase text-red-600">कुल उधारी बाकी है (Total Due)</p>
+                       <p className="text-2xl font-black font-mono text-red-600">₹{vendorsList.reduce((acc, v) => acc + (Number(v.totalDue) || 0), 0).toFixed(2)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 pb-10">
+                    <div className="hidden lg:flex justify-between items-center px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-[10px] font-black uppercase text-neutral-500 shadow-sm">
+                       <div className="w-1/3">Vendor Name (व्यापारी)</div>
+                       <div className="w-1/4 text-center">Total Purchase</div>
+                       <div className="w-1/4 text-center">Amount Due (उधार)</div>
+                       <div className="w-1/5 text-right">Action</div>
+                    </div>
+
+                    {vendorsList.length === 0 ? (
+                      <p className="text-center text-neutral-500 font-bold py-10 text-xs">कोई भी वेंडर खाता नहीं मिला।</p>
+                    ) : (
+                      vendorsList.map(vendor => (
+                        <div key={vendor.id} className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm hover:border-blue-400 transition-all gap-3 lg:gap-0">
+                          <div className="w-full lg:w-1/3 flex flex-col">
+                            <p className="font-black text-sm text-neutral-900 dark:text-neutral-100 uppercase">{vendor.name}</p>
+                            <p className="text-[10px] text-neutral-500 font-bold mt-0.5">Last Buy: {vendor.lastPurchaseDate}</p>
+                          </div>
+                          
+                          <div className="w-full lg:w-1/4 flex lg:justify-center items-center">
+                            <div className="text-center">
+                              <p className="text-[9px] font-black uppercase text-neutral-400">Total Buy</p>
+                              <p className="text-sm font-black font-mono text-neutral-800 dark:text-neutral-200">₹{Number(vendor.totalPurchased || 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="w-full lg:w-1/4 flex lg:justify-center items-center">
+                            <div className="text-center bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800/50">
+                              <p className="text-[9px] font-black uppercase text-red-500">Pending Due</p>
+                              <p className="text-sm font-black font-mono text-red-600">₹{Number(vendor.totalDue || 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="w-full lg:w-1/5 flex lg:justify-end gap-2">
+                            <button 
+                              onClick={() => {
+                                if((vendor.totalDue || 0) <= 0) return toast.error("इनका कोई उधार बाकी नहीं है!");
+                                setPayVendorObj(vendor);
+                              }} 
+                              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase shadow-sm transition-all ${
+                                (vendor.totalDue || 0) > 0 
+                                ? 'bg-green-600 hover:bg-green-500 text-white' 
+                                : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed'
+                              }`}
+                            >
+                              ₹ Pay Due
+                            </button>
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
                 </div>
