@@ -3950,11 +3950,7 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
     e.target.value = '';
   };
 
-  const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#121212] text-neutral-100" : "bg-[#f4f5f7] text-neutral-900");
-
-  return (
-    <div className={mainClass}>
-      <Toaster position="top-right" />
+ 
 
       {/* TERMINAL LOCK / LOGIN */}
       {!isLoggedIn ? (
