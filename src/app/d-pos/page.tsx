@@ -8174,28 +8174,41 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
-      {/* 👉 NEW POPUP: MONTH END STOCK REPORT MODAL */}
+  {/* 👉 NEW POPUP: MONTH END STOCK REPORT MODAL */}
       <AnimatePresence>
         {isStockReportModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-4xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-[95vw] w-full rounded-3xl p-6 shadow-2xl space-y-4 h-[95vh] flex flex-col">
               
               <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
                 <div>
                   <h3 className="font-black text-sm uppercase text-purple-600 flex items-center gap-2">
-                    <SafeBarChart3 size={18} /> Month-End Stock Report (महीने का स्टॉक)
+                    <SafeBarChart3 size={18} /> Stock Report (महीने का स्टॉक)
                   </h3>
-                  <p className="text-[10px] text-neutral-500 font-bold mt-1">कितना माल आया, कितना खर्च हुआ और सिस्टम में कितना बचना चाहिए!</p>
+                  <p className="text-[10px] text-neutral-500 font-bold mt-1">
+                    नीचे तारीख चुनें और Excel डाउनलोड करें (लाइव डेटा ऑल-टाइम स्टॉक दिखाता है)।
+                  </p>
                 </div>
-                <div className="flex gap-2 items-center">
-                  <button onClick={handleDownloadStockReport} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
+                
+                {/* 👉 NEW: Custom Date Picker and Download Button */}
+                <div className="flex gap-3 items-center">
+                  <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-300 dark:border-neutral-700 shadow-sm">
+                    <span className="text-[10px] font-black uppercase text-neutral-500 px-1">From</span>
+                    <input type="date" value={stockStartDate} onChange={e => setStockStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer" />
+                    <span className="text-[10px] font-black uppercase text-neutral-500 px-1">To</span>
+                    <input type="date" value={stockEndDate} onChange={e => setStockEndDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer" />
+                  </div>
+
+                  <button onClick={handleDownloadStockReport} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-[11px] font-black uppercase flex items-center gap-1.5 shadow-sm">
                     📥 Download Excel
                   </button>
-                  <button onClick={() => setIsStockReportModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
+                  <button onClick={() => setIsStockReportModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-2 rounded-full ml-2">
+                    <X size={20} />
+                  </button>
                 </div>
               </div>
 
-              {/* 👉 NEW: TOTALS SUMMARY CARDS (टेबल के ऊपर) */}
+              {/* 👉 TOTALS SUMMARY CARDS (टेबल के ऊपर) */}
               {(() => {
                 const totalExpectedVal = rawMaterials.reduce((sum, r) => sum + ((Number(r.totalReceived) || 0) - (Number(r.totalConsumed) || 0)) * (Number(r.lastRate) || 0), 0);
                 const totalActualVal = rawMaterials.reduce((sum, r) => sum + ((Number(r.stock) || 0) * (Number(r.lastRate) || 0)), 0);
@@ -8225,7 +8238,7 @@ export default function BbCafeDesktopPos() {
                 );
               })()}
 
-              <div className="flex-1 overflow-y-auto rounded-xl shadow-inner border border-blue-600">
+              <div className="flex-1 overflow-auto rounded-xl shadow-inner border border-blue-600">
                 <table className="w-full text-left text-xs whitespace-nowrap">
                   <thead className="bg-[#0070c0] text-white sticky top-0 shadow-md z-20">
                     <tr>
@@ -8245,68 +8258,56 @@ export default function BbCafeDesktopPos() {
                       <tr><td colSpan={9} className="py-10 text-center text-neutral-400 font-bold">कोई माल नहीं है।</td></tr>
                     ) : (
                       <>
-                        {/* 👉 NEW: GRAND TOTAL ROW INSIDE TABLE (टेबल के अंदर सबसे ऊपर की लाइन) */}
                         <tr className="bg-yellow-100 dark:bg-yellow-900/30 font-black text-neutral-900 dark:text-white sticky top-[45px] z-10 shadow-sm border-b-2 border-yellow-300 dark:border-yellow-700">
                           <td className="py-2.5 px-3 border-r border-yellow-300 dark:border-yellow-700/50">GRAND TOTAL (कुल)</td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स को जोड़ा नहीं जा सकता">--</td>
                           <td className="py-2.5 px-3 text-center text-purple-700 dark:text-purple-400 border-r border-yellow-300 dark:border-yellow-700/50">
                             ₹{rawMaterials.reduce((sum, r) => sum + ((Number(r.totalReceived || 0) - Number(r.totalConsumed || 0)) * (Number(r.lastRate) || 0)), 0).toFixed(2)}
                           </td>
-                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स को जोड़ा नहीं जा सकता">--</td>
                           <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50">--</td>
                           <td className="py-2.5 px-3 text-right text-green-700 dark:text-green-400 bg-green-500/10">
                             ₹{rawMaterials.reduce((sum, r) => sum + ((Number(r.stock) || 0) * (Number(r.lastRate) || 0)), 0).toFixed(2)}
                           </td>
                         </tr>
                         
-                        {/* MAP ROWS */}
                         {rawMaterials.map((r) => {
                           const totalIn = Number(r.totalReceived) || 0;
                           const totalOut = Number(r.totalConsumed) || 0;
                           const expected = totalIn - totalOut; 
                           const actual = Number(r.stock) || 0;
-                          const rate = Number(r.lastRate) || 0; // 👉 NEW: भाव 
-                          const amount = actual * rate;         // 👉 NEW: कुल कीमत 
+                          const rate = Number(r.lastRate) || 0; 
+                          const amount = actual * rate;         
                           const isMismatch = Math.abs(expected - actual) > 0.1; 
 
                           return (
                             <tr key={r.id} className="bg-white dark:bg-neutral-900 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                               <td className="py-3 px-3 font-bold text-neutral-900 dark:text-neutral-100 border-r border-neutral-100 dark:border-neutral-800">{r.name}</td>
-                              
                               <td className="py-3 px-3 text-center font-mono font-bold text-neutral-400 border-r border-neutral-100 dark:border-neutral-800">
                                 0.00 <span className="text-[9px]">{r.unit}</span>
                               </td>
-                              
                               <td className="py-3 px-3 text-center font-mono font-bold text-blue-600 border-r border-neutral-100 dark:border-neutral-800">
                                 + {totalIn.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
                               </td>
-
                               <td className="py-3 px-3 text-center font-mono font-black text-neutral-800 dark:text-neutral-200 bg-neutral-50 dark:bg-neutral-800/50 border-r border-neutral-100 dark:border-neutral-800">
                                 {totalIn.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
                               </td>
-
                               <td className="py-3 px-3 text-center font-mono font-bold text-red-500 border-r border-neutral-100 dark:border-neutral-800">
                                 - {totalOut.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
                               </td>
-
                               <td className="py-3 px-3 text-center font-mono font-black text-purple-700 dark:text-purple-400 bg-purple-500/5 border-r border-neutral-100 dark:border-neutral-800">
                                 {expected.toFixed(2)} <span className="text-[9px] text-purple-400">{r.unit}</span>
                               </td>
-
                               <td className={`py-3 px-3 text-center font-mono font-black border-r border-neutral-100 dark:border-neutral-800 ${isMismatch ? 'text-red-600 bg-red-500/10' : 'text-green-600'}`}>
                                 {actual.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
                                 {isMismatch && <span className="block text-[8px] text-red-500 mt-0.5">⚠️ Mismatch</span>}
                               </td>
-
-                              {/* 👉 NEW: Rate Column */}
                               <td className="py-3 px-3 text-center font-mono font-bold text-neutral-600 dark:text-neutral-400 border-r border-neutral-100 dark:border-neutral-800">
                                 ₹{rate} <span className="text-[9px] text-neutral-400">/{r.unit}</span>
                               </td>
-
-                              {/* 👉 NEW: Amount Column */}
                               <td className="py-3 px-3 text-right font-mono font-black text-green-700 dark:text-green-400 bg-green-500/10">
                                 ₹{amount.toFixed(2)}
                               </td>
@@ -8318,82 +8319,7 @@ export default function BbCafeDesktopPos() {
                   </tbody>
                 </table>
               </div>
-              
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-xl shrink-0">
-                <p className="text-[10px] font-bold text-yellow-800 dark:text-yellow-400">
-                  💡 <strong>टिप:</strong> महीने के आख़िर में "Download Excel" बटन दबाएं। फिर उस कागज़ को लेकर गोदाम में जाएँ और असली माल गिनें। अगर 'Expected (बचना चाहिए)' और असलियत में फर्क है, तो इसका मतलब कहीं वेस्टेज (Wastage) या गड़बड़ी हुई है!
-                </p>
-              </div>
 
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-      {/* 👉 NEW POPUP: VENDOR PAYMENT MODAL (व्यापारी को पेमेंट करें) */}
-      <AnimatePresence>
-        {payVendorObj && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
-              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
-                <h3 className="font-black text-sm uppercase text-green-600 flex items-center gap-2">
-                  <SafeFileText size={18} /> Vendor Payment
-                </h3>
-                <button onClick={() => { setPayVendorObj(null); setVendorPayAmount(''); }} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
-              </div>
-              
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                const amt = Number(vendorPayAmount);
-                if (!amt || amt <= 0) return toast.error("सही अमाउंट डालें!");
-                if (amt > payVendorObj.totalDue) return toast.error("उधार से ज़्यादा पैसे नहीं दे सकते!");
-
-                const toastId = toast.loading("पेमेंट सेव हो रहा है...");
-                try {
-                  const batch = writeBatch(db);
-                  
-                  // 1. Update Vendor Due
-                  const vendorRef = doc(db, "vendors", payVendorObj.id);
-                  batch.update(vendorRef, {
-                    totalPaid: increment(amt),
-                    totalDue: increment(-amt),
-                    updatedAt: new Date()
-                  });
-
-                  // 2. Add to Daily Expenses (गल्ले का खर्च)
-                  const expRef = doc(collection(db, "daily_expenses"));
-                  batch.set(expRef, {
-                    title: `Paid to ${payVendorObj.name} (Due Clear)`,
-                    amount: amt,
-                    category: 'Vendor Payment',
-                    timestamp: new Date(),
-                    enteredBy: currentUser?.name || 'Staff'
-                  });
-
-                  await batch.commit();
-                  toast.dismiss(toastId);
-                  toast.success(`₹${amt} का पेमेंट ${payVendorObj.name} को कर दिया गया! ✅`);
-                  setPayVendorObj(null);
-                  setVendorPayAmount('');
-                } catch (err) {
-                  toast.dismiss(toastId);
-                  toast.error("पेमेंट फेल हो गया!");
-                }
-              }} className="space-y-4">
-                
-                <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-xl border border-red-200 dark:border-red-800/50 text-center">
-                   <p className="text-[10px] font-black uppercase text-red-500 mb-1">Total Due (कुल बाकी)</p>
-                   <p className="text-2xl font-black font-mono text-red-600">₹{Number(payVendorObj.totalDue).toFixed(2)}</p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-neutral-500">Pay Amount (कितने पैसे दे रहे हैं?)</label>
-                  <input type="number" required max={payVendorObj.totalDue} step="0.01" min={1} value={vendorPayAmount} onChange={e=>setVendorPayAmount(e.target.value === '' ? '' : Number(e.target.value))} placeholder="₹" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-lg font-mono font-black outline-none focus:border-green-500 text-green-600 text-center" autoFocus />
-                </div>
-                
-                <button type="submit" className="w-full py-3 mt-2 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
-                  Confirm Payment (पेमेंट करें)
-                </button>
-              </form>
             </motion.div>
           </div>
         )}
