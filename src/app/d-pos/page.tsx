@@ -6864,22 +6864,64 @@ export default function BbCafeDesktopPos() {
                   <label className="font-black uppercase text-green-600 mb-2 block">Recipe Mapping (कच्चा माल)</label>
                   
                  {itemRecipe.length > 0 && (
-                    <div className="space-y-1.5 mb-2">
-                      {itemRecipe.map((rec, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-200 dark:border-green-800/50">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-bold text-green-800 dark:text-green-400">{rec.name}</span>
-                            {/* 👉 NEW: यहाँ साफ़-साफ़ दिखेगा कि यह माल Half के लिए है या Full के लिए */}
-                            <span className="text-[8px] font-black uppercase text-orange-600 bg-orange-100 dark:bg-orange-900/30 px-1 mt-0.5 rounded w-fit border border-orange-200 dark:border-orange-800">
-                              For: {rec.variant && rec.variant !== 'All' ? rec.variant : 'All Sizes (सभी साइज़)'}
-                            </span>
-                          </div>
-                          <div className="flex gap-2 items-center">
-                            <span className="text-[10px] font-black">{rec.qty} {rec.unit}</span>
-                            <button type="button" onClick={() => setItemRecipe(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:text-red-700"><SafeTrash2 size={12} /></button>
+                    <div className="space-y-3 mb-3">
+                      
+                      {/* 1. जो माल 'All Sizes' (सभी में) डलेगा वो ऊपर दिखेगा */}
+                      {itemRecipe.filter(r => !r.variant || r.variant === 'All').length > 0 && (
+                        <div className="bg-neutral-50 dark:bg-neutral-900/50 p-2 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <p className="text-[10px] font-black uppercase text-neutral-500 mb-1.5 border-b border-neutral-200 dark:border-neutral-700 pb-1 px-1">
+                            Common Items (सभी साइज़ में डलेगा)
+                          </p>
+                          <div className="space-y-1.5">
+                            {itemRecipe.map((rec, idx) => {
+                              if (rec.variant && rec.variant !== 'All') return null;
+                              return (
+                                <div key={idx} className="flex justify-between items-center bg-green-50 dark:bg-green-900/20 p-1.5 rounded-lg border border-green-200 dark:border-green-800/50">
+                                  <span className="text-[10px] font-bold text-green-800 dark:text-green-400">{rec.name}</span>
+                                  <div className="flex gap-2 items-center">
+                                    <span className="text-[10px] font-black">{rec.qty} {rec.unit}</span>
+                                    <button type="button" onClick={() => setItemRecipe(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:text-red-700"><SafeTrash2 size={12} /></button>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      ))}
+                      )}
+
+                      {/* 2. Side-by-Side Variant Mapping (Plain vs Butter / Half vs Full) */}
+                      {(() => {
+                        const variantRecipes = itemRecipe.filter(r => r.variant && r.variant !== 'All');
+                        const uniqueVariants = Array.from(new Set(variantRecipes.map(r => r.variant)));
+                        
+                        if (uniqueVariants.length === 0) return null;
+
+                        return (
+                          <div className={`grid gap-2 ${uniqueVariants.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            {uniqueVariants.map(vName => (
+                              <div key={vName} className="bg-orange-50/50 dark:bg-orange-900/10 p-2 rounded-xl border border-orange-200 dark:border-orange-800/50">
+                                <p className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 mb-1.5 border-b border-orange-200 dark:border-orange-800/50 pb-1 text-center">
+                                  For: {vName}
+                                </p>
+                                <div className="space-y-1.5">
+                                  {itemRecipe.map((rec, idx) => {
+                                    if (rec.variant !== vName) return null;
+                                    return (
+                                      <div key={idx} className="flex justify-between items-center bg-white dark:bg-neutral-800 p-1.5 rounded-lg border border-orange-100 dark:border-neutral-700 shadow-sm">
+                                        <span className="text-[10px] font-bold text-neutral-800 dark:text-neutral-200 truncate pr-1">{rec.name}</span>
+                                        <div className="flex gap-1.5 items-center shrink-0">
+                                          <span className="text-[10px] font-black">{rec.qty} {rec.unit}</span>
+                                          <button type="button" onClick={() => setItemRecipe(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-50 p-0.5 rounded"><SafeTrash2 size={12} /></button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 
