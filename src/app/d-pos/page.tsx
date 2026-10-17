@@ -422,23 +422,24 @@ export default function BbCafeDesktopPos() {
   const [stockEndDate, setStockEndDate] = useState(new Date().toISOString().split('T')[0]);
   
  const handleDownloadStockReport = () => {
-    let csv = "Item Name (माल का नाम),Opening Stock (प्रारंभिक),Received/Purchase (नई खरीद),Total Available (कुल उपलब्ध),Consumed/Used (खपत),Closing Stock (अंतिम स्टॉक),Physical Stock (असली गोदाम स्टॉक),Rate (भाव),Total Amount (कुल कीमत)\n";
+    let csv = `Stock Report From: ${stockStartDate} To: ${stockEndDate}\n\n`;
+    csv += "Item Name (माल का नाम),Opening Stock (प्रारंभिक),Received/Purchase (नई खरीद),Total Available (कुल उपलब्ध),Consumed/Used (खपत),Closing Stock (अंतिम स्टॉक),Physical Stock (असली गोदाम स्टॉक),Rate (भाव),Total Amount (कुल कीमत)\n";
     rawMaterials.forEach(r => {
       const totalIn = Number(r.totalReceived) || 0;
       const totalOut = Number(r.totalConsumed) || 0;
       const expected = totalIn - totalOut;
       const actual = Number(r.stock) || 0;
-      const rate = Number(r.lastRate) || 0; // 👉 NEW: भाव निकाला
-      const amount = actual * rate;         // 👉 NEW: स्टॉक x भाव = कीमत
+      const rate = Number(r.lastRate) || 0;
+      const amount = actual * rate;
       
       csv += `"${r.name}","0 ${r.unit}",${totalIn} ${r.unit},${totalIn} ${r.unit},${totalOut} ${r.unit},${expected} ${r.unit},${actual} ${r.unit},Rs.${rate},Rs.${amount.toFixed(2)}\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `Month_End_Stock_Report_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `Stock_Report_${stockStartDate}_to_${stockEndDate}.csv`;
     link.click();
-    toast.success("स्टॉक रिपोर्ट डाउनलोड हो गई! 📥");
+    toast.success("कस्टम डेट के साथ स्टॉक रिपोर्ट डाउनलोड हो गई! 📥");
   };
   // 👉 NEW: Raw Material History & Stock Actions
   const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
