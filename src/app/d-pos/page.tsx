@@ -4523,7 +4523,7 @@ export default function BbCafeDesktopPos() {
                             <span>Table: {tableNumber}</span>
                           </div>
                           <div className="grid grid-cols-6 gap-1">
-                          {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName, idx) => {
+                          {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6', 'Table 7', 'Table 8', 'Table 9', 'Table 10', 'Table 11', 'Table 12'].map((tName, idx) => {
                             const isTableOccupied = activeTableOrders.some(o => o.tableNumber === tName);
                             return (
                               <button 
