@@ -418,6 +418,8 @@ export default function BbCafeDesktopPos() {
   };
   // 👉 NEW: Month End Stock Report States & Function
   const [isStockReportModalOpen, setIsStockReportModalOpen] = useState(false);
+  const [stockStartDate, setStockStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+  const [stockEndDate, setStockEndDate] = useState(new Date().toISOString().split('T')[0]);
   
  const handleDownloadStockReport = () => {
     let csv = "Item Name (माल का नाम),Opening Stock (प्रारंभिक),Received/Purchase (नई खरीद),Total Available (कुल उपलब्ध),Consumed/Used (खपत),Closing Stock (अंतिम स्टॉक),Physical Stock (असली गोदाम स्टॉक),Rate (भाव),Total Amount (कुल कीमत)\n";
