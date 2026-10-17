@@ -392,6 +392,8 @@ export default function BbCafeDesktopPos() {
   const [showPurchaseDropdown, setShowPurchaseDropdown] = useState(false); // 👉 NEW: Dropdown visibility
   const [purchaseItemList, setPurchaseItemList] = useState<any[]>([]); // 👉 NEW: Bulk लिस्ट के लिए
   // 👉 NEW: Purchase History States & Function (माल का खाता)
+   const [purchaseVendorName, setPurchaseVendorName] = useState('');
+  const [purchasePaidAmount, setPurchasePaidAmount] = useState<number | ''>('');
   const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(false);
   const [purchaseHistoryList, setPurchaseHistoryList] = useState<any[]>([]);
   const [isPurchaseHistoryLoading, setIsPurchaseHistoryLoading] = useState(false);
