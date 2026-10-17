@@ -8012,74 +8012,88 @@ const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(fal
 
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
-      {/* 👉 NEW POPUP: PURCHASE HISTORY MODAL (माल का खाता) */}
+        )}{/* 👉 NEW POPUP: PURCHASE HISTORY MODAL (माल का खाता) */}
       <AnimatePresence>
         {isPurchaseHistoryModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-3xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-4xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
               
               <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
                 <div>
                   <h3 className="font-black text-sm uppercase text-indigo-600 flex items-center gap-2">
                     <History size={18} /> Raw Material Purchase History
                   </h3>
-                  <p className="text-[10px] text-neutral-500 font-bold mt-1">अब तक खरीदे गए माल का पूरा हिसाब</p>
+                  <p className="text-[10px] text-neutral-500 font-bold mt-1">अपनी आज़ादी से (Custom Date) चुनें और माल की आवक देखें।</p>
                 </div>
-                <button onClick={() => setIsPurchaseHistoryModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
+                
+                {/* 👉 NEW: Custom Date Picker */}
+                <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-300 dark:border-neutral-700 shadow-sm">
+                  <span className="text-[10px] font-black uppercase text-neutral-500 px-1">From</span>
+                  <input type="date" value={phStartDate} onChange={e => setPhStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer" />
+                  <span className="text-[10px] font-black uppercase text-neutral-500 px-1">To</span>
+                  <input type="date" value={phEndDate} onChange={e => setPhEndDate(e.target.value)} min={phStartDate} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer" />
+                  <button onClick={() => setIsPurchaseHistoryModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-200 dark:bg-neutral-700 p-1.5 rounded-full ml-2"><X size={16} /></button>
+                </div>
               </div>
 
               {isPurchaseHistoryLoading ? (
                 <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>
               ) : (
-                <>
-                  {/* SUMMARY BOX: यहाँ दिखेगा कि कुल कितने का माल आया है */}
-                  <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 p-4 rounded-2xl shrink-0 flex justify-between items-center shadow-sm">
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">Total Purchase Amount (कुल खरीदा हुआ माल)</p>
-                      <p className="text-2xl font-black font-mono text-indigo-700 dark:text-indigo-300 mt-1">
-                        ₹{purchaseHistoryList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-black uppercase text-neutral-500">Total Entries</p>
-                      <p className="text-lg font-black text-neutral-800 dark:text-neutral-200">{purchaseHistoryList.length}</p>
-                    </div>
-                  </div>
+                (() => {
+                  // 👉 NEW: Filter list based on selected dates
+                  const filteredHistory = purchaseHistoryList.filter(item => {
+                    if (!item.date) return true;
+                    return item.date >= phStartDate && item.date <= phEndDate;
+                  });
 
-                  {/* TABLE: यहाँ लिस्ट दिखेगी कि कौन सा माल, कब, कितना और कितने का आया */}
-                  <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0">
-                        <tr>
-                          <th className="py-2.5 px-3 font-black">Date (तारीख)</th>
-                          <th className="py-2.5 px-3 font-black">Item Name</th>
-                          <th className="py-2.5 px-3 font-black text-center">Qty (मात्रा)</th>
-                          <th className="py-2.5 px-3 font-black text-right">Rate (भाव)</th>
-                          <th className="py-2.5 px-3 font-black text-right">Total (₹)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
-                        {purchaseHistoryList.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">कोई भी पुरानी एंट्री नहीं मिली।</td>
-                          </tr>
-                        ) : (
-                          purchaseHistoryList.map((item) => (
-                            <tr key={item.id} className="bg-white dark:bg-neutral-900 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
-                              <td className="py-2.5 px-3 font-bold text-neutral-700 dark:text-neutral-300">{item.date}</td>
-                              <td className="py-2.5 px-3 font-bold">{item.name}</td>
-                              <td className="py-2.5 px-3 text-center font-mono">{item.qty} <span className="text-[9px] text-neutral-500">{item.unit}</span></td>
-                              <td className="py-2.5 px-3 text-right font-mono text-neutral-500">₹{item.rate}</td>
-                              <td className="py-2.5 px-3 text-right font-mono font-black text-indigo-600 dark:text-indigo-400">₹{item.amount?.toFixed(2)}</td>
+                  return (
+                    <>
+                      <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 p-4 rounded-2xl shrink-0 flex justify-between items-center shadow-sm">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">Total Purchase Amount (चुनी गई तारीखों में)</p>
+                          <p className="text-2xl font-black font-mono text-indigo-700 dark:text-indigo-300 mt-1">
+                            ₹{filteredHistory.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-black uppercase text-neutral-500">Total Entries</p>
+                          <p className="text-lg font-black text-neutral-800 dark:text-neutral-200">{filteredHistory.length}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0">
+                            <tr>
+                              <th className="py-2.5 px-3 font-black">Date (तारीख)</th>
+                              <th className="py-2.5 px-3 font-black">Item Name</th>
+                              <th className="py-2.5 px-3 font-black text-center">Qty (मात्रा)</th>
+                              <th className="py-2.5 px-3 font-black text-right">Rate (भाव)</th>
+                              <th className="py-2.5 px-3 font-black text-right">Total (₹)</th>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
+                          </thead>
+                          <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                            {filteredHistory.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">इन तारीखों के बीच कोई एंट्री नहीं मिली।</td>
+                              </tr>
+                            ) : (
+                              filteredHistory.map((item) => (
+                                <tr key={item.id} className="bg-white dark:bg-neutral-900 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+                                  <td className="py-2.5 px-3 font-bold text-neutral-700 dark:text-neutral-300">{item.date}</td>
+                                  <td className="py-2.5 px-3 font-bold">{item.name}</td>
+                                  <td className="py-2.5 px-3 text-center font-mono">{item.qty} <span className="text-[9px] text-neutral-500">{item.unit}</span></td>
+                                  <td className="py-2.5 px-3 text-right font-mono text-neutral-500">₹{item.rate}</td>
+                                  <td className="py-2.5 px-3 text-right font-mono font-black text-indigo-600 dark:text-indigo-400">₹{item.amount?.toFixed(2)}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()
               )}
             </motion.div>
           </div>
