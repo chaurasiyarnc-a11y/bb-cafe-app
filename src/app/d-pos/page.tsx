@@ -5098,7 +5098,7 @@ export default function BbCafeDesktopPos() {
                   })}
                 </div>
                 </>
-              ) : (
+             ) : inventorySubTab === 'raw' ? (
                /* 👉 NEW: RAW MATERIALS DASHBOARD & UI */
                 <div className="space-y-4">
                   
