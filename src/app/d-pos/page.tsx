@@ -4008,8 +4008,9 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
 
-             <nav className="space-y-1.5">
+            <nav className="space-y-1.5">
                 {[
+                  { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, adminOnly: true },
                   { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
                   { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt },
