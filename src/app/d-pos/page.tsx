@@ -134,7 +134,7 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'udhari' | 'customers'>('billing');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'udhari' | 'customers'>('billing');
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
   // 👉 NEW: Cash Tendered Calculator On/Off
