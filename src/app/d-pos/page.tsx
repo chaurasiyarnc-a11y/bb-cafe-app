@@ -3244,8 +3244,9 @@ export default function BbCafeDesktopPos() {
       setIsReportLoading(false);
     }
   };
-  useEffect(() => {
-    if (activeTab === 'reports') fetchReportData();
+ useEffect(() => {
+    // 👉 अब Reports और Dashboard दोनों में डेट फ़िल्टर काम करेगा
+    if (activeTab === 'reports' || activeTab === 'dashboard') fetchReportData();
   }, [activeTab, reportFilter, customStartDate, customEndDate]);
  // Financial Summary: ONLY COMPLETED / SETTLED BILLS
   const reportSummary = useMemo(() => {
