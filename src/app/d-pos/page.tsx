@@ -8,7 +8,7 @@ import {
  deleteDoc, Timestamp, writeBatch, increment
 } from 'firebase/firestore';
 import { 
-  ShoppingBag, Search, X, Loader2, Clock, Printer, Settings, 
+  LayoutDashboard, ShoppingBag, Search, X, Loader2, Clock, Printer, Settings,
   Database, RefreshCw, Layers, LogOut, Lock, ToggleLeft, ToggleRight, 
   Trash2, UserPlus, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
   PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, 
