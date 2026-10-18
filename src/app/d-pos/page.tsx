@@ -6934,8 +6934,8 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
           </main>
-          </main>
-        </>
+      
+      </>
       )}
 
       {/* POPUP: HELP & SHORTCUTS [F1] */}
