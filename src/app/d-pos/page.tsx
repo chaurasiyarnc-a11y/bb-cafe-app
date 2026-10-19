@@ -3567,6 +3567,7 @@ export default function BbCafeDesktopPos() {
       }
       
       if (e.key === 'Escape') {
+        setCompletedOrderChange(null); // 👉 NEW: Change Popup बंद करने के लिए
         setIsHelpModalOpen(false);
         setIsHeldCartsModalOpen(false);
         setIsExpenseModalOpen(false);
