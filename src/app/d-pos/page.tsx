@@ -5520,10 +5520,11 @@ export default function BbCafeDesktopPos() {
                             </span>
                             <span className="font-mono font-black text-sm text-green-600 dark:text-green-400">₹{order.total}</span>
                             <div className="flex gap-1.5">
-                              <button 
+                             <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleReEditOrder(order);
+                                  if (currentUser?.role === 'admin') { handleReEditOrder(order); } 
+                                  else { setSecurityAction('edit'); setSecurityTargetOrder(order); setIsSecurityModalOpen(true); }
                                 }} 
                                 className="p-2 bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-black rounded-xl transition-colors"
                                 title="Edit Bill"
