@@ -1174,16 +1174,17 @@ export default function BbCafeDesktopPos() {
     return todaySettlementOrders;
   }, [todaySettlementOrders, settlementFilter]);
 
-// 🚀 OFFLINE SYNC MANAGER (Orders, Expenses, Customers)
+// 🚀 OFFLINE SYNC MANAGER (Orders, Updates, Expenses, Customers)
   const syncOfflineAll = async (isManual = false) => {
     if (!navigator.onLine) {
       if (isManual) toast.error("इंटरनेट कनेक्ट नहीं है! ⚠️");
       return;
     }
     setIsSyncing(true);
-    let orderCount = 0; let expenseCount = 0; let custCount = 0;
+    let orderCount = 0; let expenseCount = 0; let custCount = 0; let updateCount = 0;
 
     try {
+      // 1. New Orders Sync
       const offlineOrdersStr = localStorage.getItem("bb_pos_offline_orders_queue");
       if (offlineOrdersStr) {
         let queue = JSON.parse(offlineOrdersStr);
@@ -1203,52 +1204,64 @@ export default function BbCafeDesktopPos() {
         }
       }
 
+      // 2. 👉 NEW: Pending Updates Sync (Settle Bill, Clear Udhari, Table Merge)
+      const updatesQueueStr = localStorage.getItem("bb_pos_offline_updates_queue");
+      if (updatesQueueStr) {
+        let upQueue = JSON.parse(updatesQueueStr);
+        let remainingUpQueue = [...upQueue];
+        if (upQueue.length > 0) {
+          for (const up of upQueue) {
+            try {
+              if (up.action === 'delete') {
+                await deleteDoc(doc(db, up.coll, up.id));
+              } else {
+                await updateDoc(doc(db, up.coll, up.id), up.data);
+              }
+              updateCount++;
+              remainingUpQueue = remainingUpQueue.filter((u: any) => u.id !== up.id || u.timestamp !== up.timestamp);
+              localStorage.setItem("bb_pos_offline_updates_queue", JSON.stringify(remainingUpQueue));
+            } catch (err) {
+               console.error("Update sync failed for", up.id);
+            }
+          }
+          if (remainingUpQueue.length === 0) localStorage.removeItem("bb_pos_offline_updates_queue");
+        }
+      }
+
+      // 3. Expenses Sync
       const offlineExpensesStr = localStorage.getItem("bb_pos_offline_expenses_queue");
       if (offlineExpensesStr) {
         let expQueue = JSON.parse(offlineExpensesStr);
-        let remainingExpQueue = [...expQueue];
         if (expQueue.length > 0) {
           for (const exp of expQueue) {
-            await addDoc(collection(db, "daily_expenses"), {
-              ...exp,
-              timestamp: exp.timestamp ? new Date(exp.timestamp) : new Date()
-            });
+            await addDoc(collection(db, "daily_expenses"), { ...exp, timestamp: exp.timestamp ? new Date(exp.timestamp) : new Date() });
             expenseCount++;
-            remainingExpQueue = remainingExpQueue.filter((e: any) => e.title !== exp.title || e.amount !== exp.amount);
-            localStorage.setItem("bb_pos_offline_expenses_queue", JSON.stringify(remainingExpQueue));
           }
-          if (remainingExpQueue.length === 0) localStorage.removeItem("bb_pos_offline_expenses_queue");
+          localStorage.removeItem("bb_pos_offline_expenses_queue");
         }
       }
 
+      // 4. Customers Sync
       const offlineCustStr = localStorage.getItem("bb_pos_offline_customers_queue");
       if (offlineCustStr) {
         let custQueue = JSON.parse(offlineCustStr);
-        let remainingCustQueue = [...custQueue];
         if (custQueue.length > 0) {
           for (const cust of custQueue) {
             const userRef = doc(db, "customer_points", cust.phone);
-            await setDoc(userRef, {
-              ...cust,
-              lastActive: cust.lastActive ? new Date(cust.lastActive) : new Date()
-            }, { merge: true });
+            await setDoc(userRef, { ...cust, lastActive: cust.lastActive ? new Date(cust.lastActive) : new Date() }, { merge: true });
             custCount++;
-            remainingCustQueue = remainingCustQueue.filter((c: any) => c.phone !== cust.phone);
-            localStorage.setItem("bb_pos_offline_customers_queue", JSON.stringify(remainingCustQueue));
           }
-          if (remainingCustQueue.length === 0) localStorage.removeItem("bb_pos_offline_customers_queue");
+          localStorage.removeItem("bb_pos_offline_customers_queue");
         }
       }
 
-      if (orderCount > 0 || expenseCount > 0 || custCount > 0) {
-        toast.success(`Cloud Sync: ${orderCount} Orders, ${custCount} Customers Synced! ☁️✅`);
+      if (orderCount > 0 || updateCount > 0 || expenseCount > 0 || custCount > 0) {
+        toast.success(`Cloud Sync: ${orderCount} Bills, ${updateCount} Updates Synced! ☁️✅`);
         if (custCount > 0) fetchAllCustomers(); 
       } else if (isManual) {
-        // 👉 अगर सब कुछ पहले से ही सेव है
         toast.success("सभी डेटा पहले से ही क्लाउड पर सुरक्षित है! ☁️✅");
       }
 
-      // 👉 बटन को 3 सेकंड के लिए हरा (Green) करें
       setSyncSuccess(true);
       setTimeout(() => setSyncSuccess(false), 3000);
 
