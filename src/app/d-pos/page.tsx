@@ -8604,6 +8604,75 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
+                  {/* 👉 NEW POPUP: STAFF MANAGEMENT MODAL */}
+      <AnimatePresence>
+        {isStaffModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-green-600 flex items-center gap-2">
+                  <SafeUserPlus size={18} /> {editStaffId ? 'Update Staff' : 'Add New Staff'}
+                </h3>
+                <button onClick={() => setIsStaffModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+              </div>
+              
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!staffFormName.trim() || !staffFormPin.trim()) return toast.error("नाम और PIN अनिवार्य हैं!");
+                if (staffFormPin.length < 4) return toast.error("PIN कम से कम 4 अंकों का होना चाहिए!");
+
+                const toastId = toast.loading("Saving staff...");
+                try {
+                  if (editStaffId) {
+                    await updateDoc(doc(db, "cafe_users", editStaffId), { name: staffFormName, pin: staffFormPin, role: staffFormRole });
+                  } else {
+                    // डुप्लीकेट PIN चेक करें
+                    const q = query(collection(db, "cafe_users"), where("pin", "==", staffFormPin));
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                      toast.dismiss(toastId);
+                      return toast.error("❌ यह PIN पहले से किसी और का है! कोई दूसरा PIN बनाएं।");
+                    }
+                    await addDoc(collection(db, "cafe_users"), { name: staffFormName, pin: staffFormPin, role: staffFormRole });
+                  }
+                  toast.dismiss(toastId);
+                  toast.success("Staff Profile Saved! ✅");
+                  setIsStaffModalOpen(false);
+                } catch(err) {
+                  toast.dismiss(toastId);
+                  toast.error("सेव करने में समस्या आई!");
+                }
+              }} className="space-y-4">
+                
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Staff Name (नाम)</label>
+                  <input type="text" required value={staffFormName} onChange={e=>setStaffFormName(e.target.value)} placeholder="e.g. Rahul Waiter" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-green-500" />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Login PIN (पासवर्ड)</label>
+                  <input type="text" required minLength={4} maxLength={6} value={staffFormPin} onChange={e=>setStaffFormPin(e.target.value.replace(/\D/g, ''))} placeholder="e.g. 5566" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-sm font-mono font-black outline-none focus:border-green-500 tracking-widest" />
+                  <p className="text-[9px] text-neutral-400">सिर्फ नंबर डालें (कम से कम 4 अंक)</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Assign Role (अधिकार)</label>
+                  <select value={staffFormRole} onChange={e=>setStaffFormRole(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none cursor-pointer focus:border-green-500">
+                    <option value="admin">👑 Admin (मालिक - फुल एक्सेस)</option>
+                    <option value="cashier">💵 Cashier (कैशियर - बिलिंग और सेटलमेंट)</option>
+                    <option value="captain">👨‍🍳 Captain (कैप्टन - सिर्फ टेबल आर्डर)</option>
+                    <option value="delivery">🛵 Delivery Boy (डिलीवरी - सिर्फ लाइव आर्डर)</option>
+                  </select>
+                </div>
+                
+                <button type="submit" className="w-full py-3 mt-2 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
+                  Save Staff Profile
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
