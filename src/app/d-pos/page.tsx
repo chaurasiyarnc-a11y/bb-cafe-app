@@ -2895,7 +2895,13 @@ export default function BbCafeDesktopPos() {
         }
       }
 
-      await updateDoc(doc(db, "orders", orderId), updatePayload);
+     // 👉 Offline Support for Quick Settle
+      if (navigator.onLine) {
+        await updateDoc(doc(db, "orders", orderId), updatePayload);
+      } else {
+        queueOfflineUpdate("orders", orderId, updatePayload, 'update');
+      }
+      
       setLiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
       toast.dismiss(toastId);
       toast.success(`बिल सेटल हुआ [${pMethod.toUpperCase()}] और आज की बिक्री में जुड़ गया! ✅`);
