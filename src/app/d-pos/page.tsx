@@ -4133,7 +4133,7 @@ export default function BbCafeDesktopPos() {
 
            <nav className="space-y-1.5">
                 {[
-                  { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin', 'cashier'] }, // 👉 Cashier को एक्सेस दिया 
+                  { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin'] }, // 👉 Cashier को एक्सेस दिया 
                   { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag, roles: ['admin', 'cashier', 'captain'] },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock, roles: ['admin', 'cashier', 'delivery', 'captain'] },
                   { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt, roles: ['admin', 'cashier'] },
