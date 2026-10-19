@@ -4133,7 +4133,7 @@ export default function BbCafeDesktopPos() {
 
            <nav className="space-y-1.5">
                 {[
-                  { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin'] },
+                  { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin', 'cashier'] }, // 👉 Cashier को एक्सेस दिया 
                   { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag, roles: ['admin', 'cashier', 'captain'] },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock, roles: ['admin', 'cashier', 'delivery', 'captain'] },
                   { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt, roles: ['admin', 'cashier'] },
@@ -4141,7 +4141,7 @@ export default function BbCafeDesktopPos() {
                   { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] },
                   { id: 'inventory', label: 'Menu & Stock', icon: Layers, roles: ['admin'] },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer, roles: ['admin', 'cashier'] },
-                  { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3, roles: ['admin'] },
+                  { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3, roles: ['admin', 'cashier'] }, // 👉 Cashier को एक्सेस दिया
                   { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText, roles: ['admin', 'cashier'] },
                   { id: 'customers', label: 'Customers Profile', icon: SafeUserPlus, roles: ['admin', 'cashier'] },
                 ].filter((item: any) => item.roles.includes(currentUser?.role || 'cashier')).map((item) => {
