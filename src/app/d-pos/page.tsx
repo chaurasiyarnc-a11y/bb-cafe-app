@@ -5025,15 +5025,21 @@ export default function BbCafeDesktopPos() {
                                 </button>
                               </div>
                             ) : (
-                              <div className="flex gap-2">
+                             <div className="flex gap-2">
                                 <button 
-                                  onClick={() => handleReEditOrder(order)} 
+                                  onClick={() => {
+                                    if (currentUser?.role === 'admin') { handleReEditOrder(order); } 
+                                    else { setSecurityAction('edit'); setSecurityTargetOrder(order); setIsSecurityModalOpen(true); }
+                                  }} 
                                   className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow"
                                 >
                                   <SafeEdit3 size={14} /> Re-Edit
                                 </button>
                                 <button 
-                                  onClick={() => handlePrintReceiptDirect(order, false)} 
+                                  onClick={() => {
+                                    if (currentUser?.role === 'admin') { handlePrintReceiptDirect(order, false); } 
+                                    else { setSecurityAction('reprint'); setSecurityTargetOrder(order); setIsSecurityModalOpen(true); }
+                                  }} 
                                   className="px-3 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-xs font-bold flex items-center gap-1 border"
                                 >
                                   <SafePrinter size={14} /> Reprint
