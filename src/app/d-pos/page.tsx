@@ -2760,10 +2760,21 @@ export default function BbCafeDesktopPos() {
         await handlePrintReceiptDirect(orderObj, true);
       }
 
-     fetchAllCustomers(); // 👉 NEW: पॉइंट्स जुड़ते ही तुरंत UI अपडेट करें
+    fetchAllCustomers(); // 👉 NEW: पॉइंट्स जुड़ते ही तुरंत UI अपडेट करें
+      
+      // 👉 NEW: Popup Trigger - सिर्फ तभी आएगा जब Settings से स्विच ON हो
+      const tenderedAmt = Number(cashTendered) || 0;
+      if (cashTenderEnabled && paymentMethod === 'cash' && tenderedAmt > finalTotal) {
+         setCompletedOrderChange({ 
+           total: finalTotal, 
+           tendered: tenderedAmt, 
+           change: tenderedAmt - finalTotal 
+         });
+      }
+
       toast.success(`बिल #${billNumber} प्रिंट हुआ! (Daily Bills से सेटल करें)`);
       // Reset state & default pickup
-      setCart([]); 
+      setCart([]);
       setCustomerPhone(''); 
       setGuestMen('');
       setGuestWomen('');
