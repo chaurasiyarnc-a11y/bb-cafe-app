@@ -4998,8 +4998,11 @@ export default function BbCafeDesktopPos() {
                                 >
                                   📕 उधार (Due)
                                 </button>
-                                <button 
-                                  onClick={() => handleReEditOrder(order)} 
+                               <button 
+                                  onClick={() => {
+                                    if (currentUser?.role === 'admin') { handleReEditOrder(order); } 
+                                    else { setSecurityAction('edit'); setSecurityTargetOrder(order); setIsSecurityModalOpen(true); }
+                                  }} 
                                   className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-xs font-black uppercase shadow ml-2 flex items-center gap-1"
                                 >
                                   <SafeEdit3 size={14} /> Edit
