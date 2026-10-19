@@ -121,7 +121,12 @@ const getCategoryBaseCode = (catName: string): number => {
   if (c.includes('rice') || c.includes('khichdi') || c.includes('biryani')) return 900;
   return 1000;
 };
-
+// 👉 NEW: Offline Update Queue Helper
+const queueOfflineUpdate = (coll: string, id: string, data: any, action = 'update') => {
+  const q = JSON.parse(localStorage.getItem('bb_pos_offline_updates_queue') || '[]');
+  q.push({ coll, id, data, action, timestamp: new Date().toISOString() });
+  localStorage.setItem('bb_pos_offline_updates_queue', JSON.stringify(q));
+};
 export default function BbCafeDesktopPos() {
   const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
     { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
