@@ -1057,6 +1057,61 @@ export default function BbCafeDesktopPos() {
 
   // Settlement Filter
   const [settlementFilter, setSettlementFilter] = useState<'all' | 'unsettled' | 'settled'>('all');
+  // 👉 NEW: Security Logging for Edit & Reprint
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const [securityAction, setSecurityAction] = useState<'reprint' | 'edit'>('reprint');
+  const [securityTargetOrder, setSecurityTargetOrder] = useState<any>(null);
+  const [securityReason, setSecurityReason] = useState('');
+  const [securityPin, setSecurityPin] = useState('');
+
+  const handleSecurityActionConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // 1. PIN Check
+    if (securityPin.trim() !== String(currentUser?.pin)) {
+      return toast.error("❌ गलत PIN! अनुमति नहीं है।");
+    }
+    // 2. Reason Check
+    if (!securityReason.trim()) {
+      return toast.error("❌ कृपया कारण (Reason) बताएं!");
+    }
+
+    const toastId = toast.loading("प्रमाणित किया जा रहा है...");
+    try {
+      // 3. Log into Database (Audit Logs)
+      const logData = {
+        orderId: securityTargetOrder.id,
+        billNumber: securityTargetOrder.billNumber,
+        action: securityAction,
+        reason: securityReason,
+        staffName: currentUser?.name || 'Unknown Staff',
+        timestamp: new Date().toISOString()
+      };
+
+      if (navigator.onLine) {
+        await addDoc(collection(db, "audit_logs"), logData);
+      } else {
+        // Offline Save
+        const offlineLogs = JSON.parse(localStorage.getItem("bb_pos_audit_logs") || "[]");
+        offlineLogs.push(logData);
+        localStorage.setItem("bb_pos_audit_logs", JSON.stringify(offlineLogs));
+      }
+
+      toast.dismiss(toastId);
+      setIsSecurityModalOpen(false);
+      setSecurityReason('');
+      setSecurityPin('');
+
+      // 4. Execute Action
+      if (securityAction === 'edit') {
+        handleReEditOrder(securityTargetOrder);
+      } else {
+        handlePrintReceiptDirect(securityTargetOrder, false);
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("सिस्टम एरर!");
+    }
+  };
 
   // Focus & Audio Refs
   const searchInputRef = useRef<HTMLInputElement | null>(null);
