@@ -8705,10 +8705,50 @@ export default function BbCafeDesktopPos() {
                   </select>
                 </div>
                 
-                <button type="submit" className="w-full py-3 mt-2 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
+              <button type="submit" className="w-full py-3 mt-2 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
                   Save Staff Profile
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 👉 NEW POPUP: POST-CHECKOUT CASH CHANGE (बिल कटने के बाद चेंज) */}
+      <AnimatePresence>
+        {completedOrderChange && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white dark:bg-neutral-900 border-4 border-green-500 max-w-sm w-full rounded-3xl p-8 shadow-[0_0_50px_rgba(34,197,94,0.3)] text-center flex flex-col items-center">
+              
+              <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mb-4">
+                <Check size={40} className="animate-pulse" />
+              </div>
+              
+              <h2 className="text-3xl font-black uppercase text-neutral-900 dark:text-white mb-1">Bill Printed!</h2>
+              <p className="text-neutral-500 font-bold mb-6">ऑर्डर सफलतापूर्वक सेव हो गया</p>
+              
+              <div className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-2xl p-5 space-y-3 mb-6 shadow-inner">
+                <div className="flex justify-between text-sm font-bold text-neutral-600 dark:text-neutral-400">
+                  <span>Total Bill (कुल बिल):</span>
+                  <span>₹{completedOrderChange.total}</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold text-neutral-600 dark:text-neutral-400">
+                  <span>Cash Given (कैश मिला):</span>
+                  <span>₹{completedOrderChange.tendered}</span>
+                </div>
+                <div className="border-t border-dashed border-neutral-300 dark:border-neutral-600 pt-3 mt-3 flex flex-col items-center gap-1">
+                  <span className="text-xs font-black text-neutral-500 uppercase">Change to Return (वापस दें)</span>
+                  <span className="text-5xl font-black font-mono text-green-600 dark:text-green-500">₹{completedOrderChange.change}</span>
+                </div>
+              </div>
+
+              <button 
+                autoFocus
+                onClick={() => setCompletedOrderChange(null)}
+                className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-black text-sm uppercase rounded-xl shadow-lg transition-all"
+              >
+                Done [Enter]
+              </button>
             </motion.div>
           </div>
         )}
