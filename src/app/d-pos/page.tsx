@@ -229,8 +229,10 @@ export default function BbCafeDesktopPos() {
   const [newCustNameInput, setNewCustNameInput] = useState('');
   const [newCustAddressInput, setNewCustAddressInput] = useState('');
 
- // Cash Change Calculator
+// Cash Change Calculator
   const [cashTendered, setCashTendered] = useState<number | ''>('');
+  // 👉 NEW: बिल निकलने के बाद वापसी (Change) दिखाने वाला State
+  const [completedOrderChange, setCompletedOrderChange] = useState<{ total: number, tendered: number, change: number } | null>(null);
 
   const [isGameVerifyModalOpen, setIsGameVerifyModalOpen] = useState(false);
   const [gameSearchInput, setGameSearchInput] = useState('');
