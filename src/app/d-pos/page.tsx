@@ -8818,6 +8818,67 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
+      {/* 👉 NEW POPUP: SECURITY AUTHORIZATION (For Edit/Reprint) */}
+      <AnimatePresence>
+        {isSecurityModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white dark:bg-neutral-900 border-2 border-red-500 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-red-600 flex items-center gap-2">
+                  <SafeLock size={18} /> Admin Authorization
+                </h3>
+                <button onClick={() => { setIsSecurityModalOpen(false); setSecurityReason(''); setSecurityPin(''); }} className="text-neutral-500 hover:text-red-500"><X size={20} /></button>
+              </div>
+
+              <div className="text-center bg-red-50 dark:bg-red-900/20 py-3 rounded-xl border border-red-200 dark:border-red-800/50">
+                <p className="text-xs font-black uppercase text-red-700 dark:text-red-400">
+                  {securityAction === 'edit' ? '✏️ Bill Re-Edit Request' : '🖨️ Bill Reprint Request'}
+                </p>
+                <p className="text-[10px] text-red-600 dark:text-red-300 font-bold mt-1">
+                  Bill #{securityTargetOrder?.billNumber}
+                </p>
+              </div>
+
+              <form onSubmit={handleSecurityActionConfirm} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">कारण (Reason) *</label>
+                  <input 
+                    type="text" 
+                    required 
+                    autoFocus
+                    placeholder="उदा: प्रिंटर पेपर ख़त्म था / आइटम बदलना है..." 
+                    value={securityReason} 
+                    onChange={e => setSecurityReason(e.target.value)} 
+                    className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-red-500" 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Your Staff PIN *</label>
+                  <input 
+                    type="password" 
+                    required 
+                    maxLength={6} 
+                    value={securityPin} 
+                    onChange={e => setSecurityPin(e.target.value.replace(/\D/g, ''))} 
+                    placeholder="Enter PIN" 
+                    className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm font-mono font-black outline-none focus:border-red-500 tracking-widest text-center" 
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase rounded-xl shadow-lg transition-all"
+                >
+                  Verify & Continue
+                </button>
+              </form>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
