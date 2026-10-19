@@ -158,7 +158,30 @@ export default function BbCafeDesktopPos() {
   const [manualInvoiceCounterInput, setManualInvoiceCounterInput] = useState<string>('200');
 // 👉 NEW: स्मार्ट गेम कंट्रोलर (POS से गेम बदलने के लिए)
   const [activeGameType, setActiveGameType] = useState('SpinGame'); 
+// 👉 NEW: Staff Management States
+  const [staffList, setStaffList] = useState<any[]>([]);
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [staffFormName, setStaffFormName] = useState('');
+  const [staffFormPin, setStaffFormPin] = useState('');
+  const [staffFormRole, setStaffFormRole] = useState('cashier');
+  const [editStaffId, setEditStaffId] = useState<string | null>(null);
 
+  // स्टाफ लिस्ट लोड करने का इफेक्ट
+  useEffect(() => {
+    if (activeTab === 'settings' && currentUser?.role === 'admin') {
+      const unsub = onSnapshot(collection(db, "cafe_users"), (snap) => {
+        setStaffList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      return () => unsub();
+    }
+  }, [activeTab, currentUser]);
+
+  const handleDeleteStaff = async (id: string, name: string) => {
+    if(window.confirm(`⚠️ क्या आप सच में ${name} को हटाना चाहते हैं? इसके बाद वो लॉग-इन नहीं कर पाएंगे।`)) {
+      await deleteDoc(doc(db, "cafe_users", id));
+      toast.success("Staff deleted! 🗑️");
+    }
+  };
   useEffect(() => {
     if (!isLoggedIn) return;
     const unsub = onSnapshot(doc(db, "system_settings", "game_config"), (docSnap) => {
