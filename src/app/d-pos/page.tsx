@@ -6825,7 +6825,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 8: SETTINGS (CORE CONFIGURATIONS ONLY) */}
+           {/* TAB 8: SETTINGS (CORE CONFIGURATIONS ONLY) */}
             {activeTab === 'settings' && (
               <div className="flex-1 p-6 lg:p-10 h-full overflow-y-auto bg-[#f4f5f7] dark:bg-[#121212]">
                 <div className="max-w-6xl mx-auto space-y-8 pb-10">
@@ -6902,7 +6902,29 @@ export default function BbCafeDesktopPos() {
                     </div>
 
                     <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-sm lg:col-span-2 space-y-6">
-                     {/* 👉 NEW: STAFF MANAGEMENT SECTION */}
+                      <h3 className="text-sm font-black uppercase text-neutral-800 dark:text-neutral-200 border-b border-neutral-100 dark:border-neutral-800 pb-3 flex items-center gap-2">
+                        <Gamepad2 size={18} className="text-purple-500"/> Experience & Interface
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-3">
+                          <div><p className="text-xs font-bold uppercase text-purple-600 dark:text-purple-400">Active Customer Game:</p></div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {['SpinGame', 'CatchGame', 'FruitNinja', 'MemoryGame', 'Cafe2048', 'HungrySnake'].map(game => (
+                              <button key={game} onClick={() => handleToggleGame(game)} className={`py-2 px-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeGameType === game ? 'bg-purple-100 text-purple-700 ring-2 ring-purple-500' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600'}`}>{game}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <p className="text-xs font-bold uppercase text-neutral-500">UI Display Theme:</p>
+                          <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl max-w-[250px]">
+                            <button onClick={() => { setThemeMode('light'); localStorage.setItem("bb_pos_theme_pc", 'light'); document.documentElement.classList.remove('dark'); }} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase transition-all ${themeMode === 'light' ? 'bg-white text-orange-600 shadow' : 'text-neutral-500'}`}>Light Mode</button>
+                            <button onClick={() => { setThemeMode('dark'); localStorage.setItem("bb_pos_theme_pc", 'dark'); document.documentElement.classList.add('dark'); }} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase transition-all ${themeMode === 'dark' ? 'bg-neutral-900 text-amber-400 shadow' : 'text-neutral-500'}`}>Dark Mode</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 👉 NEW: STAFF MANAGEMENT SECTION */}
                     <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-sm lg:col-span-2 space-y-4">
                       <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-3">
                         <h3 className="text-sm font-black uppercase text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
@@ -6944,6 +6966,10 @@ export default function BbCafeDesktopPos() {
                         )}
                       </div>
                     </div>
+
+                  </div>
+                </div>
+              </div>
             )}
           </main>
         </>
