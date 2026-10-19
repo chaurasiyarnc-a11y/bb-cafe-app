@@ -6902,30 +6902,48 @@ export default function BbCafeDesktopPos() {
                     </div>
 
                     <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-sm lg:col-span-2 space-y-6">
-                      <h3 className="text-sm font-black uppercase text-neutral-800 dark:text-neutral-200 border-b border-neutral-100 dark:border-neutral-800 pb-3 flex items-center gap-2">
-                        <Gamepad2 size={18} className="text-purple-500"/> Experience & Interface
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-3">
-                          <div><p className="text-xs font-bold uppercase text-purple-600 dark:text-purple-400">Active Customer Game:</p></div>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {['SpinGame', 'CatchGame', 'FruitNinja', 'MemoryGame', 'Cafe2048', 'HungrySnake'].map(game => (
-                              <button key={game} onClick={() => handleToggleGame(game)} className={`py-2 px-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeGameType === game ? 'bg-purple-100 text-purple-700 ring-2 ring-purple-500' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600'}`}>{game}</button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <p className="text-xs font-bold uppercase text-neutral-500">UI Display Theme:</p>
-                          <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl max-w-[250px]">
-                            <button onClick={() => { setThemeMode('light'); localStorage.setItem("bb_pos_theme_pc", 'light'); document.documentElement.classList.remove('dark'); }} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase transition-all ${themeMode === 'light' ? 'bg-white text-orange-600 shadow' : 'text-neutral-500'}`}>Light Mode</button>
-                            <button onClick={() => { setThemeMode('dark'); localStorage.setItem("bb_pos_theme_pc", 'dark'); document.documentElement.classList.add('dark'); }} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase transition-all ${themeMode === 'dark' ? 'bg-neutral-900 text-amber-400 shadow' : 'text-neutral-500'}`}>Dark Mode</button>
-                          </div>
-                        </div>
+                     {/* 👉 NEW: STAFF MANAGEMENT SECTION */}
+                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-sm lg:col-span-2 space-y-4">
+                      <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-3">
+                        <h3 className="text-sm font-black uppercase text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
+                          <SafeUserPlus size={18} className="text-green-500"/> Staff & Role Management (स्टाफ)
+                        </h3>
+                        <button onClick={() => { setEditStaffId(null); setStaffFormName(''); setStaffFormPin(''); setStaffFormRole('cashier'); setIsStaffModalOpen(true); }} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-sm flex items-center gap-1">
+                          + Add Staff
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {staffList.length === 0 ? (
+                          <p className="text-xs text-neutral-500 col-span-full py-4 text-center">अभी तक कोई स्टाफ नहीं जोड़ा गया है।</p>
+                        ) : (
+                          staffList.map(staff => (
+                            <div key={staff.id} className="border border-neutral-200 dark:border-neutral-700 p-4 rounded-2xl flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/50 hover:border-green-500 transition-colors">
+                              <div>
+                                <p className="font-black text-sm text-neutral-900 dark:text-white uppercase">{staff.name}</p>
+                                <p className="text-[10px] text-neutral-500 font-mono mt-0.5">Login PIN: <span className="font-black text-neutral-800 dark:text-neutral-300">{staff.pin}</span></p>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded mt-2 inline-block shadow-sm border ${
+                                  staff.role === 'admin' ? 'bg-purple-100 text-purple-700 border-purple-200' : 
+                                  staff.role === 'captain' ? 'bg-blue-100 text-blue-700 border-blue-200' : 
+                                  staff.role === 'delivery' ? 'bg-orange-100 text-orange-700 border-orange-200' : 
+                                  'bg-green-100 text-green-700 border-green-200'
+                                }`}>
+                                  {staff.role}
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-2">
+                                <button onClick={() => { setEditStaffId(staff.id); setStaffFormName(staff.name); setStaffFormPin(staff.pin); setStaffFormRole(staff.role); setIsStaffModalOpen(true); }} className="p-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-sm hover:text-blue-600">
+                                  <SafeEdit3 size={14}/>
+                                </button>
+                                <button onClick={() => handleDeleteStaff(staff.id, staff.name)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-100 dark:border-red-800/50 rounded-lg shadow-sm hover:bg-red-500 hover:text-white transition-colors">
+                                  <SafeTrash2 size={14}/>
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
             )}
           </main>
         </>
