@@ -4062,20 +4062,20 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
 
-            <nav className="space-y-1.5">
+           <nav className="space-y-1.5">
                 {[
-                  { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, adminOnly: true },
-                  { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag },
-                  { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
-                  { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt },
-                  { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
-                  { id: 'settings', label: 'Settings', icon: Settings, adminOnly: true }, // 👈 सिर्फ एडमिन के लिए
-                  { id: 'inventory', label: 'Menu & Stock', icon: Layers },
-                  { id: 'receipts', label: 'Past Receipts', icon: Printer },
-                  { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3 },
-                  { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText },
-                  { id: 'customers', label: 'Customers Profile', icon: SafeUserPlus },
-                ].filter((item: any) => !item.adminOnly || currentUser?.role === 'admin').map((item) => {
+                  { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin'] },
+                  { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag, roles: ['admin', 'cashier', 'captain'] },
+                  { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock, roles: ['admin', 'cashier', 'delivery', 'captain'] },
+                  { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt, roles: ['admin', 'cashier'] },
+                  { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid, roles: ['admin', 'cashier', 'captain'] },
+                  { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] },
+                  { id: 'inventory', label: 'Menu & Stock', icon: Layers, roles: ['admin'] },
+                  { id: 'receipts', label: 'Past Receipts', icon: Printer, roles: ['admin', 'cashier'] },
+                  { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3, roles: ['admin'] },
+                  { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText, roles: ['admin', 'cashier'] },
+                  { id: 'customers', label: 'Customers Profile', icon: SafeUserPlus, roles: ['admin', 'cashier'] },
+                ].filter((item: any) => item.roles.includes(currentUser?.role || 'cashier')).map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   return (
