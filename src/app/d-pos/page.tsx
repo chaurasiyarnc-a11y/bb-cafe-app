@@ -547,20 +547,23 @@ export default function BbCafeDesktopPos() {
   const [isUdhariLoading, setIsUdhariLoading] = useState(false);
   const [udhariSearchQuery, setUdhariSearchQuery] = useState('');
 
-  const fetchDueOrders = async () => {
+ const fetchDueOrders = async () => {
     setIsUdhariLoading(true);
     try {
       if (navigator.onLine) {
         const q = query(collection(db, "orders"), where("paymentMethod", "==", "due"));
         const snap = await getDocs(q);
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        // Sort by newest first
         docs.sort((a: any, b: any) => {
            const timeA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : new Date(a.timestamp || 0).getTime();
            const timeB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : new Date(b.timestamp || 0).getTime();
            return timeB - timeA;
         });
         setDueOrders(docs);
+        localStorage.setItem("bb_pos_cached_udhari", JSON.stringify(docs)); // 👉 Cache Save
+      } else {
+        const cached = JSON.parse(localStorage.getItem("bb_pos_cached_udhari") || "[]");
+        setDueOrders(cached); // 👉 Offline Load
       }
     } catch (e) {
       toast.error("उधार लोड करने में त्रुटि आई!");
