@@ -573,15 +573,18 @@ export default function BbCafeDesktopPos() {
     if (activeTab === 'udhari') fetchDueOrders();
   }, [activeTab]);
 
-  const handleClearUdhari = async (orderId: string, method: 'cash' | 'upi') => {
+ const handleClearUdhari = async (orderId: string, method: 'cash' | 'upi') => {
     triggerBeep('tap');
     const toastId = toast.loading("उधार जमा किया जा रहा है...");
+    const payload = { paymentMethod: method, udhariClearedAt: new Date(), udhariCleared: true };
+    
     try {
-      await updateDoc(doc(db, "orders", orderId), {
-        paymentMethod: method,
-        udhariClearedAt: new Date(),
-        udhariCleared: true
-      });
+      if (navigator.onLine) {
+        await updateDoc(doc(db, "orders", orderId), payload);
+      } else {
+        queueOfflineUpdate("orders", orderId, payload, 'update'); // 👉 Offline Save
+      }
+      
       setDueOrders(prev => prev.filter(o => o.id !== orderId));
       toast.dismiss(toastId);
       toast.success(`उधार सफलतापूर्वक ${method.toUpperCase()} में जमा हो गया! ✅`);
