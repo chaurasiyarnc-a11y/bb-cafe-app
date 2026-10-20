@@ -6700,211 +6700,762 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
               </div>
             )}
             
-{/* NEW TAB: SMART DASHBOARD */}
+{/* NEW TAB: MASTER SMART DASHBOARD */}
             {activeTab === 'dashboard' && (
               <div className="flex-1 p-6 lg:p-10 h-full overflow-y-auto bg-[#f3f4f6] dark:bg-[#0a0a0a]">
                 
-                {/* 🧮 DATE-WISE CALCULATIONS FOR DASHBOARD */}
-                {(() => {
-                  let dashSale = 0; let dashOrdersCount = 0; 
-                  let dashUpi = 0; let dashCash = 0;
-                  let dashDiscount = 0; let dashPointsRedeemed = 0;
-                  let dashMen = 0; let dashWomen = 0; let dashKids = 0; let dashTotalGuests = 0;
-                  let dashGamePointsGiven = 0; let gamersCount = 0;
-                  const itemSalesMap: { [key: string]: { qty: number, rev: number } } = {};
-                  let periodUdhariGenerated = 0;
+                {/* 👉 DASHBOARD NAVIGATION BUTTONS (TABS) */}
+                <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-neutral-900 p-3 rounded-2xl shadow-sm border border-neutral-200 dark:border-neutral-800">
+                   <div>
+                     <h2 className="text-xl font-black uppercase text-neutral-900 dark:text-white flex items-center gap-2">
+                       <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-600 p-2 rounded-xl"><LayoutDashboard size={20} /></span>
+                       Master Dashboard
+                     </h2>
+                   </div>
+                   <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl shadow-inner border border-neutral-200 dark:border-neutral-700 w-full md:w-auto overflow-x-auto">
+                      <button onClick={() => setDashboardSubTab('overview')} className={`flex-1 md:flex-none px-4 py-2 text-xs font-black uppercase rounded-lg transition-all whitespace-nowrap ${dashboardSubTab === 'overview' ? 'bg-orange-600 text-white shadow-md' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>
+                         📊 Overview
+                      </button>
+                      <button onClick={() => setDashboardSubTab('sales_report')} className={`flex-1 md:flex-none px-4 py-2 text-xs font-black uppercase rounded-lg transition-all whitespace-nowrap ${dashboardSubTab === 'sales_report' ? 'bg-blue-600 text-white shadow-md' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>
+                         📈 Sales & Reports
+                      </button>
+                      <button onClick={() => setDashboardSubTab('crm_analytics')} className={`flex-1 md:flex-none px-4 py-2 text-xs font-black uppercase rounded-lg transition-all whitespace-nowrap ${dashboardSubTab === 'crm_analytics' ? 'bg-purple-600 text-white shadow-md' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>
+                         👥 CRM Analytics
+                      </button>
+                   </div>
+                </div>
 
-                  reportOrders.forEach(o => {
-                    const amt = Number(o.total) || 0;
-                    if (o.paymentMethod === 'due' && o.status !== 'rejected' && o.status !== 'cancelled') {
-                      periodUdhariGenerated += amt;
-                    }
-                    if (o.status === 'completed') {
-                      dashSale += amt;
-                      dashOrdersCount++;
-                      dashDiscount += (Number(o.discountAmount) || 0);
-                      dashPointsRedeemed += (Number(o.pointsRedeemed) || 0);
+                {/* ========================================= */}
+                {/* 1. OVERVIEW VIEW */}
+                {/* ========================================= */}
+                {dashboardSubTab === 'overview' && (
+                  (() => {
+                    let dashSale = 0; let dashOrdersCount = 0; 
+                    let dashUpi = 0; let dashCash = 0;
+                    let dashDiscount = 0; let dashPointsRedeemed = 0;
+                    let dashMen = 0; let dashWomen = 0; let dashKids = 0; let dashTotalGuests = 0;
+                    let dashGamePointsGiven = 0; let gamersCount = 0;
+                    const itemSalesMap: { [key: string]: { qty: number, rev: number } } = {};
+                    let periodUdhariGenerated = 0;
 
-                      if(o.paymentMethod === 'upi') dashUpi += amt;
-                      else if(o.paymentMethod === 'cash') dashCash += amt;
-                      else if(o.paymentMethod === 'split') {
-                         dashCash += Number(o.splitCashAmount) || 0;
-                         dashUpi += Number(o.splitUpiAmount) || 0;
+                    reportOrders.forEach(o => {
+                      const amt = Number(o.total) || 0;
+                      if (o.paymentMethod === 'due' && o.status !== 'rejected' && o.status !== 'cancelled') {
+                        periodUdhariGenerated += amt;
                       }
+                      if (o.status === 'completed') {
+                        dashSale += amt;
+                        dashOrdersCount++;
+                        dashDiscount += (Number(o.discountAmount) || 0);
+                        dashPointsRedeemed += (Number(o.pointsRedeemed) || 0);
 
-                      if (o.guests) {
-                        dashMen += (o.guests.men || 0); dashWomen += (o.guests.women || 0);
-                        dashKids += (o.guests.kids || 0); dashTotalGuests += (o.guests.total || 0);
+                        if(o.paymentMethod === 'upi') dashUpi += amt;
+                        else if(o.paymentMethod === 'cash') dashCash += amt;
+                        else if(o.paymentMethod === 'split') {
+                           dashCash += Number(o.splitCashAmount) || 0;
+                           dashUpi += Number(o.splitUpiAmount) || 0;
+                        }
+
+                        if (o.guests) {
+                          dashMen += (o.guests.men || 0); dashWomen += (o.guests.women || 0);
+                          dashKids += (o.guests.kids || 0); dashTotalGuests += (o.guests.total || 0);
+                        }
+                        if (o.promoCodeUsed || o.pointsEarned > 0) gamersCount++;
+
+                        o.items?.forEach((it: any) => {
+                           let cleanName = it.name.split('|')[0].replace(/[^\x00-\x7F]/g, "").replace(/\(\s*\)/g, "").trim();
+                           if (!cleanName) cleanName = "Menu Item";
+                           if(!itemSalesMap[cleanName]) itemSalesMap[cleanName] = { qty: 0, rev: 0 };
+                           itemSalesMap[cleanName].qty += (Number(it.quantity) || 1);
+                           itemSalesMap[cleanName].rev += (Number(it.price) * (Number(it.quantity) || 1));
+                        });
                       }
-                      if (o.promoCodeUsed || o.pointsEarned > 0) gamersCount++;
+                    });
 
-                      o.items?.forEach((it: any) => {
-                         let cleanName = it.name.split('|')[0].replace(/[^\x00-\x7F]/g, "").replace(/\(\s*\)/g, "").trim();
-                         if (!cleanName) cleanName = "Menu Item";
-                         if(!itemSalesMap[cleanName]) itemSalesMap[cleanName] = { qty: 0, rev: 0 };
-                         itemSalesMap[cleanName].qty += (Number(it.quantity) || 1);
-                         itemSalesMap[cleanName].rev += (Number(it.price) * (Number(it.quantity) || 1));
-                      });
-                    }
-                  });
+                    let dashExpense = 0;
+                    dailyExpenses.forEach(e => dashExpense += (Number(e.amount) || 0));
 
-                  let dashExpense = 0;
-                  dailyExpenses.forEach(e => dashExpense += (Number(e.amount) || 0));
+                    const dashNetProfit = dashSale - dashExpense;
+                    const dashAov = dashOrdersCount > 0 ? Math.round(dashSale / dashOrdersCount) : 0;
+                    const topItems = Object.entries(itemSalesMap).sort((a,b) => b[1].qty - a[1].qty).slice(0, 5);
+                    const lifetimePendingUdhari = dueOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
 
-                  const dashNetProfit = dashSale - dashExpense;
-                  const dashAov = dashOrdersCount > 0 ? Math.round(dashSale / dashOrdersCount) : 0;
-                  const topItems = Object.entries(itemSalesMap).sort((a,b) => b[1].qty - a[1].qty).slice(0, 5);
-                  const lifetimePendingUdhari = dueOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
-
-                  return (
-                    <div className="max-w-7xl mx-auto space-y-6 pb-10">
-                      
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-neutral-900 p-5 rounded-3xl shadow-sm border border-neutral-200 dark:border-neutral-800">
-                        <div>
-                          <h2 className="text-2xl font-black uppercase text-neutral-900 dark:text-white flex items-center gap-3 tracking-tight">
-                            <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-600 p-2 rounded-2xl"><LayoutDashboard size={24} /></span>
-                            Smart Dashboard
-                          </h2>
-                          <p className="text-[11px] text-neutral-500 font-bold mt-1">Sales, CRM & Item Insights (तारीख के अनुसार डेटा देखें)</p>
-                        </div>
-                        
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex bg-neutral-100 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-inner">
-                            <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Today</button>
-                            <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Yesterday</button>
-                            <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
-                            <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1 ${reportFilter === 'custom' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>📅 Custom</button>
-                          </div>
-                          
-                          {reportFilter === 'custom' && (
-                            <div className="flex items-center gap-2 bg-neutral-50 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
-                              <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-neutral-700 dark:text-neutral-300" />
-                              <span className="text-[10px] font-black uppercase text-neutral-400">To</span>
-                              <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-neutral-700 dark:text-neutral-300" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {isReportLoading ? (
-                        <div className="flex flex-col items-center justify-center py-20">
-                          <Loader2 className="animate-spin text-orange-500 mb-4" size={40} />
-                          <p className="text-neutral-500 font-bold uppercase text-xs tracking-widest animate-pulse">Calculating Smart Data...</p>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-2 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10 border border-emerald-200 dark:border-emerald-800/50 p-6 rounded-3xl shadow-sm relative overflow-hidden">
-                               <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none"><IndianRupee size={200}/></div>
-                               <h3 className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-4 border-b border-emerald-200 dark:border-emerald-800/50 pb-2">Financial Overview (चुनी गई तारीख का बिज़नेस)</h3>
-                               
-                               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
-                                  <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-neutral-500">Gross Sales</p>
-                                    <p className="text-3xl font-black font-mono text-neutral-900 dark:text-white">₹{dashSale}</p>
-                                    <p className="text-[10px] font-bold text-neutral-500">{dashOrdersCount} Orders Settled</p>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-red-500">Total Expenses</p>
-                                    <p className="text-3xl font-black font-mono text-red-600">-₹{dashExpense}</p>
-                                  </div>
-                                  <div className="space-y-1 border-l border-emerald-200 dark:border-emerald-800/50 pl-4">
-                                    <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">Net Profit (मुनाफ़ा)</p>
-                                    <p className={`text-3xl font-black font-mono ${dashNetProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                      {dashNetProfit >= 0 ? '+' : ''}₹{dashNetProfit}
-                                    </p>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400">Avg. Order Value</p>
-                                    <p className="text-3xl font-black font-mono text-blue-700 dark:text-blue-300">₹{dashAov}</p>
-                                  </div>
-                               </div>
-
-                               <div className="mt-6 flex justify-between items-center text-[10px] font-black uppercase bg-white dark:bg-neutral-900 p-2.5 rounded-xl shadow-inner border border-emerald-100 dark:border-neutral-800">
-                                  <span className="text-neutral-500">Payment Split:</span>
-                                  <div className="flex gap-4">
-                                    <span className="text-emerald-600 flex items-center gap-1"><IndianRupee size={12}/> Cash: ₹{dashCash}</span>
-                                    <span className="text-blue-600 flex items-center gap-1">📱 UPI: ₹{dashUpi}</span>
-                                  </div>
-                               </div>
-                            </div>
-
-                            <div className="flex flex-col gap-4">
-                              <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 p-5 rounded-3xl shadow-sm flex-1 flex flex-col justify-center relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><SafeFileText size={60} className="text-red-600"/></div>
-                                <p className="text-[10px] font-black uppercase text-red-500 mb-1">Lifetime Pending Udhari (कुल उधार)</p>
-                                <p className="text-3xl font-black font-mono text-red-600">₹{lifetimePendingUdhari}</p>
-                                <p className="text-[10px] text-red-700/70 dark:text-red-400/70 font-bold mt-1 mb-3">बाजार में आपका इतना पैसा फंसा है</p>
-                                <button onClick={() => setActiveTab('udhari')} className="bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase py-2 rounded-xl shadow-sm w-max px-4">View Khata</button>
+                    return (
+                      <div className="max-w-7xl mx-auto space-y-6 pb-10">
+                        {/* Date Filters */}
+                        <div className="flex justify-end mb-2">
+                           <div className="flex flex-col items-end gap-2">
+                              <div className="flex bg-neutral-100 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-inner">
+                                <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Today</button>
+                                <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Yesterday</button>
+                                <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
+                                <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1 ${reportFilter === 'custom' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>📅 Custom</button>
                               </div>
-                              <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 p-4 rounded-3xl shadow-sm flex items-center justify-between">
-                                <div>
-                                  <p className="text-[10px] font-black uppercase text-amber-600 mb-0.5">Udhari Given</p>
-                                  <p className="text-[9px] text-neutral-500 font-bold">(In Selected Dates)</p>
-                                </div>
-                                <p className="text-lg font-black font-mono text-amber-600">₹{periodUdhariGenerated}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm">
-                              <div className="flex justify-between items-center mb-4 border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                                <h3 className="text-xs font-black text-orange-600 uppercase flex items-center gap-2"><Layers size={16} /> Top 5 Selling Items</h3>
-                                <span className="text-[9px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-2 py-1 rounded font-bold uppercase">In Selected Dates</span>
-                              </div>
-                              {topItems.length === 0 ? (
-                                <p className="text-xs text-neutral-400 py-6 text-center italic">कोई बिक्री रिकॉर्ड नहीं मिला।</p>
-                              ) : (
-                                <div className="space-y-2">
-                                  {topItems.map(([itemName, data], idx) => (
-                                    <div key={idx} className="flex justify-between items-center bg-orange-50/50 dark:bg-orange-900/10 px-3 py-2 rounded-xl border border-orange-100 dark:border-orange-800/30">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-black text-orange-400">#{idx + 1}</span>
-                                        <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{itemName}</span>
-                                      </div>
-                                      <div className="flex items-center gap-3 text-right">
-                                        <span className="text-[11px] font-black font-mono text-neutral-500">{data.qty} Qty</span>
-                                        <span className="text-xs font-black font-mono text-green-600 dark:text-green-400 w-16">₹{data.rev}</span>
-                                      </div>
-                                    </div>
-                                  ))}
+                              {reportFilter === 'custom' && (
+                                <div className="flex items-center gap-2 bg-neutral-50 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                                  <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-neutral-700 dark:text-neutral-300" />
+                                  <span className="text-[10px] font-black uppercase text-neutral-400">To</span>
+                                  <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-neutral-700 dark:text-neutral-300" />
                                 </div>
                               )}
                             </div>
+                        </div>
 
-                            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm flex flex-col justify-between">
-                              <div className="border-b border-neutral-100 dark:border-neutral-800 pb-2 mb-4">
-                                <h3 className="text-xs font-black text-purple-600 uppercase flex items-center gap-2"><SafeUserPlus size={16} /> CRM Footfall & Loyalty</h3>
-                                <p className="text-[9px] text-neutral-400 font-bold mt-1 uppercase">Stats for Selected Period</p>
+                        {isReportLoading ? (
+                          <div className="flex flex-col items-center justify-center py-20">
+                            <Loader2 className="animate-spin text-orange-500 mb-4" size={40} />
+                            <p className="text-neutral-500 font-bold uppercase text-xs tracking-widest animate-pulse">Calculating Smart Data...</p>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                              <div className="lg:col-span-2 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10 border border-emerald-200 dark:border-emerald-800/50 p-6 rounded-3xl shadow-sm relative overflow-hidden">
+                                 <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none"><IndianRupee size={200}/></div>
+                                 <h3 className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-4 border-b border-emerald-200 dark:border-emerald-800/50 pb-2">Financial Overview (चुनी गई तारीख का बिज़नेस)</h3>
+                                 
+                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
+                                    <div className="space-y-1">
+                                      <p className="text-[10px] font-black uppercase text-neutral-500">Gross Sales</p>
+                                      <p className="text-3xl font-black font-mono text-neutral-900 dark:text-white">₹{dashSale}</p>
+                                      <p className="text-[10px] font-bold text-neutral-500">{dashOrdersCount} Orders Settled</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-[10px] font-black uppercase text-red-500">Total Expenses</p>
+                                      <p className="text-3xl font-black font-mono text-red-600">-₹{dashExpense}</p>
+                                    </div>
+                                    <div className="space-y-1 border-l border-emerald-200 dark:border-emerald-800/50 pl-4">
+                                      <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">Net Profit (मुनाफ़ा)</p>
+                                      <p className={`text-3xl font-black font-mono ${dashNetProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                        {dashNetProfit >= 0 ? '+' : ''}₹{dashNetProfit}
+                                      </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400">Avg. Order Value</p>
+                                      <p className="text-3xl font-black font-mono text-blue-700 dark:text-blue-300">₹{dashAov}</p>
+                                    </div>
+                                 </div>
+
+                                 <div className="mt-6 flex justify-between items-center text-[10px] font-black uppercase bg-white dark:bg-neutral-900 p-2.5 rounded-xl shadow-inner border border-emerald-100 dark:border-neutral-800">
+                                    <span className="text-neutral-500">Payment Split:</span>
+                                    <div className="flex gap-4">
+                                      <span className="text-emerald-600 flex items-center gap-1"><IndianRupee size={12}/> Cash: ₹{dashCash}</span>
+                                      <span className="text-blue-600 flex items-center gap-1">📱 UPI: ₹{dashUpi}</span>
+                                    </div>
+                                 </div>
                               </div>
-                              <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="bg-purple-50 dark:bg-purple-900/10 p-3 rounded-2xl border border-purple-100 dark:border-purple-800/30">
-                                  <p className="text-[10px] font-black uppercase text-purple-500 mb-1">Total Footfall (लोग आए)</p>
-                                  <p className="text-2xl font-black font-mono text-purple-700 dark:text-purple-400">{dashTotalGuests}</p>
-                                  <div className="flex gap-2 mt-2 text-[9px] font-bold text-neutral-500">
-                                    <span>👨 {dashMen}</span><span>👩 {dashWomen}</span><span>👶 {dashKids}</span>
+
+                              <div className="flex flex-col gap-4">
+                                <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 p-5 rounded-3xl shadow-sm flex-1 flex flex-col justify-center relative overflow-hidden group">
+                                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><SafeFileText size={60} className="text-red-600"/></div>
+                                  <p className="text-[10px] font-black uppercase text-red-500 mb-1">Lifetime Pending Udhari (कुल उधार)</p>
+                                  <p className="text-3xl font-black font-mono text-red-600">₹{lifetimePendingUdhari}</p>
+                                  <p className="text-[10px] text-red-700/70 dark:text-red-400/70 font-bold mt-1 mb-3">बाजार में आपका इतना पैसा फंसा है</p>
+                                  <button onClick={() => setActiveTab('udhari')} className="bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase py-2 rounded-xl shadow-sm w-max px-4">View Khata</button>
+                                </div>
+                                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 p-4 rounded-3xl shadow-sm flex items-center justify-between">
+                                  <div>
+                                    <p className="text-[10px] font-black uppercase text-amber-600 mb-0.5">Udhari Given</p>
+                                    <p className="text-[9px] text-neutral-500 font-bold">(In Selected Dates)</p>
+                                  </div>
+                                  <p className="text-lg font-black font-mono text-amber-600">₹{periodUdhariGenerated}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm">
+                                <div className="flex justify-between items-center mb-4 border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                                  <h3 className="text-xs font-black text-orange-600 uppercase flex items-center gap-2"><Layers size={16} /> Top 5 Selling Items</h3>
+                                  <span className="text-[9px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-2 py-1 rounded font-bold uppercase">In Selected Dates</span>
+                                </div>
+                                {topItems.length === 0 ? (
+                                  <p className="text-xs text-neutral-400 py-6 text-center italic">कोई बिक्री रिकॉर्ड नहीं मिला।</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {topItems.map(([itemName, data], idx) => (
+                                      <div key={idx} className="flex justify-between items-center bg-orange-50/50 dark:bg-orange-900/10 px-3 py-2 rounded-xl border border-orange-100 dark:border-orange-800/30">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-[10px] font-black text-orange-400">#{idx + 1}</span>
+                                          <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{itemName}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-right">
+                                          <span className="text-[11px] font-black font-mono text-neutral-500">{data.qty} Qty</span>
+                                          <span className="text-xs font-black font-mono text-green-600 dark:text-green-400 w-16">₹{data.rev}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm flex flex-col justify-between">
+                                <div className="border-b border-neutral-100 dark:border-neutral-800 pb-2 mb-4">
+                                  <h3 className="text-xs font-black text-purple-600 uppercase flex items-center gap-2"><SafeUserPlus size={16} /> CRM Footfall & Loyalty</h3>
+                                  <p className="text-[9px] text-neutral-400 font-bold mt-1 uppercase">Stats for Selected Period</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                  <div className="bg-purple-50 dark:bg-purple-900/10 p-3 rounded-2xl border border-purple-100 dark:border-purple-800/30">
+                                    <p className="text-[10px] font-black uppercase text-purple-500 mb-1">Total Footfall (लोग आए)</p>
+                                    <p className="text-2xl font-black font-mono text-purple-700 dark:text-purple-400">{dashTotalGuests}</p>
+                                    <div className="flex gap-2 mt-2 text-[9px] font-bold text-neutral-500">
+                                      <span>👨 {dashMen}</span><span>👩 {dashWomen}</span><span>👶 {dashKids}</span>
+                                    </div>
+                                  </div>
+                                  <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-2xl border border-blue-100 dark:border-blue-800/30">
+                                    <p className="text-[10px] font-black uppercase text-blue-500 mb-1">Gamification Hits</p>
+                                    <p className="text-2xl font-black font-mono text-blue-700 dark:text-blue-400">{gamersCount}</p>
                                   </div>
                                 </div>
-                                <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-2xl border border-blue-100 dark:border-blue-800/30">
-                                  <p className="text-[10px] font-black uppercase text-blue-500 mb-1">Gamification Hits</p>
-                                  <p className="text-2xl font-black font-mono text-blue-700 dark:text-blue-400">{gamersCount}</p>
+                                <div className="bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 flex justify-between items-center">
+                                  <div><p className="text-[10px] font-black uppercase text-neutral-500">Points Redeemed</p><p className="text-lg font-black font-mono text-red-500 mt-0.5">-₹{dashPointsRedeemed}</p></div>
+                                  <div className="text-right"><p className="text-[10px] font-black uppercase text-neutral-500">Coupon Discount</p><p className="text-lg font-black font-mono text-orange-500 mt-0.5">-₹{dashDiscount}</p></div>
                                 </div>
                               </div>
-                              <div className="bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 flex justify-between items-center">
-                                <div><p className="text-[10px] font-black uppercase text-neutral-500">Points Redeemed</p><p className="text-lg font-black font-mono text-red-500 mt-0.5">-₹{dashPointsRedeemed}</p></div>
-                                <div className="text-right"><p className="text-[10px] font-black uppercase text-neutral-500">Coupon Discount</p><p className="text-lg font-black font-mono text-orange-500 mt-0.5">-₹{dashDiscount}</p></div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()
+                )}
+
+                {/* ========================================= */}
+                {/* 2. SALES & REPORTS VIEW */}
+                {/* ========================================= */}
+                {dashboardSubTab === 'sales_report' && (
+                  <div className="max-w-7xl mx-auto space-y-6 pb-10">
+                    <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-neutral-200 dark:border-neutral-800 pb-4 gap-4">
+                      <div>
+                        <h2 className="text-lg font-black uppercase text-blue-600 dark:text-blue-500 flex items-center gap-2">
+                          <SafeBarChart3 size={20} /> Sales & Item-wise Analytics
+                        </h2>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400">Total settled sales, cash drawer reconciliation and item-wise sales report.</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-2">
+                          <button onClick={handleDownloadSummaryPDF} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                            📥 Download PDF
+                          </button>
+                          <button onClick={handleSendOwnerSummary} className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                            <SafeSend size={14} /> WhatsApp
+                          </button>
+                          <div className="flex bg-neutral-200 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-300 dark:border-neutral-700 shadow-inner">
+                            <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'today' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Today</button>
+                            <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'yesterday' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Yesterday</button>
+                            <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
+                            <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1 ${reportFilter === 'custom' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>📅 Custom</button>
+                          </div>
+                        </div>
+                        {reportFilter === 'custom' && (
+                          <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-300 dark:border-neutral-700 shadow-sm transition-all duration-300">
+                            <span className="text-[10px] font-black uppercase text-neutral-500 px-1">From</span>
+                            <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer" />
+                            <span className="text-[10px] font-black uppercase text-neutral-500 px-1">To</span>
+                            <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {isReportLoading ? (
+                      <div className="flex flex-col items-center justify-center py-20">
+                        <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
+                        <p className="text-neutral-500 font-bold uppercase text-xs tracking-widest animate-pulse">Loading Reports...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-3 xl:grid-cols-6 gap-3">
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-neutral-500">Settled Sales</p>
+                            <p className="text-xl font-black font-mono text-green-600 dark:text-green-400">₹{reportSummary.totalSale}</p>
+                            <p className="text-[9px] text-neutral-500">{reportSummary.totalOrdersCount} Settled Orders</p>
+                          </div>
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-neutral-500">Cash Received</p>
+                            <p className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">₹{reportSummary.cashSale}</p>
+                          </div>
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-neutral-500">UPI Received</p>
+                            <p className="text-xl font-black font-mono text-blue-600 dark:text-blue-400">₹{reportSummary.upiSale}</p>
+                          </div>
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-neutral-500">उधार (Due)</p>
+                            <p className="text-xl font-black font-mono text-red-600 dark:text-red-400">₹{reportSummary.dueSale}</p>
+                          </div>
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-neutral-500">Total Discount</p>
+                            <p className="text-xl font-black font-mono text-purple-600 dark:text-purple-400">₹{reportSummary.totalDiscount}</p>
+                          </div>
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-neutral-500">Net in Drawer</p>
+                            <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">₹{reportSummary.netCashInDrawer}</p>
+                          </div>
+                        </div>
+
+                        {/* Profit & Loss */}
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 border border-green-200 dark:border-green-800/30 p-5 rounded-3xl mt-4 shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
+                          <div>
+                            <h3 className="text-sm font-black uppercase text-green-700 dark:text-green-500 flex items-center gap-1.5">
+                              💰 Profit & Loss Statement (मुनाफ़ा और नुकसान)
+                            </h3>
+                            <p className="text-[10px] text-green-700/70 dark:text-green-400/70 font-bold mt-1">
+                              (कुल बिक्री - आज के कुल खर्चे = आज का शुद्ध मुनाफा)
+                            </p>
+                          </div>
+                          <div className="flex gap-4 md:gap-6 items-center bg-white dark:bg-neutral-900 p-3 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-800 overflow-x-auto no-scrollbar">
+                            <div className="text-center px-2">
+                              <p className="text-[10px] font-black uppercase text-neutral-500">Gross Sales</p>
+                              <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">₹{reportSummary.totalSale}</p>
+                            </div>
+                            <div className="text-xl font-black text-neutral-300">-</div>
+                            <div className="text-center px-2">
+                              <p className="text-[10px] font-black uppercase text-red-500">Total Expenses</p>
+                              <p className="text-lg font-black font-mono text-red-600">₹{reportSummary.totalExpenseAmount}</p>
+                            </div>
+                            <div className="text-xl font-black text-neutral-300">=</div>
+                            <div className={`text-center px-4 py-1.5 rounded-xl border ${reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800/50' : 'bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800/50'}`}>
+                              <p className={`text-[10px] font-black uppercase ${reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>Net Profit</p>
+                              <p className={`text-xl font-black font-mono ${reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                {reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? '+' : ''}₹{reportSummary.totalSale - reportSummary.totalExpenseAmount}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Cash Drawer Audit */}
+                        <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-4 shadow-sm mt-6">
+                          <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3">
+                            <div>
+                              <h3 className="text-xs font-black uppercase text-amber-600 dark:text-yellow-400">Cash Drawer Audit (गल्ला मिलान)</h3>
+                              <p className="text-[11px] text-neutral-600 dark:text-neutral-400">Expected Net Cash: <span className="font-mono text-green-600 dark:text-green-400 font-bold">₹{reportSummary.netCashInDrawer}</span></p>
+                            </div>
+                            <button onClick={() => setIsExpenseModalOpen(true)} className="px-3 py-1.5 bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30 rounded-xl text-xs font-black uppercase">
+                              + Add Expense [F6]
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <input type="number" placeholder="Counted Cash in Drawer (₹)" value={physicalCashInput} onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))} className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-4 py-2.5 text-sm font-mono text-neutral-900 dark:text-white outline-none font-bold" />
+                            {physicalCashInput !== '' && (
+                              <div className={`text-xs font-black px-4 py-2.5 rounded-xl border ${Number(physicalCashInput) === reportSummary.netCashInDrawer ? 'bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/40' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/40' : 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40'}`}>
+                                {Number(physicalCashInput) === reportSummary.netCashInDrawer ? '✅ Matched!' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? `⚠️ Excess: +₹${Number(physicalCashInput) - reportSummary.netCashInDrawer}` : `❌ Short: -₹${reportSummary.netCashInDrawer - Number(physicalCashInput)}`}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Item-Wise Table & Chart */}
+                        <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm mt-6">
+                          <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3 mb-4">
+                            <h3 className="text-xs font-black uppercase text-blue-600 dark:text-blue-500 flex items-center gap-1.5">
+                              <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट और ग्राफ
+                            </h3>
+                            <div className="flex items-center gap-3">
+                              <select value={reportCategoryFilter} onChange={e => setReportCategoryFilter(e.target.value)} className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs font-bold text-neutral-800 dark:text-neutral-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer shadow-sm">
+                                {categories.filter(c => c !== '⭐ Top Items').map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                              </select>
+                              <span className="text-[10px] text-neutral-500 font-bold bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-2 py-1 rounded-lg">
+                                {filteredItemWiseSales.length} Items
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col lg:flex-row gap-6">
+                            <div className="w-full lg:w-1/3 flex flex-col items-center bg-neutral-50 dark:bg-neutral-800/30 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                              {chartData.length === 0 || chartData.reduce((s, c) => s + c.value, 0) === 0 ? (
+                                <div className="h-48 flex items-center justify-center text-xs text-neutral-400 font-bold">चार्ट के लिए कोई डेटा नहीं है</div>
+                              ) : (
+                                <>
+                                  <div className="w-48 h-48 rounded-full flex items-center justify-center relative shadow-lg ring-4 ring-white dark:ring-neutral-900" 
+                                    style={{ background: `conic-gradient(${chartData.map((slice, i, arr) => {
+                                        const total = arr.reduce((acc, curr) => acc + curr.value, 0);
+                                        const startPercent = arr.slice(0, i).reduce((acc, curr) => acc + curr.value, 0) / total * 100;
+                                        const endPercent = startPercent + (slice.value / total * 100);
+                                        return `${CHART_COLORS[i % CHART_COLORS.length]} ${startPercent}% ${endPercent}%`;
+                                      }).join(', ')})`
+                                    }}
+                                  >
+                                    <div className="w-32 h-32 bg-white dark:bg-neutral-900 rounded-full flex flex-col items-center justify-center shadow-inner">
+                                      <span className="text-[10px] text-neutral-500 font-black uppercase">Food Items Sale</span>
+                                      <span className="text-lg font-black text-neutral-900 dark:text-white font-mono">₹{chartData.reduce((s, c) => s + c.value, 0)}</span>
+                                    </div>
+                                  </div>
+                                  <div className="mt-6 w-full max-h-36 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
+                                    {chartData.map((slice, i) => {
+                                      const total = chartData.reduce((s, c) => s + c.value, 0);
+                                      const percentage = ((slice.value / total) * 100).toFixed(1);
+                                      return (
+                                        <div key={i} className="flex justify-between items-center text-[10px]">
+                                          <div className="flex items-center gap-2 truncate pr-2">
+                                            <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}></span>
+                                            <span className="truncate font-bold text-neutral-700 dark:text-neutral-300">{slice.label}</span>
+                                          </div>
+                                          <div className="text-right shrink-0">
+                                            <span className="font-mono font-black text-neutral-900 dark:text-white mr-2">₹{slice.value}</span>
+                                            <span className="font-bold text-neutral-500 bg-neutral-200 dark:bg-neutral-800 px-1 rounded">{percentage}%</span>
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            <div className="w-full lg:w-2/3 border border-neutral-200 dark:border-neutral-800 rounded-2xl overflow-hidden flex flex-col">
+                              {filteredItemWiseSales.length === 0 ? (
+                                <p className="text-xs text-neutral-400 py-10 text-center">कोई बिक्री रिकॉर्ड नहीं मिला।</p>
+                              ) : (
+                                <div className="max-h-80 overflow-y-auto pr-1">
+                                  <table className="w-full text-left text-xs">
+                                    <thead>
+                                      <tr className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 uppercase text-[10px] sticky top-0 z-10">
+                                        <th className="py-2.5 px-3 font-black">Item Name</th>
+                                        <th className="py-2.5 px-3 font-black">Category</th>
+                                        <th className="py-2.5 px-3 font-black text-center">Qty</th>
+                                        <th className="py-2.5 px-3 font-black text-right">Revenue (₹)</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800 bg-white dark:bg-neutral-900">
+                                      {filteredItemWiseSales.map((row, idx) => (
+                                        <tr key={idx} className="hover:bg-blue-50 dark:hover:bg-neutral-800/50 transition-colors">
+                                          <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
+                                          <td className="py-2.5 px-3 text-[10px] text-neutral-500 font-bold">{row.category}</td>
+                                          <td className="py-2.5 px-3 text-center font-mono font-black text-blue-600 bg-blue-500/5">{row.quantity}</td>
+                                          <td className="py-2.5 px-3 text-right font-mono font-black text-green-600 dark:text-green-400">₹{row.revenue}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                    <tfoot className="sticky bottom-0 bg-neutral-100 dark:bg-neutral-800 border-t-2 border-neutral-300 dark:border-neutral-700 shadow-[0_-5px_10px_-2px_rgba(0,0,0,0.05)]">
+                                      <tr>
+                                        <td colSpan={2} className="py-3 px-3 font-black text-right uppercase text-neutral-800 dark:text-neutral-200 text-[11px]">
+                                          {reportCategoryFilter === 'All' ? 'कुल बिक्री (All Items) :' : `${reportCategoryFilter} Total :`}
+                                        </td>
+                                        <td className="py-3 px-3 text-center font-mono font-black text-blue-600 text-sm">
+                                          {filteredItemWiseSales.reduce((sum, item) => sum + item.quantity, 0)}
+                                        </td>
+                                        <td className="py-3 px-3 text-right font-mono font-black text-green-600 dark:text-green-400 text-sm">
+                                          ₹{filteredItemWiseSales.reduce((sum, item) => sum + item.revenue, 0)}
+                                        </td>
+                                      </tr>
+                                    </tfoot>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Graph */}
+                        {(reportFilter === 'last7days' || reportFilter === 'last30days' || reportFilter === 'custom') && dailyTrendData.length > 0 && (
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-sm mt-6 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
+                            <div className="flex justify-between items-center mb-8 relative z-10">
+                               <div>
+                                 <h3 className="text-sm font-black uppercase text-blue-600 dark:text-blue-500 flex items-center gap-2">
+                                   <SafeBarChart3 size={18} /> Sales Trend (बिक्री ग्राफ)
+                                 </h3>
+                                 <p className="text-[10px] text-neutral-500 font-bold mt-1">
+                                   {reportFilter === 'custom' ? 'चुनी गई तारीखों की बिक्री' : reportFilter === 'last30days' ? 'पिछले 30 दिनों की बिक्री का ग्राफ' : 'पिछले 7 दिनों की बिक्री का ग्राफ'}
+                                 </p>
+                               </div>
+                               <div className="text-right">
+                                 <p className="text-[9px] font-black uppercase text-neutral-500">Highest Sale</p>
+                                 <span className="text-sm font-mono font-black text-green-600 dark:text-green-400 bg-green-500/10 px-2 py-1 rounded-lg border border-green-500/20 shadow-sm">
+                                   ₹{Math.max(...dailyTrendData.map(d => d.total))}
+                                 </span>
+                               </div>
+                            </div>
+                            <div className="flex items-end gap-2 sm:gap-4 h-56 relative z-10 pt-12 border-b border-neutral-200 dark:border-neutral-800 pb-2 overflow-x-auto scrollbar-hide">
+                              {dailyTrendData.map((day, idx) => {
+                                const maxVal = Math.max(...dailyTrendData.map(d => d.total));
+                                const barHeight = maxVal > 0 && day.total > 0 ? Math.max((day.total / maxVal) * 100, 3) : 0;
+                                const todayDateStr = `${String(new Date().getDate()).padStart(2, '0')} ${new Date().toLocaleString('default', { month: 'short' })}`;
+                                const isToday = day.date === todayDateStr; 
+                                return (
+                                  <div key={idx} className="flex flex-col items-center gap-2 group h-full justify-end min-w-[32px] sm:min-w-[48px] relative">
+                                    <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:-translate-y-1 flex flex-col items-center pointer-events-none absolute -top-8 z-20">
+                                      <span className="bg-neutral-900 dark:bg-white text-white dark:text-black text-[10px] font-mono font-black px-2 py-1 rounded-lg shadow-lg whitespace-nowrap">
+                                        ₹{day.total}
+                                      </span>
+                                      <div className="w-2 h-2 bg-neutral-900 dark:bg-white rotate-45 -mt-1.5"></div>
+                                    </div>
+                                    <div className="w-full h-full bg-neutral-100 dark:bg-neutral-800/60 rounded-t-xl relative flex items-end justify-center overflow-hidden border border-neutral-200 dark:border-neutral-700/50">
+                                       {day.total > 0 ? (
+                                         <div className={`w-full rounded-t-lg transition-all duration-1000 ease-out shadow-[inset_0_4px_4px_rgba(255,255,255,0.3)] ${isToday ? 'bg-gradient-to-t from-green-600 to-emerald-400' : 'bg-gradient-to-t from-blue-600 to-cyan-400'}`} style={{ height: `${barHeight}%` }}></div>
+                                       ) : (
+                                         <div className="text-[8px] text-neutral-400 font-bold mb-2">₹0</div>
+                                       )}
+                                    </div>
+                                    <span className={`text-[10px] font-bold whitespace-nowrap ${isToday ? 'text-green-600 dark:text-green-400 font-black' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                                      {isToday ? 'Today' : day.date}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* ========================================= */}
+                {/* 3. CRM ANALYTICS VIEW */}
+                {/* ========================================= */}
+                {dashboardSubTab === 'crm_analytics' && (
+                  (() => {
+                    const totalCust = allCustomers.length;
+                    let totalGamerRevenue = 0; let gamersCount = 0; let returningGamersCount = 0;
+                    let totalAOV_Revenue = 0; let totalAOV_Visits = 0;
+                    let vipCustomers = 0; let regularCustomers = 0; let atRiskCustomers = 0; let sleepingCustomers = 0;
+                    let newCustomers7Days = 0;
+                    
+                    const fomoCustomers: any[] = [];
+                    const acqTrend = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 };
+                    const now = Date.now();
+
+                    allCustomers.forEach(c => {
+                      const lastAct = c.lastActive?.toDate ? c.lastActive.toDate().getTime() : new Date(c.lastActive || 0).getTime();
+                      const daysSince = Math.floor((now - lastAct) / (1000 * 3600 * 24));
+                      const visits = c.totalVisits || 0;
+                      const spent = c.totalSpent || 0;
+
+                      totalAOV_Revenue += spent;
+                      totalAOV_Visits += visits;
+
+                      const isGamer = c.lastPrizeWon || c.lastCatchGameScore !== undefined || (c.gamePoints && c.gamePoints > 0);
+                      if (isGamer) {
+                        gamersCount++;
+                        totalGamerRevenue += spent;
+                        if (visits > 1) returningGamersCount++;
+                      }
+
+                      const isVip = spent >= 5000 || visits >= 10;
+                      if (isVip) vipCustomers++;
+                      else if (daysSince > 30) sleepingCustomers++;
+                      else if (daysSince >= 15 && daysSince <= 30) atRiskCustomers++;
+                      else regularCustomers++;
+
+                      if (visits === 1 && daysSince <= 6) {
+                        newCustomers7Days++;
+                        acqTrend[daysSince as keyof typeof acqTrend]++;
+                      }
+
+                      if ((c.points > 40 || c.gamePoints > 40) && daysSince >= 15) {
+                        fomoCustomers.push({ ...c, daysSince });
+                      }
+                    });
+
+                    const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
+                    const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
+                    fomoCustomers.sort((a, b) => ((b.points || 0) + (b.gamePoints || 0)) - ((a.points || 0) + (a.gamePoints || 0)));
+
+                    let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0;
+                    let totalGuestRevenue = 0;
+
+                    pastReceipts.forEach(o => {
+                      if (o.status === 'completed' && o.guests && o.guests.total > 0) {
+                        totalMen += (o.guests.men || 0);
+                        totalWomen += (o.guests.women || 0);
+                        totalKids += (o.guests.kids || 0);
+                        totalGuests += (o.guests.total || 0);
+                        totalGuestRevenue += (Number(o.total) || 0);
+                      }
+                    });
+                    const avgPerHead = totalGuests > 0 ? Math.round(totalGuestRevenue / totalGuests) : 0;
+                    
+                    const hourCounts: { [key: number]: number } = {};
+                    pastReceipts.forEach(o => {
+                      if (o.status === 'completed') {
+                        const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
+                        const h = d.getHours();
+                        hourCounts[h] = (hourCounts[h] || 0) + 1;
+                      }
+                    });
+                    const sortedHours = Object.entries(hourCounts).sort((a: any, b: any) => b[1] - a[1]).slice(0, 2);
+                    const peakHoursText = sortedHours.length > 0 
+                      ? sortedHours.map(([h]) => { const hr = parseInt(h); return `${hr % 12 || 12} ${hr >= 12 ? 'PM' : 'AM'}`; }).join(' & ') 
+                      : 'Load Receipts First';
+
+                    const vipPct = totalCust > 0 ? (vipCustomers / totalCust) * 100 : 0;
+                    const regPct = totalCust > 0 ? (regularCustomers / totalCust) * 100 : 0;
+                    const riskPct = totalCust > 0 ? (atRiskCustomers / totalCust) * 100 : 0;
+                    const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
+
+                    return (
+                      <div className="max-w-7xl mx-auto space-y-6 pb-10">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800/50 p-4 rounded-2xl shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 flex items-center gap-1"><IndianRupee size={12}/> Average Order Value</p>
+                            <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white mt-1">₹{aov}</p>
+                            <p className="text-[9px] text-blue-700 dark:text-blue-300 font-bold mt-1">औसत प्रति ग्राहक खर्च (AOV)</p>
+                          </div>
+                          <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-800/50 p-4 rounded-2xl shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 flex items-center gap-1"><Gamepad2 size={12}/> Gamification ROI</p>
+                            <div className="flex items-end justify-between mt-1">
+                               <p className="text-xl font-black font-mono text-neutral-900 dark:text-white">₹{totalGamerRevenue}</p>
+                               <span className="text-[10px] font-black text-purple-700 bg-purple-200 dark:bg-purple-900 px-2 py-0.5 rounded">{gamerRetentionPct}% Retained</span>
+                            </div>
+                            <p className="text-[9px] text-purple-700 dark:text-purple-300 font-bold mt-1">गेम खेलने वालों ने खर्च किए</p>
+                          </div>
+                          <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border border-amber-200 dark:border-amber-800/50 p-4 rounded-2xl shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400 flex items-center gap-1"><Clock size={12}/> Best Visiting Hours</p>
+                            <p className="text-xl font-black font-mono text-neutral-900 dark:text-white mt-1">{peakHoursText}</p>
+                            <p className="text-[9px] text-amber-700 dark:text-amber-300 font-bold mt-1">सबसे ज़्यादा भीड़ का समय</p>
+                            <button onClick={() => { if(pastReceipts.length === 0) fetchPastReceipts(); else toast.success("Data Analyzed!"); }} className="text-[9px] font-black uppercase mt-1 text-amber-600 underline cursor-pointer">Analyze Receipts</button>
+                          </div>
+                          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl shadow-sm">
+                            <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><SafeUserPlus size={12}/> Fresh Customers</p>
+                            <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white mt-1">+{newCustomers7Days}</p>
+                            <p className="text-[9px] text-emerald-700 dark:text-emerald-300 font-bold mt-1">पिछले 7 दिनों में पहली बार आए</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-200 dark:border-blue-800/30 p-5 rounded-3xl mt-4 mb-4 shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
+                          <div>
+                            <h3 className="text-sm font-black uppercase text-blue-700 dark:text-blue-500 flex items-center gap-1.5">
+                              👥 Guest Demographics & Footfall
+                            </h3>
+                            <p className="text-[10px] text-blue-700/70 dark:text-blue-400/70 font-bold mt-1">
+                              कैफे में आने वाले लोगों का रिकॉर्ड
+                            </p>
+                          </div>
+                          <div className="flex gap-2 sm:gap-4 items-center bg-white dark:bg-neutral-900 p-3 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-800 overflow-x-auto no-scrollbar">
+                            <div className="text-center px-2 border-r border-neutral-200 dark:border-neutral-700">
+                              <p className="text-[10px] font-black uppercase text-neutral-500">👨 Men</p>
+                              <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">{totalMen}</p>
+                            </div>
+                            <div className="text-center px-2 border-r border-neutral-200 dark:border-neutral-700">
+                              <p className="text-[10px] font-black uppercase text-neutral-500">👩 Women</p>
+                              <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">{totalWomen}</p>
+                            </div>
+                            <div className="text-center px-2 border-r border-neutral-200 dark:border-neutral-700">
+                              <p className="text-[10px] font-black uppercase text-neutral-500">👶 Kids</p>
+                              <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">{totalKids}</p>
+                            </div>
+                            <div className="text-center px-2">
+                              <p className="text-[10px] font-black uppercase text-purple-600">Total</p>
+                              <p className="text-lg font-black font-mono text-purple-600">{totalGuests}</p>
+                            </div>
+                            <div className="bg-blue-100 dark:bg-blue-900/30 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/50 text-center ml-2">
+                              <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400">Avg / Head</p>
+                              <p className="text-lg font-black font-mono text-blue-600 dark:text-blue-400">₹{avgPerHead}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-5 shadow-sm flex flex-col items-center">
+                            <div className="w-full flex justify-between items-center mb-6 border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                               <h3 className="text-xs font-black uppercase text-neutral-600 dark:text-neutral-400">RFM Customer Segments</h3>
+                               <button className="text-[9px] bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded font-bold uppercase text-neutral-500">Auto-Sorted</button>
+                            </div>
+                            <div className="w-40 h-40 rounded-full relative shadow-lg ring-4 ring-neutral-50 dark:ring-neutral-950 flex items-center justify-center" style={{ background: donutGradient }}>
+                              <div className="w-24 h-24 bg-white dark:bg-neutral-900 rounded-full flex flex-col items-center justify-center shadow-inner">
+                                <span className="text-xl font-black text-neutral-900 dark:text-white">{totalCust}</span>
+                              </div>
+                            </div>
+                            <div className="mt-6 w-full grid grid-cols-2 gap-3">
+                              <div className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50">
+                                <p className="text-[10px] font-bold text-yellow-600">VIP (👑)</p>
+                                <p className="text-sm font-black font-mono text-yellow-700">{vipCustomers}</p>
+                              </div>
+                              <div className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50">
+                                <p className="text-[10px] font-bold text-green-600">Regular (🌟)</p>
+                                <p className="text-sm font-black font-mono text-green-700">{regularCustomers}</p>
+                              </div>
+                              <div className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50">
+                                <p className="text-[10px] font-bold text-orange-600">At-Risk (⚠️)</p>
+                                <p className="text-sm font-black font-mono text-orange-700">{atRiskCustomers}</p>
+                              </div>
+                              <div className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50">
+                                <p className="text-[10px] font-bold text-red-600">Sleeping (😴)</p>
+                                <p className="text-sm font-black font-mono text-red-700">{sleepingCustomers}</p>
                               </div>
                             </div>
                           </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })()}
+
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
+                            <h3 className="text-xs font-black uppercase text-neutral-600 dark:text-neutral-400 mb-2 border-b border-neutral-100 dark:border-neutral-800 pb-2">📈 New Customer Acquisition</h3>
+                            <p className="text-[10px] font-bold text-neutral-500 mb-6">कैफे में प्रतिदिन जुड़ने वाले नए ग्राहकों का ग्राफ़ (पिछले 7 दिन)</p>
+                            <div className="flex items-end justify-between h-40 mt-4 border-b border-neutral-200 dark:border-neutral-800 pb-2 relative">
+                              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 dark:opacity-10">
+                                <div className="border-b border-neutral-400 w-full h-0"></div><div className="border-b border-neutral-400 w-full h-0"></div><div className="border-b border-neutral-400 w-full h-0"></div>
+                              </div>
+                              {[6,5,4,3,2,1,0].map(dayOffset => {
+                                const count = acqTrend[dayOffset as keyof typeof acqTrend];
+                                const maxCount = Math.max(...Object.values(acqTrend)) || 1;
+                                const heightPct = (count / maxCount) * 100;
+                                const dLabel = dayOffset === 0 ? 'Today' : `${dayOffset}d ago`;
+                                return (
+                                  <div key={dayOffset} className="flex flex-col items-center gap-2 group w-8 sm:w-12 h-full justify-end relative z-10">
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-black dark:bg-white text-white dark:text-black text-[10px] font-black px-2 py-1 rounded shadow-lg whitespace-nowrap pointer-events-none">
+                                      {count} New
+                                    </div>
+                                    <div className={`w-full rounded-t-lg transition-all duration-700 relative overflow-hidden ${dayOffset === 0 ? 'bg-gradient-to-t from-emerald-600 to-green-400' : 'bg-gradient-to-t from-purple-600 to-pink-400'}`} style={{ height: `${Math.max(heightPct, 5)}%` }}></div>
+                                    <p className={`text-[9px] font-bold ${dayOffset===0 ? 'text-green-600 font-black' : 'text-neutral-500'} truncate w-full text-center`}>{dLabel}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                           <div className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10 border border-red-200 dark:border-red-800/30 rounded-3xl p-5 shadow-sm">
+                             <div className="flex justify-between items-center border-b border-red-200 dark:border-red-800/50 pb-2 mb-3">
+                               <h3 className="text-xs font-black uppercase text-red-600 dark:text-red-500 flex items-center gap-1.5"><Tag size={16}/> FOMO Marketing ⏳</h3>
+                               <span className="text-[9px] bg-red-100 dark:bg-red-900/50 text-red-600 px-2 py-1 rounded font-black uppercase animate-pulse">{fomoCustomers.length} Risking Expiry</span>
+                             </div>
+                             <p className="text-[10px] font-bold text-red-800/70 dark:text-red-300/70 mb-3">
+                               इन ग्राहकों के पास बहुत सारे पॉइंट्स जमा हैं, लेकिन ये काफी दिनों से कैफे नहीं आए हैं। इन्हें डराने (FOMO) वाला मैसेज भेजकर वापस बुलाएं!
+                             </p>
+                             <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                               {fomoCustomers.length === 0 ? (
+                                 <p className="text-xs text-neutral-500 py-6 text-center font-bold">कोई भी पॉइंट्स खतरे में नहीं हैं।</p>
+                               ) : (
+                                 fomoCustomers.slice(0, 10).map((c, idx) => {
+                                   const msg = `Hi ${c.name}, आपके Bum Bum Cafe के ⭐ ${c.points || c.gamePoints} Points एक्सपायर होने वाले हैं! 😱 आज ही आएं और अपना बिल कम करवाएं या फ्री आइटम पाएं।`;
+                                   return (
+                                     <div key={idx} className="flex justify-between items-center bg-white dark:bg-neutral-800 p-2.5 rounded-xl border border-red-100 dark:border-red-900/30 shadow-sm">
+                                       <div>
+                                         <p className="font-bold text-xs text-neutral-900 dark:text-white uppercase">{c.name}</p>
+                                         <p className="text-[10px] font-black text-red-600 dark:text-red-400 mt-0.5">⭐ {c.points || c.gamePoints} Pts • {c.daysSince} days ago</p>
+                                       </div>
+                                       <button onClick={() => window.open(`https://wa.me/91${String(c.phone || c.id).replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`, '_blank')} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase shadow-sm flex items-center gap-1">
+                                          <SafeSend size={12}/> Alert
+                                       </button>
+                                     </div>
+                                   );
+                                 })
+                               )}
+                             </div>
+                           </div>
+
+                           <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-5 shadow-sm flex flex-col">
+                             <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2 mb-3">
+                               <h3 className="text-xs font-black uppercase text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">⭐ Customer Feedback Center</h3>
+                               <span className="text-[9px] bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded font-bold text-neutral-500">Auto-Linked via WhatsApp</span>
+                             </div>
+                             <p className="text-[10px] font-bold text-neutral-500 mb-4">
+                               जो बिल आप WhatsApp पर भेजते हैं, उसमें अब एक "Feedback Link" जाता है। अगर ग्राहक "Bad 🔴" पर क्लिक करता है, तो वो मैसेज सीधा आपके WhatsApp पर आएगा।
+                             </p>
+                             <div className="flex-1 flex flex-col justify-center items-center bg-neutral-50 dark:bg-neutral-800/30 rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 p-4 text-center">
+                                <div className="flex gap-4 text-3xl mb-3 opacity-80">
+                                   <span>🟢</span><span>🟡</span><span>🔴</span>
+                                </div>
+                                <p className="text-sm font-black text-neutral-700 dark:text-neutral-300">Sentiment Tracking Active</p>
+                                <p className="text-[10px] text-neutral-500 font-bold mt-2">
+                                   अगर कोई ग्राहक शिकायत करे, तो Google Maps पर खराब रिव्यु डालने से पहले उसे कॉल करके मना लें (Damage Control)।
+                                </p>
+                             </div>
+                           </div>
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
               </div>
             )}
-
            {/* TAB 8: SETTINGS (CORE CONFIGURATIONS ONLY) */}
             {activeTab === 'settings' && (
               <div className="flex-1 p-6 lg:p-10 h-full overflow-y-auto bg-[#f4f5f7] dark:bg-[#121212]">
