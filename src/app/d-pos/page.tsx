@@ -4142,7 +4142,7 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                   { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] },
                   { id: 'inventory', label: 'Menu & Stock', icon: Layers, roles: ['admin'] },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer, roles: ['admin', 'cashier'] },
-                  { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3, roles: ['admin', 'cashier'] }, // 👉 Cashier को एक्सेस दिया
+                 
                   { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText, roles: ['admin', 'cashier'] },
                   { id: 'customers', label: 'Customers Profile', icon: SafeUserPlus, roles: ['admin', 'cashier'] },
                 ].filter((item: any) => item.roles.includes(currentUser?.role || 'cashier')).map((item) => {
