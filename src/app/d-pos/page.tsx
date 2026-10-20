@@ -484,7 +484,8 @@ export default function BbCafeDesktopPos() {
 
   // Reports
   // Reports
-  const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7days' | 'last30days' | 'custom'>('today');
+const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7days' | 'last30days' | 'custom'>('today');
+  const [dashboardSubTab, setDashboardSubTab] = useState<'overview' | 'sales_report' | 'crm_analytics'>('overview');
   const [reportCategoryFilter, setReportCategoryFilter] = useState<string>('All'); // 👈 यह लाइन यहाँ जोड़नी है
   const [customStartDate, setCustomStartDate] = useState(new Date().toISOString().split('T')[0]);
   
