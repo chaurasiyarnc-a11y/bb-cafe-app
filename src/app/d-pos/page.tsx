@@ -8772,6 +8772,60 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
           </div>
         )}
       </AnimatePresence>
+               {/* 👉 NEW POPUP: CRM SEGMENT LIST MODAL (क्लिक करने पर खुलने वाली लिस्ट) */}
+      <AnimatePresence>
+        {isSegmentModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-3xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+              
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
+                <div>
+                  <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
+                    <SafeUserPlus size={18} /> {selectedSegmentTitle}
+                  </h3>
+                  <p className="text-[10px] text-neutral-500 font-bold mt-1">
+                    कुल {selectedSegmentCustomers.length} ग्राहक इस लिस्ट में हैं। आप इन्हें सीधे WhatsApp पर मैसेज भेज सकते हैं।
+                  </p>
+                </div>
+                <button onClick={() => setIsSegmentModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {selectedSegmentCustomers.length === 0 ? (
+                  <p className="text-center text-xs font-bold text-neutral-500 py-10">इस लिस्ट में अभी कोई ग्राहक नहीं है।</p>
+                ) : (
+                  selectedSegmentCustomers.map((cust, idx) => {
+                    // WhatsApp पर भेजने वाला मैसेज
+                    const waMsg = `Hi ${cust.name}, we miss you at Bum Bum Cafe! ☕ Visit us soon to enjoy our special offers.`;
+                    
+                    return (
+                      <div key={idx} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700/50 shadow-sm hover:border-blue-400 transition-colors">
+                        <div>
+                           <p className="font-bold text-sm text-neutral-900 dark:text-white uppercase">
+                             {cust.name} <span className="text-[10px] text-neutral-500 font-mono lowercase">({cust.phone || cust.id})</span>
+                           </p>
+                           <p className="text-[10px] font-black text-neutral-600 dark:text-neutral-400 mt-1">
+                             🛒 ₹{cust.totalSpent || 0} Spent • {cust.totalVisits || 0} Visits • ⭐ {cust.points || 0} Pts
+                           </p>
+                           <p className="text-[10px] text-red-500 font-bold mt-0.5">
+                             ⏰ {cust.daysSince === 0 ? 'Today' : `${cust.daysSince} Days Ago`} (Last Active)
+                           </p>
+                        </div>
+                        <button 
+                          onClick={() => window.open(`https://wa.me/91${String(cust.phone || cust.id).replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`, '_blank')} 
+                          className="bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30 px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-colors"
+                        >
+                          <SafeSend size={13} /> Message
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>  
     </div>
   );
 }
