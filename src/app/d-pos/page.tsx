@@ -3597,7 +3597,7 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
         else { setIsHeldCartsModalOpen(prev => !prev); } 
       }
       
-      if (e.key === 'F4') { e.preventDefault(); setActiveTab('reports'); }
+     if (e.key === 'F4') { e.preventDefault(); setActiveTab('dashboard'); }
       
       if (e.key === 'F5') { 
         e.preventDefault(); 
