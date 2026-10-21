@@ -6697,24 +6697,23 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                               </div>
                             </div>
                             <div className="mt-6 w-full grid grid-cols-2 gap-3">
-                              <div className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50">
+                              <div onClick={() => handleOpenSegment('👑 VIP Customers (Top Spenders)', vipList)} className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50 cursor-pointer hover:scale-105 transition-transform shadow-sm">
                                 <p className="text-[10px] font-bold text-yellow-600">VIP (👑)</p>
-                                <p className="text-sm font-black font-mono text-yellow-700">{vipCustomers}</p>
+                                <p className="text-sm font-black font-mono text-yellow-700">{vipList.length}</p>
                               </div>
-                              <div className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50">
+                              <div onClick={() => handleOpenSegment('🌟 Regular Customers (Active)', regularList)} className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50 cursor-pointer hover:scale-105 transition-transform shadow-sm">
                                 <p className="text-[10px] font-bold text-green-600">Regular (🌟)</p>
-                                <p className="text-sm font-black font-mono text-green-700">{regularCustomers}</p>
+                                <p className="text-sm font-black font-mono text-green-700">{regularList.length}</p>
                               </div>
-                              <div className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50">
+                              <div onClick={() => handleOpenSegment('⚠️ At-Risk Customers (15-30 Days)', atRiskList)} className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50 cursor-pointer hover:scale-105 transition-transform shadow-sm">
                                 <p className="text-[10px] font-bold text-orange-600">At-Risk (⚠️)</p>
-                                <p className="text-sm font-black font-mono text-orange-700">{atRiskCustomers}</p>
+                                <p className="text-sm font-black font-mono text-orange-700">{atRiskList.length}</p>
                               </div>
-                              <div className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50">
+                              <div onClick={() => handleOpenSegment('😴 Sleeping Customers (30+ Days)', sleepingList)} className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50 cursor-pointer hover:scale-105 transition-transform shadow-sm">
                                 <p className="text-[10px] font-bold text-red-600">Sleeping (😴)</p>
-                                <p className="text-sm font-black font-mono text-red-700">{sleepingCustomers}</p>
+                                <p className="text-sm font-black font-mono text-red-700">{sleepingList.length}</p>
                               </div>
                             </div>
-                          </div>
 
                           <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
                             <h3 className="text-xs font-black uppercase text-neutral-600 dark:text-neutral-400 mb-2 border-b border-neutral-100 dark:border-neutral-800 pb-2">📈 New Customer Acquisition</h3>
