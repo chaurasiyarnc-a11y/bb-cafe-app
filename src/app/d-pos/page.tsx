@@ -9421,7 +9421,7 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                   />
                 </div>
 
-                <button 
+               <button 
                   type="submit" 
                   className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase rounded-xl shadow-lg transition-all"
                 >
@@ -9431,6 +9431,9 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
 
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
        {/* 👉 NEW POPUP: RFM CUSTOMER LIST MODAL */}
       <AnimatePresence>
         {isRfmModalOpen && (
