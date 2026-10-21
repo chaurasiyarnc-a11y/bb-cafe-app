@@ -691,6 +691,10 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
   const [custHistoryList, setCustHistoryList] = useState<any[]>([]);
   const [isCustHistoryLoading, setIsCustHistoryLoading] = useState(false);
   const [activeWaDropdown, setActiveWaDropdown] = useState<string | null>(null); // 👉 NEW: WhatsApp Menu के लिए
+  // 👉 NEW: CRM Segment Modal States (कार्ड क्लिक करने पर लिस्ट खोलने के लिए)
+  const [isSegmentModalOpen, setIsSegmentModalOpen] = useState(false);
+  const [selectedSegmentTitle, setSelectedSegmentTitle] = useState('');
+  const [selectedSegmentCustomers, setSelectedSegmentCustomers] = useState<any[]>([]);
 // 👉 NEW: Customer Analytics (Favorite Items & Points)
   const customerInsights = useMemo(() => {
     if (!custHistoryList || custHistoryList.length === 0) return null;
