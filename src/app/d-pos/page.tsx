@@ -6248,7 +6248,7 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                     const totalCust = allCustomers.length;
                     let totalGamerRevenue = 0; let gamersCount = 0; let returningGamersCount = 0;
                     let totalAOV_Revenue = 0; let totalAOV_Visits = 0;
-                    let vipCustomers = 0; let regularCustomers = 0; let atRiskCustomers = 0; let sleepingCustomers = 0;
+                    const vipList: any[] = []; const regularList: any[] = []; const atRiskList: any[] = []; const sleepingList: any[] = [];
                     let newCustomers7Days = 0;
                     
                     const fomoCustomers: any[] = [];
