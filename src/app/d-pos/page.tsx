@@ -165,10 +165,6 @@ export default function BbCafeDesktopPos() {
   const [staffFormPin, setStaffFormPin] = useState('');
   const [staffFormRole, setStaffFormRole] = useState('cashier');
   const [editStaffId, setEditStaffId] = useState<string | null>(null);
-  // 👉 NEW: RFM Customer List Modal States
-  const [isRfmModalOpen, setIsRfmModalOpen] = useState(false);
-  const [rfmModalTitle, setRfmModalTitle] = useState('');
-  const [rfmModalCustomers, setRfmModalCustomers] = useState<any[]>([]);
 
   // स्टाफ लिस्ट लोड करने का इफेक्ट
   useEffect(() => {
@@ -6248,7 +6244,7 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                     const totalCust = allCustomers.length;
                     let totalGamerRevenue = 0; let gamersCount = 0; let returningGamersCount = 0;
                     let totalAOV_Revenue = 0; let totalAOV_Visits = 0;
-                    const vipList: any[] = []; const regularList: any[] = []; const atRiskList: any[] = []; const sleepingList: any[] = [];
+                    let vipCustomers = 0; let regularCustomers = 0; let atRiskCustomers = 0; let sleepingCustomers = 0;
                     let newCustomers7Days = 0;
                     
                     const fomoCustomers: any[] = [];
@@ -6274,11 +6270,11 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                       }
 
                       // RFM Segments
-                     const isVip = spent >= 5000 || visits >= 10;
-if (isVip) vipList.push({ ...c, daysSince });
-else if (daysSince > 30) sleepingList.push({ ...c, daysSince });
-else if (daysSince >= 15 && daysSince <= 30) atRiskList.push({ ...c, daysSince });
-else regularList.push({ ...c, daysSince });
+                      const isVip = spent >= 5000 || visits >= 10;
+                      if (isVip) vipCustomers++;
+                      else if (daysSince > 30) sleepingCustomers++;
+                      else if (daysSince >= 15 && daysSince <= 30) atRiskCustomers++;
+                      else regularCustomers++;
 
                       // New Customer Trend
                       if (visits === 1 && daysSince <= 6) {
@@ -6324,9 +6320,9 @@ else regularList.push({ ...c, daysSince });
                       : 'Load Receipts First';
 
                     // Donut Chart
-                    const vipPct = totalCust > 0 ? (vipList.length / totalCust) * 100 : 0;
-const regPct = totalCust > 0 ? (regularList.length / totalCust) * 100 : 0;
-const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
+                    const vipPct = totalCust > 0 ? (vipCustomers / totalCust) * 100 : 0;
+                    const regPct = totalCust > 0 ? (regularCustomers / totalCust) * 100 : 0;
+                    const riskPct = totalCust > 0 ? (atRiskCustomers / totalCust) * 100 : 0;
                     const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
 
                     return (
@@ -6416,23 +6412,23 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                             </div>
 
                             <div className="mt-6 w-full grid grid-cols-2 gap-3">
-  <button onClick={() => { setRfmModalTitle('VIP (👑) Customers'); setRfmModalCustomers(vipList); setIsRfmModalOpen(true); }} className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors shadow-sm cursor-pointer w-full">
-    <p className="text-[10px] font-bold text-yellow-600">VIP (👑)</p>
-    <p className="text-sm font-black font-mono text-yellow-700">{vipList.length}</p>
-  </button>
-  <button onClick={() => { setRfmModalTitle('Regular (🌟) Customers'); setRfmModalCustomers(regularList); setIsRfmModalOpen(true); }} className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors shadow-sm cursor-pointer w-full">
-    <p className="text-[10px] font-bold text-green-600">Regular (🌟)</p>
-    <p className="text-sm font-black font-mono text-green-700">{regularList.length}</p>
-  </button>
-  <button onClick={() => { setRfmModalTitle('At-Risk (⚠️) Customers'); setRfmModalCustomers(atRiskList); setIsRfmModalOpen(true); }} className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors shadow-sm cursor-pointer w-full">
-    <p className="text-[10px] font-bold text-orange-600">At-Risk (⚠️)</p>
-    <p className="text-sm font-black font-mono text-orange-700">{atRiskList.length}</p>
-  </button>
-  <button onClick={() => { setRfmModalTitle('Sleeping (😴) Customers'); setRfmModalCustomers(sleepingList); setIsRfmModalOpen(true); }} className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shadow-sm cursor-pointer w-full">
-    <p className="text-[10px] font-bold text-red-600">Sleeping (😴)</p>
-    <p className="text-sm font-black font-mono text-red-700">{sleepingList.length}</p>
-  </button>
-</div>
+                              <div className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50">
+                                <p className="text-[10px] font-bold text-yellow-600">VIP (👑)</p>
+                                <p className="text-sm font-black font-mono text-yellow-700">{vipCustomers}</p>
+                              </div>
+                              <div className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50">
+                                <p className="text-[10px] font-bold text-green-600">Regular (🌟)</p>
+                                <p className="text-sm font-black font-mono text-green-700">{regularCustomers}</p>
+                              </div>
+                              <div className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50">
+                                <p className="text-[10px] font-bold text-orange-600">At-Risk (⚠️)</p>
+                                <p className="text-sm font-black font-mono text-orange-700">{atRiskCustomers}</p>
+                              </div>
+                              <div className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50">
+                                <p className="text-[10px] font-bold text-red-600">Sleeping (😴)</p>
+                                <p className="text-sm font-black font-mono text-red-700">{sleepingCustomers}</p>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Right: New Customer Acquisition Trend (Bar Chart) */}
@@ -7210,7 +7206,7 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                     const totalCust = allCustomers.length;
                     let totalGamerRevenue = 0; let gamersCount = 0; let returningGamersCount = 0;
                     let totalAOV_Revenue = 0; let totalAOV_Visits = 0;
-                    const vipList: any[] = []; const regularList: any[] = []; const atRiskList: any[] = []; const sleepingList: any[] = [];
+                    let vipCustomers = 0; let regularCustomers = 0; let atRiskCustomers = 0; let sleepingCustomers = 0;
                     let newCustomers7Days = 0;
                     
                     const fomoCustomers: any[] = [];
@@ -7234,10 +7230,11 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                       }
 
                       const isVip = spent >= 5000 || visits >= 10;
-if (isVip) vipList.push({ ...c, daysSince });
-else if (daysSince > 30) sleepingList.push({ ...c, daysSince });
-else if (daysSince >= 15 && daysSince <= 30) atRiskList.push({ ...c, daysSince });
-else regularList.push({ ...c, daysSince });
+                      if (isVip) vipCustomers++;
+                      else if (daysSince > 30) sleepingCustomers++;
+                      else if (daysSince >= 15 && daysSince <= 30) atRiskCustomers++;
+                      else regularCustomers++;
+
                       if (visits === 1 && daysSince <= 6) {
                         newCustomers7Days++;
                         acqTrend[daysSince as keyof typeof acqTrend]++;
@@ -7279,9 +7276,9 @@ else regularList.push({ ...c, daysSince });
                       ? sortedHours.map(([h]) => { const hr = parseInt(h); return `${hr % 12 || 12} ${hr >= 12 ? 'PM' : 'AM'}`; }).join(' & ') 
                       : 'Load Receipts First';
 
-                    const vipPct = totalCust > 0 ? (vipList.length / totalCust) * 100 : 0;
-const regPct = totalCust > 0 ? (regularList.length / totalCust) * 100 : 0;
-const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
+                    const vipPct = totalCust > 0 ? (vipCustomers / totalCust) * 100 : 0;
+                    const regPct = totalCust > 0 ? (regularCustomers / totalCust) * 100 : 0;
+                    const riskPct = totalCust > 0 ? (atRiskCustomers / totalCust) * 100 : 0;
                     const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
 
                     return (
@@ -7358,23 +7355,23 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                               </div>
                             </div>
                             <div className="mt-6 w-full grid grid-cols-2 gap-3">
-  <button onClick={() => { setRfmModalTitle('VIP (👑) Customers'); setRfmModalCustomers(vipList); setIsRfmModalOpen(true); }} className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors shadow-sm cursor-pointer w-full">
-    <p className="text-[10px] font-bold text-yellow-600">VIP (👑)</p>
-    <p className="text-sm font-black font-mono text-yellow-700">{vipList.length}</p>
-  </button>
-  <button onClick={() => { setRfmModalTitle('Regular (🌟) Customers'); setRfmModalCustomers(regularList); setIsRfmModalOpen(true); }} className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors shadow-sm cursor-pointer w-full">
-    <p className="text-[10px] font-bold text-green-600">Regular (🌟)</p>
-    <p className="text-sm font-black font-mono text-green-700">{regularList.length}</p>
-  </button>
-  <button onClick={() => { setRfmModalTitle('At-Risk (⚠️) Customers'); setRfmModalCustomers(atRiskList); setIsRfmModalOpen(true); }} className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors shadow-sm cursor-pointer w-full">
-    <p className="text-[10px] font-bold text-orange-600">At-Risk (⚠️)</p>
-    <p className="text-sm font-black font-mono text-orange-700">{atRiskList.length}</p>
-  </button>
-  <button onClick={() => { setRfmModalTitle('Sleeping (😴) Customers'); setRfmModalCustomers(sleepingList); setIsRfmModalOpen(true); }} className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shadow-sm cursor-pointer w-full">
-    <p className="text-[10px] font-bold text-red-600">Sleeping (😴)</p>
-    <p className="text-sm font-black font-mono text-red-700">{sleepingList.length}</p>
-  </button>
-</div>
+                              <div className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50">
+                                <p className="text-[10px] font-bold text-yellow-600">VIP (👑)</p>
+                                <p className="text-sm font-black font-mono text-yellow-700">{vipCustomers}</p>
+                              </div>
+                              <div className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50">
+                                <p className="text-[10px] font-bold text-green-600">Regular (🌟)</p>
+                                <p className="text-sm font-black font-mono text-green-700">{regularCustomers}</p>
+                              </div>
+                              <div className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50">
+                                <p className="text-[10px] font-bold text-orange-600">At-Risk (⚠️)</p>
+                                <p className="text-sm font-black font-mono text-orange-700">{atRiskCustomers}</p>
+                              </div>
+                              <div className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50">
+                                <p className="text-[10px] font-bold text-red-600">Sleeping (😴)</p>
+                                <p className="text-sm font-black font-mono text-red-700">{sleepingCustomers}</p>
+                              </div>
+                            </div>
                           </div>
 
                           <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
@@ -9422,7 +9419,7 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                   />
                 </div>
 
-               <button 
+                <button 
                   type="submit" 
                   className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase rounded-xl shadow-lg transition-all"
                 >
@@ -9434,54 +9431,6 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
           </div>
         )}
       </AnimatePresence>
-
-       {/* 👉 NEW POPUP: RFM CUSTOMER LIST MODAL */}
-      <AnimatePresence>
-        {isRfmModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-2xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
-              
-              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
-                <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
-                  <SafeUserPlus size={18} /> {rfmModalTitle}
-                </h3>
-                <button onClick={() => setIsRfmModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white transition-colors bg-neutral-100 dark:bg-neutral-800 p-2 rounded-full">
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <div className="overflow-y-auto pr-1 flex-1 space-y-3">
-                {rfmModalCustomers.length === 0 ? (
-                  <div className="text-center py-10">
-                    <p className="text-xs text-neutral-500 font-bold">इस लिस्ट में कोई ग्राहक नहीं है।</p>
-                  </div>
-                ) : (
-                  rfmModalCustomers.map((cust, idx) => (
-                    <div key={idx} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-700/50 p-3 rounded-2xl hover:border-blue-400 transition-colors shadow-sm">
-                      <div>
-                        <p className="font-bold text-sm text-neutral-900 dark:text-white uppercase">{cust.name || 'Valued Guest'}</p>
-                        <p className="text-[11px] text-neutral-500 font-mono mt-0.5">📞 {cust.phone || cust.id}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-black uppercase text-neutral-500">Spent / Visits</p>
-                        <p className="text-sm font-mono font-black text-green-600 dark:text-green-500">
-                          ₹{cust.totalSpent || 0} <span className="text-xs text-neutral-400">({cust.totalVisits || 0})</span>
-                        </p>
-                        <p className="text-[9px] text-orange-500 font-bold mt-1">
-                          Last Active: {cust.daysSince === 0 ? 'Today' : `${cust.daysSince} days ago`}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-         </div>
     </div>
   );
 }
-
