@@ -702,7 +702,7 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
     setSelectedSegmentCustomers([...list].sort((a,b) => b.daysSince - a.daysSince));
     setIsSegmentModalOpen(true);
   };
-  const [selectedSegmentCustomers, setSelectedSegmentCustomers] = useState<any[]>([]);
+  
 // 👉 NEW: Customer Analytics (Favorite Items & Points)
   const customerInsights = useMemo(() => {
     if (!custHistoryList || custHistoryList.length === 0) return null;
