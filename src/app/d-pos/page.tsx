@@ -6416,23 +6416,23 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                             </div>
 
                             <div className="mt-6 w-full grid grid-cols-2 gap-3">
-                              <div className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50">
-                                <p className="text-[10px] font-bold text-yellow-600">VIP (👑)</p>
-                                <p className="text-sm font-black font-mono text-yellow-700">{vipCustomers}</p>
-                              </div>
-                              <div className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50">
-                                <p className="text-[10px] font-bold text-green-600">Regular (🌟)</p>
-                                <p className="text-sm font-black font-mono text-green-700">{regularCustomers}</p>
-                              </div>
-                              <div className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50">
-                                <p className="text-[10px] font-bold text-orange-600">At-Risk (⚠️)</p>
-                                <p className="text-sm font-black font-mono text-orange-700">{atRiskCustomers}</p>
-                              </div>
-                              <div className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50">
-                                <p className="text-[10px] font-bold text-red-600">Sleeping (😴)</p>
-                                <p className="text-sm font-black font-mono text-red-700">{sleepingCustomers}</p>
-                              </div>
-                            </div>
+  <button onClick={() => { setRfmModalTitle('VIP (👑) Customers'); setRfmModalCustomers(vipList); setIsRfmModalOpen(true); }} className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors shadow-sm cursor-pointer w-full">
+    <p className="text-[10px] font-bold text-yellow-600">VIP (👑)</p>
+    <p className="text-sm font-black font-mono text-yellow-700">{vipList.length}</p>
+  </button>
+  <button onClick={() => { setRfmModalTitle('Regular (🌟) Customers'); setRfmModalCustomers(regularList); setIsRfmModalOpen(true); }} className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors shadow-sm cursor-pointer w-full">
+    <p className="text-[10px] font-bold text-green-600">Regular (🌟)</p>
+    <p className="text-sm font-black font-mono text-green-700">{regularList.length}</p>
+  </button>
+  <button onClick={() => { setRfmModalTitle('At-Risk (⚠️) Customers'); setRfmModalCustomers(atRiskList); setIsRfmModalOpen(true); }} className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors shadow-sm cursor-pointer w-full">
+    <p className="text-[10px] font-bold text-orange-600">At-Risk (⚠️)</p>
+    <p className="text-sm font-black font-mono text-orange-700">{atRiskList.length}</p>
+  </button>
+  <button onClick={() => { setRfmModalTitle('Sleeping (😴) Customers'); setRfmModalCustomers(sleepingList); setIsRfmModalOpen(true); }} className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shadow-sm cursor-pointer w-full">
+    <p className="text-[10px] font-bold text-red-600">Sleeping (😴)</p>
+    <p className="text-sm font-black font-mono text-red-700">{sleepingList.length}</p>
+  </button>
+</div>
                           </div>
 
                           {/* Right: New Customer Acquisition Trend (Bar Chart) */}
