@@ -6146,6 +6146,40 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                     const topItems = Object.entries(itemSalesMap).sort((a,b) => b[1].qty - a[1].qty).slice(0, 5);
                     const lifetimePendingUdhari = dueOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
 
+                    // 👉 FIX: Overview टैब में भी CRM कार्ड्स काम करें, उसके लिए लिस्ट बनाएँ
+                    const totalCust = allCustomers.length;
+                    const vipList: any[] = []; const regularList: any[] = []; 
+                    const atRiskList: any[] = []; const sleepingList: any[] = [];
+                    const newCustList: any[] = []; const fomoCustomers: any[] = [];
+                    const acqTrend = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 };
+                    const now = Date.now();
+
+                    allCustomers.forEach(c => {
+                      const lastAct = c.lastActive?.toDate ? c.lastActive.toDate().getTime() : new Date(c.lastActive || 0).getTime();
+                      const daysSince = Math.floor((now - lastAct) / (1000 * 3600 * 24));
+                      const visits = c.totalVisits || 0;
+                      const spent = c.totalSpent || 0;
+                      const custData = { ...c, daysSince };
+                      
+                      if (spent >= 5000 || visits >= 10) vipList.push(custData);
+                      else if (daysSince > 30) sleepingList.push(custData);
+                      else if (daysSince >= 15 && daysSince <= 30) atRiskList.push(custData);
+                      else regularList.push(custData);
+
+                      if (visits === 1 && daysSince <= 6) {
+                        newCustList.push(custData);
+                        if(daysSince >= 0 && daysSince <= 6) acqTrend[daysSince as keyof typeof acqTrend]++;
+                      }
+                      if ((c.points > 40 || c.gamePoints > 40) && daysSince >= 15) {
+                        fomoCustomers.push({ ...c, daysSince });
+                      }
+                    });
+                    
+                    const vipPct = totalCust > 0 ? (vipList.length / totalCust) * 100 : 0;
+                    const regPct = totalCust > 0 ? (regularList.length / totalCust) * 100 : 0;
+                    const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
+                    const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
+
                     return (
                       <div className="max-w-7xl mx-auto space-y-6 pb-10">
                         {/* Date Filters */}
