@@ -7279,9 +7279,9 @@ else regularList.push({ ...c, daysSince });
                       ? sortedHours.map(([h]) => { const hr = parseInt(h); return `${hr % 12 || 12} ${hr >= 12 ? 'PM' : 'AM'}`; }).join(' & ') 
                       : 'Load Receipts First';
 
-                    const vipPct = totalCust > 0 ? (vipCustomers / totalCust) * 100 : 0;
-                    const regPct = totalCust > 0 ? (regularCustomers / totalCust) * 100 : 0;
-                    const riskPct = totalCust > 0 ? (atRiskCustomers / totalCust) * 100 : 0;
+                    const vipPct = totalCust > 0 ? (vipList.length / totalCust) * 100 : 0;
+const regPct = totalCust > 0 ? (regularList.length / totalCust) * 100 : 0;
+const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                     const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
 
                     return (
