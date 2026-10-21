@@ -7234,11 +7234,10 @@ else regularList.push({ ...c, daysSince });
                       }
 
                       const isVip = spent >= 5000 || visits >= 10;
-                      if (isVip) vipCustomers++;
-                      else if (daysSince > 30) sleepingCustomers++;
-                      else if (daysSince >= 15 && daysSince <= 30) atRiskCustomers++;
-                      else regularCustomers++;
-
+if (isVip) vipList.push({ ...c, daysSince });
+else if (daysSince > 30) sleepingList.push({ ...c, daysSince });
+else if (daysSince >= 15 && daysSince <= 30) atRiskList.push({ ...c, daysSince });
+else regularList.push({ ...c, daysSince });
                       if (visits === 1 && daysSince <= 6) {
                         newCustomers7Days++;
                         acqTrend[daysSince as keyof typeof acqTrend]++;
