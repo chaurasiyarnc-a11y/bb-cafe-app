@@ -5869,8 +5869,7 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                   <div className="flex gap-2 items-center">
                      {/* CRM Dashboard / Directory टॉगल बटन */}
                      <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl mr-2 shadow-inner">
-                        <button onClick={() => setCustomerSubTab('directory')} className={`px-4 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${customerSubTab === 'directory' ? 'bg-orange-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'}`}>Directory (लिस्ट)</button>
-                        <button onClick={() => setCustomerSubTab('dashboard')} className={`px-4 py-1.5 text-xs font-black uppercase rounded-lg transition-all flex items-center gap-1 ${customerSubTab === 'dashboard' ? 'bg-orange-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'}`}>
+                       
                           <SafeBarChart3 size={14} /> CRM Dashboard
                         </button>
                      </div>
