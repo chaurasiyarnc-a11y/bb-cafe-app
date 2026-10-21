@@ -9481,6 +9481,7 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
         )}
       </AnimatePresence>
          </div>
+    </div>
   );
 }
 
