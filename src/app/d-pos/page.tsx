@@ -9432,8 +9432,48 @@ const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
 
             </motion.div>
           </div>
+       {/* 👉 NEW POPUP: RFM CUSTOMER LIST MODAL */}
+      <AnimatePresence>
+        {isRfmModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-2xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+              
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
+                <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
+                  <SafeUserPlus size={18} /> {rfmModalTitle}
+                </h3>
+                <button onClick={() => setIsRfmModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white transition-colors bg-neutral-100 dark:bg-neutral-800 p-2 rounded-full">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="overflow-y-auto pr-1 flex-1 space-y-3">
+                {rfmModalCustomers.length === 0 ? (
+                  <div className="text-center py-10">
+                    <p className="text-xs text-neutral-500 font-bold">इस लिस्ट में कोई ग्राहक नहीं है।</p>
+                  </div>
+                ) : (
+                  rfmModalCustomers.map((cust, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-700/50 p-3 rounded-2xl hover:border-blue-400 transition-colors shadow-sm">
+                      <div>
+                        <p className="font-bold text-sm text-neutral-900 dark:text-white uppercase">{cust.name || 'Valued Guest'}</p>
+                        <p className="text-[11px] text-neutral-500 font-mono mt-0.5">📞 {cust.phone || cust.id}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black uppercase text-neutral-500">Spent / Visits</p>
+                        <p className="text-sm font-mono font-black text-green-600 dark:text-green-500">
+                          ₹{cust.totalSpent || 0} <span className="text-xs text-neutral-400">({cust.totalVisits || 0})</span>
+                        </p>
+                        <p className="text-[9px] text-orange-500 font-bold mt-1">
+                          Last Active: {cust.daysSince === 0 ? 'Today' : `${cust.daysSince} days ago`}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
