@@ -628,7 +628,6 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
   
   const [isCustomersLoading, setIsCustomersLoading] = useState(false);
   const [customerTabSearch, setCustomerTabSearch] = useState('');
-   const [customerSubTab, setCustomerSubTab] = useState<'directory' | 'dashboard'>('dashboard'); // 👈 डिफ़ॉल्ट रूप से अब CRM Dashboard खुलेगा
 // 👉 NEW: CUSTOMER SORTING & FILTERING
   const [customerSortBy, setCustomerSortBy] = useState<'recent' | 'points_high' | 'points_low' | 'spent_high'>('recent');
   
