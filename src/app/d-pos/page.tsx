@@ -6564,8 +6564,13 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                     const totalCust = allCustomers.length;
                     let totalGamerRevenue = 0; let gamersCount = 0; let returningGamersCount = 0;
                     let totalAOV_Revenue = 0; let totalAOV_Visits = 0;
-                    let vipCustomers = 0; let regularCustomers = 0; let atRiskCustomers = 0; let sleepingCustomers = 0;
-                    let newCustomers7Days = 0;
+                    
+                    // 👉 NEW: कार्ड क्लिक करने पर दिखने वाली लिस्ट
+                    const vipList: any[] = []; 
+                    const regularList: any[] = []; 
+                    const atRiskList: any[] = []; 
+                    const sleepingList: any[] = [];
+                    const newCustList: any[] = [];
                     
                     const fomoCustomers: any[] = [];
                     const acqTrend = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 };
@@ -6587,14 +6592,17 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                         if (visits > 1) returningGamersCount++;
                       }
 
+                      // 👉 FIX: ग्राहकों को उनकी लिस्ट में डालें
+                      const custData = { ...c, daysSince };
                       const isVip = spent >= 5000 || visits >= 10;
-                      if (isVip) vipCustomers++;
-                      else if (daysSince > 30) sleepingCustomers++;
-                      else if (daysSince >= 15 && daysSince <= 30) atRiskCustomers++;
-                      else regularCustomers++;
+                      
+                      if (isVip) vipList.push(custData);
+                      else if (daysSince > 30) sleepingList.push(custData);
+                      else if (daysSince >= 15 && daysSince <= 30) atRiskList.push(custData);
+                      else regularList.push(custData);
 
                       if (visits === 1 && daysSince <= 6) {
-                        newCustomers7Days++;
+                        newCustList.push(custData);
                         acqTrend[daysSince as keyof typeof acqTrend]++;
                       }
 
@@ -6603,42 +6611,18 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                       }
                     });
 
-                    const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
-                    const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
-                    fomoCustomers.sort((a, b) => ((b.points || 0) + (b.gamePoints || 0)) - ((a.points || 0) + (a.gamePoints || 0)));
+                    // 👉 NEW: Popup खोलने का फंक्शन
+                    const handleOpenSegment = (title: string, list: any[]) => {
+                      setSelectedSegmentTitle(title);
+                      // ज्यादा दिन से जो नहीं आये, उन्हें ऊपर दिखाएं (Sort)
+                      setSelectedSegmentCustomers([...list].sort((a,b) => b.daysSince - a.daysSince));
+                      setIsSegmentModalOpen(true);
+                    };
 
-                    let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0;
-                    let totalGuestRevenue = 0;
-
-                    pastReceipts.forEach(o => {
-                      if (o.status === 'completed' && o.guests && o.guests.total > 0) {
-                        totalMen += (o.guests.men || 0);
-                        totalWomen += (o.guests.women || 0);
-                        totalKids += (o.guests.kids || 0);
-                        totalGuests += (o.guests.total || 0);
-                        totalGuestRevenue += (Number(o.total) || 0);
-                      }
-                    });
-                    const avgPerHead = totalGuests > 0 ? Math.round(totalGuestRevenue / totalGuests) : 0;
-                    
-                    const hourCounts: { [key: number]: number } = {};
-                    pastReceipts.forEach(o => {
-                      if (o.status === 'completed') {
-                        const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
-                        const h = d.getHours();
-                        hourCounts[h] = (hourCounts[h] || 0) + 1;
-                      }
-                    });
-                    const sortedHours = Object.entries(hourCounts).sort((a: any, b: any) => b[1] - a[1]).slice(0, 2);
-                    const peakHoursText = sortedHours.length > 0 
-                      ? sortedHours.map(([h]) => { const hr = parseInt(h); return `${hr % 12 || 12} ${hr >= 12 ? 'PM' : 'AM'}`; }).join(' & ') 
-                      : 'Load Receipts First';
-
-                    const vipPct = totalCust > 0 ? (vipCustomers / totalCust) * 100 : 0;
-                    const regPct = totalCust > 0 ? (regularCustomers / totalCust) * 100 : 0;
-                    const riskPct = totalCust > 0 ? (atRiskCustomers / totalCust) * 100 : 0;
+                    const vipPct = totalCust > 0 ? (vipList.length / totalCust) * 100 : 0;
+                    const regPct = totalCust > 0 ? (regularList.length / totalCust) * 100 : 0;
+                    const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                     const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
-
                     return (
                       <div className="max-w-7xl mx-auto space-y-6 pb-10">
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
