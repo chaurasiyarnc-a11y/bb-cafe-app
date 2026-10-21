@@ -165,6 +165,10 @@ export default function BbCafeDesktopPos() {
   const [staffFormPin, setStaffFormPin] = useState('');
   const [staffFormRole, setStaffFormRole] = useState('cashier');
   const [editStaffId, setEditStaffId] = useState<string | null>(null);
+  // 👉 NEW: RFM Customer List Modal States
+  const [isRfmModalOpen, setIsRfmModalOpen] = useState(false);
+  const [rfmModalTitle, setRfmModalTitle] = useState('');
+  const [rfmModalCustomers, setRfmModalCustomers] = useState<any[]>([]);
 
   // स्टाफ लिस्ट लोड करने का इफेक्ट
   useEffect(() => {
