@@ -6645,10 +6645,10 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                             <p className="text-[9px] text-amber-700 dark:text-amber-300 font-bold mt-1">सबसे ज़्यादा भीड़ का समय</p>
                             <button onClick={() => { if(pastReceipts.length === 0) fetchPastReceipts(); else toast.success("Data Analyzed!"); }} className="text-[9px] font-black uppercase mt-1 text-amber-600 underline cursor-pointer">Analyze Receipts</button>
                           </div>
-                          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl shadow-sm">
+                          <div onClick={() => handleOpenSegment('🌱 Fresh Customers (Last 7 Days)', newCustList)} className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl shadow-sm cursor-pointer hover:scale-105 transition-transform">
                             <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><SafeUserPlus size={12}/> Fresh Customers</p>
-                            <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white mt-1">+{newCustomers7Days}</p>
-                            <p className="text-[9px] text-emerald-700 dark:text-emerald-300 font-bold mt-1">पिछले 7 दिनों में पहली बार आए</p>
+                            <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white mt-1">+{newCustList.length}</p>
+                            <p className="text-[9px] text-emerald-700 dark:text-emerald-300 font-bold mt-1">पिछले 7 दिनों में पहली बार आए (Click to view)</p>
                           </div>
                         </div>
 
