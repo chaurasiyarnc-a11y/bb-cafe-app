@@ -6274,11 +6274,11 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                       }
 
                       // RFM Segments
-                      const isVip = spent >= 5000 || visits >= 10;
-                      if (isVip) vipCustomers++;
-                      else if (daysSince > 30) sleepingCustomers++;
-                      else if (daysSince >= 15 && daysSince <= 30) atRiskCustomers++;
-                      else regularCustomers++;
+                     const isVip = spent >= 5000 || visits >= 10;
+if (isVip) vipList.push({ ...c, daysSince });
+else if (daysSince > 30) sleepingList.push({ ...c, daysSince });
+else if (daysSince >= 15 && daysSince <= 30) atRiskList.push({ ...c, daysSince });
+else regularList.push({ ...c, daysSince });
 
                       // New Customer Trend
                       if (visits === 1 && daysSince <= 6) {
