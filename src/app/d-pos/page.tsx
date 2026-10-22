@@ -618,7 +618,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       return toast.error("ग्राहक का मोबाइल नंबर सही नहीं है!");
     }
 
-    // 👉 स्मार्ट लॉजिक: सभी बिलों के नंबर साफ करके मैच करें ताकि +91 वाला कोई बिल छूटे नहीं
+    // 👉 स्मार्ट लॉजिक: सभी बिलों के नंबर साफ करके मैच करें
     const customerBills = dueOrders.filter(o => {
        const oPhone = String(o.customerPhone || '').replace(/\D/g, '').slice(-10);
        return oPhone === targetCleanPhone;
@@ -629,15 +629,18 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     // सारे बिलों की लिस्ट बनाएं (Bill No, Date, Amount)
     const billDetails = customerBills.map(o => {
       const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
-      // Date को सुरक्षित फॉर्मेट में दिखाएं
       const dateStr = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
       return `• Bill #${o.billNumber || 'N/A'} (${dateStr}): ₹${o.total}`;
     }).join('\n');
 
-    // शानदार WhatsApp मैसेज तैयार करें
-    const msg = `*☕ BUM BUM CAFE - Payment Reminder*\n------------------------------\nHello ${targetOrder.customerName || 'Customer'},\n\nआपका हमारे कैफे में कुछ पिछला बकाया (Udhari) है। कृपया समय निकालकर इसे जमा करा दें। 🙏\n\n*कुल बकाया राशि (Total Due): ₹${totalDue}*\n\n*बिलों का विवरण (${customerBills.length} Bills):*\n${billDetails}\n------------------------------\nThank you! 💛`;
+    // 👉 डायनामिक UPI पेमेंट स्ट्रिंग और QR Code लिंक बनाना (जिसमे अमाउंट फिक्स होगा)
+    const upiString = `upi://pay?pa=${upiIdConfig}&pn=Bum%20Bum%20Cafe&am=${totalDue}&cu=INR`;
+    const qrImageLink = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiString)}`;
+
+    // शानदार WhatsApp मैसेज तैयार करें (UPI ID और QR लिंक के साथ)
+    const msg = `*☕ BUM BUM CAFE - Payment Reminder*\n------------------------------\nHello ${targetOrder.customerName || 'Customer'},\n\nआपका हमारे कैफे में कुछ पिछला बकाया (Udhari) है। कृपया समय निकालकर इसे जमा करा दें। 🙏\n\n*कुल बकाया राशि (Total Due): ₹${totalDue}*\n\n*बिलों का विवरण (${customerBills.length} Bills):*\n${billDetails}\n\n------------------------------\n*📱 ऑनलाइन पेमेंट के लिए:*\n👉 *UPI ID:* ${upiIdConfig}\n\n*QR Code स्कैन करने के लिए नीचे दिए गए लिंक पर क्लिक करें:*\n${qrImageLink}\n------------------------------\nThank you! 💛`;
     
-    // 👉 Encode करना बहुत ज़रूरी है, वरना आधी डिटेल कट जाएगी!
+    // मैसेज को एन्कोड करके WhatsApp पर भेजें
     window.open(`https://wa.me/91${targetCleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
