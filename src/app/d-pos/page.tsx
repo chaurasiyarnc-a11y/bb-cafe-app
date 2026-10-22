@@ -568,6 +568,12 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
 
  const [isSyncing, setIsSyncing] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState(false); // 👉 NEW: हरा रंग दिखाने के लिए
+
+  // 👉 NEW: CRM Segment Modal States
+  const [isSegmentModalOpen, setIsSegmentModalOpen] = useState(false);
+  const [selectedSegmentTitle, setSelectedSegmentTitle] = useState('');
+  const [selectedSegmentCustomers, setSelectedSegmentCustomers] = useState<any[]>([]);
+
 // --- UDHARI BOOK STATES & LOGIC ---
   const [dueOrders, setDueOrders] = useState<any[]>([]);
   const [isUdhariLoading, setIsUdhariLoading] = useState(false);
