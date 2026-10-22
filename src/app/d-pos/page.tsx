@@ -1810,6 +1810,64 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       setShowNewCustForm(false);
     }
   };
+  // 👉 NEW: स्मार्ट उधार चेकर और अलर्ट पॉपअप
+  const checkAndAlertUdhari = async (phone: string, custName: string) => {
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) return;
+
+    let customerBills = [];
+
+    try {
+      if (navigator.onLine) {
+        // डेटाबेस से इस ग्राहक के उधार बिल खोजें
+        const q1 = query(collection(db, "orders"), where("customerPhone", "==", `+91${cleanPhone}`), where("paymentMethod", "==", "due"));
+        const q2 = query(collection(db, "orders"), where("customerPhone", "==", cleanPhone), where("paymentMethod", "==", "due"));
+        
+        const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+        customerBills = [...snap1.docs, ...snap2.docs].map(d => ({ id: d.id, ...d.data() }));
+      } else {
+        // ऑफलाइन चेक करें
+        const cached = JSON.parse(localStorage.getItem("bb_pos_cached_udhari") || "[]");
+        customerBills = cached.filter((o: any) => {
+           const oPhone = String(o.customerPhone || '').replace(/\D/g, '').slice(-10);
+           return oPhone === cleanPhone;
+        });
+      }
+
+      // रिजेक्ट बिल हटा दें और टोटल निकालें
+      customerBills = customerBills.filter(o => o.status !== 'rejected' && o.status !== 'cancelled');
+      
+      // डुप्लीकेट बिल हटाने के लिए
+      const uniqueBills = Array.from(new Map(customerBills.map(item => [item.id, item])).values());
+      const totalDue = uniqueBills.reduce((acc, o) => acc + Number(o.total || 0), 0);
+      
+      // अगर उधार है तो पॉपअप दिखाएं
+      if (totalDue > 0) {
+        triggerBeep('alarm'); // अलार्म साउंड बजेगा!
+        toast.custom((t) => (
+          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white dark:bg-neutral-900 shadow-[0_0_40px_rgba(239,68,68,0.4)] rounded-2xl pointer-events-auto flex flex-col border-4 border-red-500 overflow-hidden z-[9999]`}>
+            <div className="bg-red-500 p-3 text-center">
+              <p className="font-black uppercase text-white tracking-widest flex justify-center items-center gap-2">
+                 ⚠️ उधार अलर्ट (Udhari Alert)
+              </p>
+            </div>
+            <div className="p-5 text-center space-y-2 bg-red-50 dark:bg-red-900/10">
+              <p className="text-sm font-bold text-red-800 dark:text-red-300">ग्राहक: {custName}</p>
+              <p className="text-4xl font-black font-mono text-red-600">₹{totalDue}</p>
+              <p className="text-xs font-bold text-red-700 dark:text-red-400 bg-red-200 dark:bg-red-900/50 p-2 rounded-lg mt-2">
+                कुल {uniqueBills.length} बिल पेंडिंग हैं। <br/> कृपया नया बिल बनाने से पहले पैसे मांगें!
+              </p>
+            </div>
+            <button onClick={() => toast.dismiss(t.id)} className="w-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 py-3 font-black uppercase text-sm hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors">
+              ठीक है (Dismiss)
+            </button>
+          </div>
+        ), { duration: 15000 }); // यह 15 सेकंड तक स्क्रीन पर रुका रहेगा
+      }
+    } catch (e) {
+      console.error("Udhari Check Error", e);
+    }
+  };
   // ड्रॉपडाउन से कस्टमर सेलेक्ट करने पर
   const handleSelectDropdownCustomer = (cust: any) => {
     triggerBeep('tap');
