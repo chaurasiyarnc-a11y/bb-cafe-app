@@ -6596,11 +6596,10 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                       }
 
                       const isVip = spent >= 5000 || visits >= 10;
-                      if (isVip) vipCustomers++;
-                      else if (daysSince > 30) sleepingCustomers++;
-                      else if (daysSince >= 15 && daysSince <= 30) atRiskCustomers++;
-                      else regularCustomers++;
-
+                      if (isVip) vipList.push(c);
+                      else if (daysSince > 30) sleepingList.push(c);
+                      else if (daysSince >= 15 && daysSince <= 30) atRiskList.push(c);
+                      else regularList.push(c);
                       if (visits === 1 && daysSince <= 6) {
                         newCustomers7Days++;
                         acqTrend[daysSince as keyof typeof acqTrend]++;
