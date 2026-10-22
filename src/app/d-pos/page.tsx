@@ -6652,25 +6652,23 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                         fomoCustomers.push({ ...c, daysSince });
                       }
                     });
-// 👇 यहाँ से मिसिंग वेरिएबल्स ऐड करें 👇
 const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
-const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
+                    const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
 
-let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0; let crmSale = 0;
-reportOrders.forEach(o => {
-  if (o.status === 'completed') {
-    crmSale += Number(o.total) || 0;
-    if (o.guests) {
-      totalMen += (Number(o.guests.men) || 0);
-      totalWomen += (Number(o.guests.women) || 0);
-      totalKids += (Number(o.guests.kids) || 0);
-      totalGuests += (Number(o.guests.total) || 0);
-    }
-  }
-});
-const avgPerHead = totalGuests > 0 ? Math.round(crmSale / totalGuests) : 0;
-const peakHoursText = "6:00 PM - 9:00 PM";
-// 👆 बस इतना ही पेस्ट करना है 👆
+                    let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0; let crmSale = 0;
+                    reportOrders.forEach(o => {
+                      if (o.status === 'completed') {
+                        crmSale += Number(o.total) || 0;
+                        if (o.guests) {
+                          totalMen += (Number(o.guests.men) || 0);
+                          totalWomen += (Number(o.guests.women) || 0);
+                          totalKids += (Number(o.guests.kids) || 0);
+                          totalGuests += (Number(o.guests.total) || 0);
+                        }
+                      }
+                    });
+                    const avgPerHead = totalGuests > 0 ? Math.round(crmSale / totalGuests) : 0;
+                    const peakHoursText = "6:00 PM - 9:00 PM";
 
                     // 👉 NEW: Popup खोलने का फंक्शन
                     const handleOpenSegment = (title: string, list: any[]) => {
@@ -6687,7 +6685,6 @@ const peakHoursText = "6:00 PM - 9:00 PM";
                     
                     return (
                       <div className="max-w-7xl mx-auto space-y-6 pb-10">
-                    return (
                       <div className="max-w-7xl mx-auto space-y-6 pb-10">
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800/50 p-4 rounded-2xl shadow-sm">
