@@ -5865,7 +5865,11 @@ const handleSendUdhariReminder = (targetOrder: any) => {
                                <span className="text-[10px] text-neutral-500 block uppercase font-bold">Pending Amount</span>
                                <span className="font-mono font-black text-lg text-red-600 dark:text-red-400">₹{order.total}</span>
                              </div>
-                             <div className="flex gap-2">
+<div className="flex gap-2 flex-wrap justify-end">
+                               {/* 👉 NEW: WhatsApp Reminder Button */}
+                               <button onClick={() => handleSendUdhariReminder(order)} className="px-3 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 hover:bg-green-500 hover:text-white border border-green-500/30 rounded-xl text-xs font-black uppercase shadow-sm transition-colors flex items-center gap-1" title="WhatsApp पर सारे बिल भेजकर पैसे मांगें">
+                                 <SafeSend size={14} /> Send Reminder
+                               </button>
                                <button onClick={() => {
                                  if(window.confirm(`क्या आप ${order.customerName} का ₹${order.total} का उधार CASH में जमा करना चाहते हैं?`)) {
                                    handleClearUdhari(order.id, 'cash');
