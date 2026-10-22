@@ -1815,7 +1815,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
     if (cleanPhone.length !== 10) return;
 
-    let customerBills = [];
+    let customerBills: any[] = []; // 👈 FIX 1: यहाँ 'any[]' लगाया गया है
 
     try {
       if (navigator.onLine) {
@@ -1835,11 +1835,11 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       }
 
       // रिजेक्ट बिल हटा दें और टोटल निकालें
-      customerBills = customerBills.filter(o => o.status !== 'rejected' && o.status !== 'cancelled');
+      customerBills = customerBills.filter((o: any) => o.status !== 'rejected' && o.status !== 'cancelled'); // 👈 FIX 2: यहाँ '(o: any)' लगाया गया है
       
       // डुप्लीकेट बिल हटाने के लिए
-      const uniqueBills = Array.from(new Map(customerBills.map(item => [item.id, item])).values());
-      const totalDue = uniqueBills.reduce((acc, o) => acc + Number(o.total || 0), 0);
+      const uniqueBills = Array.from(new Map(customerBills.map((item: any) => [item.id, item])).values()); // 👈 FIX 3: यहाँ '(item: any)' लगाया गया है
+      const totalDue = uniqueBills.reduce((acc: number, o: any) => acc + Number(o.total || 0), 0); // 👈 FIX 4
       
       // अगर उधार है तो पॉपअप दिखाएं
       if (totalDue > 0) {
