@@ -6652,26 +6652,25 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                         fomoCustomers.push({ ...c, daysSince });
                       }
                     });
+// 👇 यहाँ से मिसिंग वेरिएबल्स ऐड करें 👇
+const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
+const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
 
-                    // 👇👇👇 यहाँ से सारा Missing Variables का लॉजिक बिल्कुल सही जगह पर रखा गया है 
-                    const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
-                    const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
-
-                    let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0; let crmSale = 0;
-                    reportOrders.forEach(o => {
-                      if (o.status === 'completed') {
-                        crmSale += Number(o.total) || 0;
-                        if (o.guests) {
-                          totalMen += (Number(o.guests.men) || 0);
-                          totalWomen += (Number(o.guests.women) || 0);
-                          totalKids += (Number(o.guests.kids) || 0);
-                          totalGuests += (Number(o.guests.total) || 0);
-                        }
-                      }
-                    });
-                    const avgPerHead = totalGuests > 0 ? Math.round(crmSale / totalGuests) : 0;
-                    const peakHoursText = "6:00 PM - 9:00 PM";
-                    // 👆👆👆 
+let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0; let crmSale = 0;
+reportOrders.forEach(o => {
+  if (o.status === 'completed') {
+    crmSale += Number(o.total) || 0;
+    if (o.guests) {
+      totalMen += (Number(o.guests.men) || 0);
+      totalWomen += (Number(o.guests.women) || 0);
+      totalKids += (Number(o.guests.kids) || 0);
+      totalGuests += (Number(o.guests.total) || 0);
+    }
+  }
+});
+const avgPerHead = totalGuests > 0 ? Math.round(crmSale / totalGuests) : 0;
+const peakHoursText = "6:00 PM - 9:00 PM";
+// 👆 बस इतना ही पेस्ट करना है 👆
 
                     // 👉 NEW: Popup खोलने का फंक्शन
                     const handleOpenSegment = (title: string, list: any[]) => {
