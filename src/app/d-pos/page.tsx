@@ -6665,6 +6665,27 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                     const regPct = totalCust > 0 ? (regularList.length / totalCust) * 100 : 0;
                     const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
                     const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
+                    // 👉 FIX: यहाँ Missing Variables को कैलकुलेट किया गया है
+const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
+const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
+
+// Demographic calculations
+let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0; let crmSale = 0;
+reportOrders.forEach(o => {
+  if (o.status === 'completed') {
+    crmSale += Number(o.total) || 0;
+    if (o.guests) {
+      totalMen += (Number(o.guests.men) || 0);
+      totalWomen += (Number(o.guests.women) || 0);
+      totalKids += (Number(o.guests.kids) || 0);
+      totalGuests += (Number(o.guests.total) || 0);
+    }
+  }
+});
+const avgPerHead = totalGuests > 0 ? Math.round(crmSale / totalGuests) : 0;
+
+// Peak hours static fallback (या आप इसे अपने हिसाब से डायनामिक बना सकते हैं)
+const peakHoursText = "6:00 PM - 9:00 PM";
                     return (
                       <div className="max-w-7xl mx-auto space-y-6 pb-10">
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
