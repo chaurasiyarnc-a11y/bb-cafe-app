@@ -6174,7 +6174,31 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                         fomoCustomers.push({ ...c, daysSince });
                       }
                     });
+                    // 👇 यहाँ से मिसिंग कोड ऐड करें 👇
+                    const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
+                    const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
+
+                    let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0; let crmSale = 0;
+                    reportOrders.forEach(o => {
+                      if (o.status === 'completed') {
+                        crmSale += Number(o.total) || 0;
+                        if (o.guests) {
+                          totalMen += (Number(o.guests.men) || 0);
+                          totalWomen += (Number(o.guests.women) || 0);
+                          totalKids += (Number(o.guests.kids) || 0);
+                          totalGuests += (Number(o.guests.total) || 0);
+                        }
+                      }
+                    });
+                    const avgPerHead = totalGuests > 0 ? Math.round(crmSale / totalGuests) : 0;
+                    const peakHoursText = "6:00 PM - 9:00 PM";
                     
+                    const handleOpenSegment = (title, list) => {
+                      setSelectedSegmentTitle(title);
+                      setSelectedSegmentCustomers([...list].sort((a,b) => b.daysSince - a.daysSince));
+                      setIsSegmentModalOpen(true);
+                    };
+                    // 👆 बस इतना ही पेस्ट करना है 👆
                     const vipPct = totalCust > 0 ? (vipList.length / totalCust) * 100 : 0;
                     const regPct = totalCust > 0 ? (regularList.length / totalCust) * 100 : 0;
                     const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
