@@ -608,6 +608,32 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
     if (activeTab === 'udhari') fetchDueOrders();
   }, [activeTab]);
 
+const handleSendUdhariReminder = (targetOrder: any) => {
+    if (!targetOrder.customerPhone) {
+      return toast.error("इस ग्राहक का मोबाइल नंबर सेव नहीं है!");
+    }
+    
+    const cleanPhone = String(targetOrder.customerPhone).replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      return toast.error("ग्राहक का मोबाइल नंबर सही नहीं है!");
+    }
+
+    // 👉 स्मार्ट लॉजिक: इस ग्राहक के सारे पेंडिंग बिल निकालें
+    const customerBills = dueOrders.filter(o => o.customerPhone === targetOrder.customerPhone);
+    const totalDue = customerBills.reduce((acc, o) => acc + Number(o.total || 0), 0);
+    
+    // सारे बिलों की लिस्ट बनाएं (Bill No, Date, Amount)
+    const billDetails = customerBills.map(o => {
+      const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
+      return `• Bill #${o.billNumber} (${d.toLocaleDateString()}): ₹${o.total}`;
+    }).join('%0A');
+
+    // शानदार WhatsApp मैसेज तैयार करें
+    const msg = `*☕ BUM BUM CAFE - Payment Reminder*%0A------------------------------%0AHello ${targetOrder.customerName || 'Customer'},%0A%0Aआपका हमारे कैफे में कुछ पिछला बकाया (Udhari) है। कृपया समय निकालकर इसे जमा करा दें। 🙏%0A%0A*कुल बकाया राशि (Total Due): ₹${totalDue}*%0A%0A*बिलों का विवरण (${customerBills.length} Bills):*%0A${billDetails}%0A------------------------------%0AThank you! 💛`;
+    
+    window.open(`https://wa.me/91${cleanPhone}?text=${msg}`, '_blank');
+  };
+
  const handleClearUdhari = async (orderId: string, method: 'cash' | 'upi') => {
     triggerBeep('tap');
     const toastId = toast.loading("उधार जमा किया जा रहा है...");
