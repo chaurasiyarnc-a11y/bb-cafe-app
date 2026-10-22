@@ -691,18 +691,6 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
   const [custHistoryList, setCustHistoryList] = useState<any[]>([]);
   const [isCustHistoryLoading, setIsCustHistoryLoading] = useState(false);
   const [activeWaDropdown, setActiveWaDropdown] = useState<string | null>(null); // 👉 NEW: WhatsApp Menu के लिए
-// 👉 NEW: CRM Segment Modal States (कार्ड क्लिक करने पर लिस्ट खोलने के लिए)
-  const [isSegmentModalOpen, setIsSegmentModalOpen] = useState(false);
-  const [selectedSegmentTitle, setSelectedSegmentTitle] = useState('');
-  const [selectedSegmentCustomers, setSelectedSegmentCustomers] = useState<any[]>([]);
-
-  // 👉 NEW: यह फंक्शन अब पूरे ऐप में काम करेगा
-  const handleOpenSegment = (title: string, list: any[]) => {
-    setSelectedSegmentTitle(title);
-    setSelectedSegmentCustomers([...list].sort((a,b) => b.daysSince - a.daysSince));
-    setIsSegmentModalOpen(true);
-  };
-  
 // 👉 NEW: Customer Analytics (Favorite Items & Points)
   const customerInsights = useMemo(() => {
     if (!custHistoryList || custHistoryList.length === 0) return null;
@@ -6146,64 +6134,6 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                     const topItems = Object.entries(itemSalesMap).sort((a,b) => b[1].qty - a[1].qty).slice(0, 5);
                     const lifetimePendingUdhari = dueOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
 
-                    // 👉 FIX: Overview टैब में भी CRM कार्ड्स काम करें, उसके लिए लिस्ट बनाएँ
-                    const totalCust = allCustomers.length;
-                    const vipList: any[] = []; const regularList: any[] = []; 
-                    const atRiskList: any[] = []; const sleepingList: any[] = [];
-                    const newCustList: any[] = []; const fomoCustomers: any[] = [];
-                    const acqTrend = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 };
-                    const now = Date.now();
-
-                    allCustomers.forEach(c => {
-                      const lastAct = c.lastActive?.toDate ? c.lastActive.toDate().getTime() : new Date(c.lastActive || 0).getTime();
-                      const daysSince = Math.floor((now - lastAct) / (1000 * 3600 * 24));
-                      const visits = c.totalVisits || 0;
-                      const spent = c.totalSpent || 0;
-                      const custData = { ...c, daysSince };
-                      
-                      if (spent >= 5000 || visits >= 10) vipList.push(custData);
-                      else if (daysSince > 30) sleepingList.push(custData);
-                      else if (daysSince >= 15 && daysSince <= 30) atRiskList.push(custData);
-                      else regularList.push(custData);
-
-                      if (visits === 1 && daysSince <= 6) {
-                        newCustList.push(custData);
-                        if(daysSince >= 0 && daysSince <= 6) acqTrend[daysSince as keyof typeof acqTrend]++;
-                      }
-                      if ((c.points > 40 || c.gamePoints > 40) && daysSince >= 15) {
-                        fomoCustomers.push({ ...c, daysSince });
-                      }
-                    });
-                    // 👇 यहाँ से मिसिंग कोड ऐड करें 👇
-                    const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
-                    const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
-
-                    let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0; let crmSale = 0;
-                    reportOrders.forEach(o => {
-                      if (o.status === 'completed') {
-                        crmSale += Number(o.total) || 0;
-                        if (o.guests) {
-                          totalMen += (Number(o.guests.men) || 0);
-                          totalWomen += (Number(o.guests.women) || 0);
-                          totalKids += (Number(o.guests.kids) || 0);
-                          totalGuests += (Number(o.guests.total) || 0);
-                        }
-                      }
-                    });
-                    const avgPerHead = totalGuests > 0 ? Math.round(crmSale / totalGuests) : 0;
-                    const peakHoursText = "6:00 PM - 9:00 PM";
-                    
-                    const handleOpenSegment = (title, list) => {
-                      setSelectedSegmentTitle(title);
-                      setSelectedSegmentCustomers([...list].sort((a,b) => b.daysSince - a.daysSince));
-                      setIsSegmentModalOpen(true);
-                    };
-                    // 👆 बस इतना ही पेस्ट करना है 👆
-                    const vipPct = totalCust > 0 ? (vipList.length / totalCust) * 100 : 0;
-                    const regPct = totalCust > 0 ? (regularList.length / totalCust) * 100 : 0;
-                    const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
-                    const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
-
                     return (
                       <div className="max-w-7xl mx-auto space-y-6 pb-10">
                         {/* Date Filters */}
@@ -6622,7 +6552,7 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                   </div>
                 )}
 
-            {/* ========================================= */}
+                {/* ========================================= */}
                 {/* 3. CRM ANALYTICS VIEW */}
                 {/* ========================================= */}
                 {dashboardSubTab === 'crm_analytics' && (
@@ -6630,13 +6560,8 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                     const totalCust = allCustomers.length;
                     let totalGamerRevenue = 0; let gamersCount = 0; let returningGamersCount = 0;
                     let totalAOV_Revenue = 0; let totalAOV_Visits = 0;
-                    
-                    // 👉 NEW: कार्ड क्लिक करने पर दिखने वाली लिस्ट
-                    const vipList: any[] = []; 
-                    const regularList: any[] = []; 
-                    const atRiskList: any[] = []; 
-                    const sleepingList: any[] = [];
-                    const newCustList: any[] = [];
+                    let vipCustomers = 0; let regularCustomers = 0; let atRiskCustomers = 0; let sleepingCustomers = 0;
+                    let newCustomers7Days = 0;
                     
                     const fomoCustomers: any[] = [];
                     const acqTrend = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 };
@@ -6658,17 +6583,15 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                         if (visits > 1) returningGamersCount++;
                       }
 
-                      const custData = { ...c, daysSince };
                       const isVip = spent >= 5000 || visits >= 10;
-                      
-                      if (isVip) vipList.push(custData);
-                      else if (daysSince > 30) sleepingList.push(custData);
-                      else if (daysSince >= 15 && daysSince <= 30) atRiskList.push(custData);
-                      else regularList.push(custData);
+                      if (isVip) vipCustomers++;
+                      else if (daysSince > 30) sleepingCustomers++;
+                      else if (daysSince >= 15 && daysSince <= 30) atRiskCustomers++;
+                      else regularCustomers++;
 
                       if (visits === 1 && daysSince <= 6) {
-                        newCustList.push(custData);
-                        if (daysSince >= 0 && daysSince <= 6) acqTrend[daysSince as keyof typeof acqTrend]++;
+                        newCustomers7Days++;
+                        acqTrend[daysSince as keyof typeof acqTrend]++;
                       }
 
                       if ((c.points > 40 || c.gamePoints > 40) && daysSince >= 15) {
@@ -6676,37 +6599,42 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                       }
                     });
 
-                    // 🎯 Missing Variables Calculations Added Here
                     const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
                     const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
+                    fomoCustomers.sort((a, b) => ((b.points || 0) + (b.gamePoints || 0)) - ((a.points || 0) + (a.gamePoints || 0)));
 
-                    let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0; let crmSale = 0;
-                    reportOrders.forEach(o => {
-                      if (o.status === 'completed') {
-                        crmSale += Number(o.total) || 0;
-                        if (o.guests) {
-                          totalMen += (Number(o.guests.men) || 0);
-                          totalWomen += (Number(o.guests.women) || 0);
-                          totalKids += (Number(o.guests.kids) || 0);
-                          totalGuests += (Number(o.guests.total) || 0);
-                        }
+                    let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0;
+                    let totalGuestRevenue = 0;
+
+                    pastReceipts.forEach(o => {
+                      if (o.status === 'completed' && o.guests && o.guests.total > 0) {
+                        totalMen += (o.guests.men || 0);
+                        totalWomen += (o.guests.women || 0);
+                        totalKids += (o.guests.kids || 0);
+                        totalGuests += (o.guests.total || 0);
+                        totalGuestRevenue += (Number(o.total) || 0);
                       }
                     });
-                    const avgPerHead = totalGuests > 0 ? Math.round(crmSale / totalGuests) : 0;
-                    const peakHoursText = "6:00 PM - 9:00 PM";
-
-                    // 👉 NEW: Popup खोलने का फंक्शन
-                    const handleOpenSegment = (title: string, list: any[]) => {
-                      setSelectedSegmentTitle(title);
-                      setSelectedSegmentCustomers([...list].sort((a,b) => b.daysSince - a.daysSince));
-                      setIsSegmentModalOpen(true);
-                    };
-
-                    const vipPct = totalCust > 0 ? (vipList.length / totalCust) * 100 : 0;
-                    const regPct = totalCust > 0 ? (regularList.length / totalCust) * 100 : 0;
-                    const riskPct = totalCust > 0 ? (atRiskList.length / totalCust) * 100 : 0;
-                    const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
+                    const avgPerHead = totalGuests > 0 ? Math.round(totalGuestRevenue / totalGuests) : 0;
                     
+                    const hourCounts: { [key: number]: number } = {};
+                    pastReceipts.forEach(o => {
+                      if (o.status === 'completed') {
+                        const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
+                        const h = d.getHours();
+                        hourCounts[h] = (hourCounts[h] || 0) + 1;
+                      }
+                    });
+                    const sortedHours = Object.entries(hourCounts).sort((a: any, b: any) => b[1] - a[1]).slice(0, 2);
+                    const peakHoursText = sortedHours.length > 0 
+                      ? sortedHours.map(([h]) => { const hr = parseInt(h); return `${hr % 12 || 12} ${hr >= 12 ? 'PM' : 'AM'}`; }).join(' & ') 
+                      : 'Load Receipts First';
+
+                    const vipPct = totalCust > 0 ? (vipCustomers / totalCust) * 100 : 0;
+                    const regPct = totalCust > 0 ? (regularCustomers / totalCust) * 100 : 0;
+                    const riskPct = totalCust > 0 ? (atRiskCustomers / totalCust) * 100 : 0;
+                    const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
+
                     return (
                       <div className="max-w-7xl mx-auto space-y-6 pb-10">
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -6729,10 +6657,10 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                             <p className="text-[9px] text-amber-700 dark:text-amber-300 font-bold mt-1">सबसे ज़्यादा भीड़ का समय</p>
                             <button onClick={() => { if(pastReceipts.length === 0) fetchPastReceipts(); else toast.success("Data Analyzed!"); }} className="text-[9px] font-black uppercase mt-1 text-amber-600 underline cursor-pointer">Analyze Receipts</button>
                           </div>
-                          <div onClick={() => handleOpenSegment('🌱 Fresh Customers (Last 7 Days)', newCustList)} className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl shadow-sm cursor-pointer hover:scale-105 transition-transform">
+                          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border border-emerald-200 dark:border-emerald-800/50 p-4 rounded-2xl shadow-sm">
                             <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><SafeUserPlus size={12}/> Fresh Customers</p>
-                            <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white mt-1">+{newCustList.length}</p>
-                            <p className="text-[9px] text-emerald-700 dark:text-emerald-300 font-bold mt-1">पिछले 7 दिनों में पहली बार आए (Click to view)</p>
+                            <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white mt-1">+{newCustomers7Days}</p>
+                            <p className="text-[9px] text-emerald-700 dark:text-emerald-300 font-bold mt-1">पिछले 7 दिनों में पहली बार आए</p>
                           </div>
                         </div>
 
@@ -6781,23 +6709,24 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                               </div>
                             </div>
                             <div className="mt-6 w-full grid grid-cols-2 gap-3">
-                              <div onClick={() => handleOpenSegment('👑 VIP Customers (Top Spenders)', vipList)} className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50 cursor-pointer hover:scale-105 transition-transform shadow-sm">
+                              <div className="bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded-xl text-center border border-yellow-100 dark:border-yellow-900/50">
                                 <p className="text-[10px] font-bold text-yellow-600">VIP (👑)</p>
-                                <p className="text-sm font-black font-mono text-yellow-700">{vipList.length}</p>
+                                <p className="text-sm font-black font-mono text-yellow-700">{vipCustomers}</p>
                               </div>
-                              <div onClick={() => handleOpenSegment('🌟 Regular Customers (Active)', regularList)} className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50 cursor-pointer hover:scale-105 transition-transform shadow-sm">
+                              <div className="bg-green-50 dark:bg-green-900/10 p-2 rounded-xl text-center border border-green-100 dark:border-green-900/50">
                                 <p className="text-[10px] font-bold text-green-600">Regular (🌟)</p>
-                                <p className="text-sm font-black font-mono text-green-700">{regularList.length}</p>
+                                <p className="text-sm font-black font-mono text-green-700">{regularCustomers}</p>
                               </div>
-                              <div onClick={() => handleOpenSegment('⚠️ At-Risk Customers (15-30 Days)', atRiskList)} className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50 cursor-pointer hover:scale-105 transition-transform shadow-sm">
+                              <div className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded-xl text-center border border-orange-100 dark:border-orange-900/50">
                                 <p className="text-[10px] font-bold text-orange-600">At-Risk (⚠️)</p>
-                                <p className="text-sm font-black font-mono text-orange-700">{atRiskList.length}</p>
+                                <p className="text-sm font-black font-mono text-orange-700">{atRiskCustomers}</p>
                               </div>
-                              <div onClick={() => handleOpenSegment('😴 Sleeping Customers (30+ Days)', sleepingList)} className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50 cursor-pointer hover:scale-105 transition-transform shadow-sm">
+                              <div className="bg-red-50 dark:bg-red-900/10 p-2 rounded-xl text-center border border-red-100 dark:border-red-900/50">
                                 <p className="text-[10px] font-bold text-red-600">Sleeping (😴)</p>
-                                <p className="text-sm font-black font-mono text-red-700">{sleepingList.length}</p>
+                                <p className="text-sm font-black font-mono text-red-700">{sleepingCustomers}</p>
                               </div>
                             </div>
+                          </div>
 
                           <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
                             <h3 className="text-xs font-black uppercase text-neutral-600 dark:text-neutral-400 mb-2 border-b border-neutral-100 dark:border-neutral-800 pb-2">📈 New Customer Acquisition</h3>
@@ -8856,60 +8785,6 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
           </div>
         )}
       </AnimatePresence>
-               {/* 👉 NEW POPUP: CRM SEGMENT LIST MODAL (क्लिक करने पर खुलने वाली लिस्ट) */}
-      <AnimatePresence>
-        {isSegmentModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-3xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
-              
-              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
-                <div>
-                  <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
-                    <SafeUserPlus size={18} /> {selectedSegmentTitle}
-                  </h3>
-                  <p className="text-[10px] text-neutral-500 font-bold mt-1">
-                    कुल {selectedSegmentCustomers.length} ग्राहक इस लिस्ट में हैं। आप इन्हें सीधे WhatsApp पर मैसेज भेज सकते हैं।
-                  </p>
-                </div>
-                <button onClick={() => setIsSegmentModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                {selectedSegmentCustomers.length === 0 ? (
-                  <p className="text-center text-xs font-bold text-neutral-500 py-10">इस लिस्ट में अभी कोई ग्राहक नहीं है।</p>
-                ) : (
-                  selectedSegmentCustomers.map((cust, idx) => {
-                    // WhatsApp पर भेजने वाला मैसेज
-                    const waMsg = `Hi ${cust.name}, we miss you at Bum Bum Cafe! ☕ Visit us soon to enjoy our special offers.`;
-                    
-                    return (
-                      <div key={idx} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700/50 shadow-sm hover:border-blue-400 transition-colors">
-                        <div>
-                           <p className="font-bold text-sm text-neutral-900 dark:text-white uppercase">
-                             {cust.name} <span className="text-[10px] text-neutral-500 font-mono lowercase">({cust.phone || cust.id})</span>
-                           </p>
-                           <p className="text-[10px] font-black text-neutral-600 dark:text-neutral-400 mt-1">
-                             🛒 ₹{cust.totalSpent || 0} Spent • {cust.totalVisits || 0} Visits • ⭐ {cust.points || 0} Pts
-                           </p>
-                           <p className="text-[10px] text-red-500 font-bold mt-0.5">
-                             ⏰ {cust.daysSince === 0 ? 'Today' : `${cust.daysSince} Days Ago`} (Last Active)
-                           </p>
-                        </div>
-                        <button 
-                          onClick={() => window.open(`https://wa.me/91${String(cust.phone || cust.id).replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`, '_blank')} 
-                          className="bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30 px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-colors"
-                        >
-                          <SafeSend size={13} /> Message
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>  
     </div>
   );
 }
