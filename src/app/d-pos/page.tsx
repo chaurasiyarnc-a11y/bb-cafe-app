@@ -1881,6 +1881,9 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     setShowNewCustForm(false);
     toast.success(`ग्राहक मिला: ${cust.name}`);
     setTimeout(() => searchInputRef.current?.focus(), 80);
+    
+    // 👉 NEW: उधार चेक करें और अलर्ट दें
+    checkAndAlertUdhari(cust.phone || cust.id, cust.name || 'Valued Guest');
   };
 
 // 🚀 OFFLINE SMART CUSTOMER SEARCH
