@@ -8796,6 +8796,50 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
           </div>
         )}
       </AnimatePresence>
+
+      {/* 👉 NEW POPUP: SEGMENT CUSTOMERS LIST & WHATSAPP */}
+      <AnimatePresence>
+        {isSegmentModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl flex flex-col max-h-[85vh]">
+              
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-4 shrink-0">
+                <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
+                  {selectedSegmentTitle} ({selectedSegmentCustomers.length})
+                </h3>
+                <button onClick={() => setIsSegmentModalOpen(false)} className="text-neutral-500 hover:text-red-500 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto space-y-3 pr-1 flex-1">
+                {selectedSegmentCustomers.length === 0 ? (
+                  <p className="text-center text-xs text-neutral-500 py-10 font-bold">इस केटेगरी में कोई ग्राहक नहीं है।</p>
+                ) : (
+                  selectedSegmentCustomers.map((c, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-blue-400 transition-colors">
+                      <div>
+                        <p className="font-bold text-xs text-neutral-900 dark:text-white uppercase">{c.name || 'Valued Guest'}</p>
+                        <p className="text-[10px] font-mono text-neutral-500 mt-1">📞 {c.phone || c.id}</p>
+                        <p className="text-[9px] font-black text-green-600 dark:text-green-400 mt-1">Spent: ₹{c.totalSpent || 0} | Visits: {c.totalVisits || 0}</p>
+                      </div>
+                      
+                      <button 
+                        onClick={() => window.open(`https://wa.me/91${String(c.phone || c.id).replace(/\D/g,'')}?text=${encodeURIComponent(`Hi ${c.name || ''}, we have a special offer for you at Bum Bum Cafe! ☕`)}`, '_blank')} 
+                        className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-1 transition-colors"
+                      >
+                        <SafeSend size={12}/> Message
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
