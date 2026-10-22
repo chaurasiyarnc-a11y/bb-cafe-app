@@ -613,25 +613,32 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       return toast.error("इस ग्राहक का मोबाइल नंबर सेव नहीं है!");
     }
     
-    const cleanPhone = String(targetOrder.customerPhone).replace(/\D/g, '').slice(-10);
-    if (cleanPhone.length !== 10) {
+    const targetCleanPhone = String(targetOrder.customerPhone).replace(/\D/g, '').slice(-10);
+    if (targetCleanPhone.length !== 10) {
       return toast.error("ग्राहक का मोबाइल नंबर सही नहीं है!");
     }
 
-    // 👉 स्मार्ट लॉजिक: इस ग्राहक के सारे पेंडिंग बिल निकालें
-    const customerBills = dueOrders.filter(o => o.customerPhone === targetOrder.customerPhone);
+    // 👉 स्मार्ट लॉजिक: सभी बिलों के नंबर साफ करके मैच करें ताकि +91 वाला कोई बिल छूटे नहीं
+    const customerBills = dueOrders.filter(o => {
+       const oPhone = String(o.customerPhone || '').replace(/\D/g, '').slice(-10);
+       return oPhone === targetCleanPhone;
+    });
+
     const totalDue = customerBills.reduce((acc, o) => acc + Number(o.total || 0), 0);
     
     // सारे बिलों की लिस्ट बनाएं (Bill No, Date, Amount)
     const billDetails = customerBills.map(o => {
       const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
-      return `• Bill #${o.billNumber} (${d.toLocaleDateString()}): ₹${o.total}`;
-    }).join('%0A');
+      // Date को सुरक्षित फॉर्मेट में दिखाएं
+      const dateStr = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+      return `• Bill #${o.billNumber || 'N/A'} (${dateStr}): ₹${o.total}`;
+    }).join('\n');
 
     // शानदार WhatsApp मैसेज तैयार करें
-    const msg = `*☕ BUM BUM CAFE - Payment Reminder*%0A------------------------------%0AHello ${targetOrder.customerName || 'Customer'},%0A%0Aआपका हमारे कैफे में कुछ पिछला बकाया (Udhari) है। कृपया समय निकालकर इसे जमा करा दें। 🙏%0A%0A*कुल बकाया राशि (Total Due): ₹${totalDue}*%0A%0A*बिलों का विवरण (${customerBills.length} Bills):*%0A${billDetails}%0A------------------------------%0AThank you! 💛`;
+    const msg = `*☕ BUM BUM CAFE - Payment Reminder*\n------------------------------\nHello ${targetOrder.customerName || 'Customer'},\n\nआपका हमारे कैफे में कुछ पिछला बकाया (Udhari) है। कृपया समय निकालकर इसे जमा करा दें। 🙏\n\n*कुल बकाया राशि (Total Due): ₹${totalDue}*\n\n*बिलों का विवरण (${customerBills.length} Bills):*\n${billDetails}\n------------------------------\nThank you! 💛`;
     
-    window.open(`https://wa.me/91${cleanPhone}?text=${msg}`, '_blank');
+    // 👉 Encode करना बहुत ज़रूरी है, वरना आधी डिटेल कट जाएगी!
+    window.open(`https://wa.me/91${targetCleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
  const handleClearUdhari = async (orderId: string, method: 'cash' | 'upi') => {
