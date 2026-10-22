@@ -6634,7 +6634,6 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                         if (visits > 1) returningGamersCount++;
                       }
 
-                      // 👉 FIX: ग्राहकों को उनकी लिस्ट में डालें
                       const custData = { ...c, daysSince };
                       const isVip = spent >= 5000 || visits >= 10;
                       
@@ -6652,7 +6651,9 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
                         fomoCustomers.push({ ...c, daysSince });
                       }
                     });
-const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
+
+                    // 🎯 Missing Variables Calculations Added Here
+                    const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
                     const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
 
                     let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0; let crmSale = 0;
@@ -6673,7 +6674,6 @@ const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits)
                     // 👉 NEW: Popup खोलने का फंक्शन
                     const handleOpenSegment = (title: string, list: any[]) => {
                       setSelectedSegmentTitle(title);
-                      // ज्यादा दिन से जो नहीं आये, उन्हें ऊपर दिखाएं (Sort)
                       setSelectedSegmentCustomers([...list].sort((a,b) => b.daysSince - a.daysSince));
                       setIsSegmentModalOpen(true);
                     };
@@ -6684,7 +6684,6 @@ const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits)
                     const donutGradient = `conic-gradient(#eab308 0% ${vipPct}%, #10b981 ${vipPct}% ${vipPct + regPct}%, #f97316 ${vipPct + regPct}% ${vipPct + regPct + riskPct}%, #ef4444 ${vipPct + regPct + riskPct}% 100%)`;
                     
                     return (
-                      <div className="max-w-7xl mx-auto space-y-6 pb-10">
                       <div className="max-w-7xl mx-auto space-y-6 pb-10">
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800/50 p-4 rounded-2xl shadow-sm">
