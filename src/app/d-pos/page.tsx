@@ -1914,6 +1914,9 @@ const handleSendUdhariReminder = (targetOrder: any) => {
         setShowNewCustForm(false);
         toast.success(`ग्राहक मिला: ${customerData.name} (${customerData.points || 0} Pts) ${navigator.onLine ? '🟢' : '⚡'}`);
         setTimeout(() => searchInputRef.current?.focus(), 80);
+        
+        // 👉 NEW: उधार चेक करें और अलर्ट दें
+        checkAndAlertUdhari(phoneStr, customerData.name || 'Valued Guest');
       } else {
         setCustomerName(''); setCustomerPoints(0); setAddress(''); setShowNewCustForm(true);
         toast("नया ग्राहक! नाम दर्ज करें", { icon: '👤' });
