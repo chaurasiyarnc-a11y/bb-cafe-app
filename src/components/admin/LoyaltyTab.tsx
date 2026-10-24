@@ -45,13 +45,13 @@ export default function LoyaltyTab({ loyaltyRules, transferLogs }: LoyaltyTabPro
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 transition-colors duration-300">
       {/* नया इनाम रूल जोड़ने का फ़ॉर्म */}
-      <form onSubmit={handleAddRule} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-        <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2">
+      <form onSubmit={handleAddRule} className="bg-white dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-sm transition-colors duration-300">
+        <h3 className="text-lg font-black text-orange-600 dark:text-orange-500 italic uppercase flex items-center gap-2">
           <Gift size={18}/> Setup Loyalty Rules
         </h3>
-        <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">
+        <p className="text-[10px] text-neutral-500 dark:text-gray-400 font-semibold leading-relaxed">
           नया इनाम (Reward) बनाएं जो ग्राहक चेकआउट के समय अपने पॉइंट्स का उपयोग करके मुफ़्त में क्लेम कर सकें:
         </p>
         
@@ -61,7 +61,7 @@ export default function LoyaltyTab({ loyaltyRules, transferLogs }: LoyaltyTabPro
             placeholder="Reward Name (उदा: Free Pizza)" 
             value={newRuleName} 
             onChange={(e) => setNewRuleName(e.target.value)} 
-            className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
+            className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-xs font-black text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-gray-500 transition-colors duration-300" 
             required 
           />
           <input 
@@ -69,32 +69,32 @@ export default function LoyaltyTab({ loyaltyRules, transferLogs }: LoyaltyTabPro
             placeholder="Points Needed" 
             value={newRulePoints} 
             onChange={(e) => setNewRulePoints(e.target.value)} 
-            className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-black text-white" 
+            className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs font-black text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-gray-500 transition-colors duration-300" 
             required 
           />
         </div>
-        <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">
+        <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white p-4 rounded-xl font-black text-sm uppercase shadow-sm transition-all">
           Add Reward Rule
         </button>
       </form>
 
       {/* एक्टिव रूल्स की लिस्ट */}
       <div className="space-y-3">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">
+        <p className="text-xs font-bold text-neutral-500 dark:text-gray-500 uppercase tracking-widest pl-1">
           Active Customer Reward Rules ({loyaltyRules.length})
         </p>
         {loyaltyRules.length === 0 ? (
-          <p className="text-center text-xs font-bold text-gray-500 py-6">
+          <p className="text-center text-xs font-bold text-neutral-400 dark:text-gray-500 py-6">
             No custom rules configured yet...
           </p>
         ) : (
           loyaltyRules.map(rule => (
-            <div key={rule.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
+            <div key={rule.id} className="bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 p-5 rounded-2xl flex justify-between items-center hover:border-orange-500 dark:hover:bg-white/[0.04] transition-all shadow-sm">
               <div>
-                <h4 className="font-black text-sm text-gray-200">{rule.rewardName}</h4>
-                <p className="text-xs text-yellow-400 font-extrabold mt-0.5">Cost: {rule.pointsCost} Points</p>
+                <h4 className="font-black text-sm text-neutral-900 dark:text-gray-200">{rule.rewardName}</h4>
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 font-extrabold mt-0.5">Cost: {rule.pointsCost} Points</p>
               </div>
-              <button onClick={() => handleDeleteRule(rule.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl transition-all">
+              <button onClick={() => handleDeleteRule(rule.id)} className="p-3 bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-500 rounded-xl hover:bg-red-200 dark:hover:bg-red-500/20 transition-all">
                 <Trash size={16}/>
               </button>
             </div>
@@ -103,33 +103,33 @@ export default function LoyaltyTab({ loyaltyRules, transferLogs }: LoyaltyTabPro
       </div>
 
       {/* ग्राहक पॉइंट ट्रांसफर ऑडिट लॉग्स (Passbook Audit) */}
-      <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-        <h3 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
+      <div className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-sm transition-colors duration-300">
+        <h3 className="text-sm font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest flex items-center gap-2">
           <RefreshCw size={14}/> 🔄 Points Transfer Logs ({transferLogs.length})
         </h3>
-        <p className="text-[10px] text-gray-500 font-bold uppercase leading-relaxed">
+        <p className="text-[10px] text-neutral-500 dark:text-gray-500 font-bold uppercase leading-relaxed">
           ग्राहकों द्वारा एक-दूसरे को गिफ्ट किए गए पॉइंट्स का रीयल-टाइम ऑडिट ट्रेल:
         </p>
         
         <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
           {transferLogs.length === 0 ? (
-            <p className="text-center text-xs text-gray-500 py-6">कोई ट्रांसफर लॉग उपलब्ध नहीं है।</p>
+            <p className="text-center text-xs text-neutral-400 dark:text-gray-500 py-6">कोई ट्रांसफर लॉग उपलब्ध नहीं है।</p>
           ) : (
             transferLogs.map(log => (
-              <div key={log.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-sans">
+              <div key={log.id} className="bg-neutral-50 dark:bg-white/[0.01] border border-neutral-200 dark:border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-sans shadow-sm transition-colors duration-300">
                 <div>
-                  <p className="font-bold text-gray-300">
-                    <span className="text-orange-400">{log.senderName || "Sender"}</span> (+{log.senderPhone})
+                  <p className="font-bold text-neutral-800 dark:text-gray-300">
+                    <span className="text-orange-600 dark:text-orange-400">{log.senderName || "Sender"}</span> (+{log.senderPhone})
                   </p>
-                  <p className="text-[10px] text-gray-500 mt-0.5 font-mono">
-                    ➡️ Gifted to: <span className="text-yellow-500 font-extrabold">+{log.recipientPhone}</span>
+                  <p className="text-[10px] text-neutral-500 dark:text-gray-500 mt-0.5 font-mono">
+                    ➡️ Gifted to: <span className="text-yellow-600 dark:text-yellow-500 font-extrabold">+{log.recipientPhone}</span>
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="bg-orange-500/10 text-orange-500 font-black px-2.5 py-1 rounded-md text-[10px] inline-block font-sans">
+                  <span className="bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-500 font-black px-2.5 py-1 rounded-md text-[10px] inline-block font-sans">
                     {log.points} Pts 🎁
                   </span>
-                  <p className="text-[8px] text-gray-500 mt-1 font-mono">
+                  <p className="text-[8px] text-neutral-400 dark:text-gray-500 mt-1 font-mono">
                     {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString() : "Just now"}
                   </p>
                 </div>
