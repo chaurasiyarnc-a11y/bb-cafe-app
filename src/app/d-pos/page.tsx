@@ -4345,7 +4345,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
         </div>
       ) : (
         <>
-          {{/* 👉 NEW TOUCH POS DRAWER (SIDEBAR) */}
+          {/* 👉 NEW TOUCH POS DRAWER (SIDEBAR) */}
           {isNavOpen && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" onClick={() => setIsNavOpen(false)} />
           )}
