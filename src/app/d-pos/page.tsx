@@ -5298,12 +5298,14 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
               </div>
             )}
 
-            {/* TAB 2: INVENTORY & STOCK */}
+           {/* TAB 2: INVENTORY & STOCK */}
             {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto space-y-4">
                 <div className="flex justify-between items-center border-b pb-3">
-                  <div>
-                    <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">Inventory & Stock Manager</h2>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setIsNavOpen(true)} className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"><Menu size={20} /></button>
+                    <div>
+                      <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">Inventory & Stock Manager</h2>
                     <p className="text-xs text-neutral-600 dark:text-neutral-400">Add food items, manage raw materials and recipes.</p>
                   </div>
                   <div className="flex gap-2">
