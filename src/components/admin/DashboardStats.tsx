@@ -126,163 +126,163 @@ export default function DashboardStats({
   }, [orders]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 transition-colors duration-300">
       <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">
         <BarChart3 size={20}/> Sales Dashboard
       </h3>
       
       {/* त्वरित फ़िल्टर बटन्स (English Labels के साथ) */}
-      <div className="grid grid-cols-4 gap-2 bg-[#111] p-3 rounded-2xl border border-white/5 font-sans">
-        <button onClick={() => applyQuickSalesFilter('today')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">Today's Sale</button>
-        <button onClick={() => applyQuickSalesFilter('yesterday')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">Yesterday's Sale</button>
-        <button onClick={() => applyQuickSalesFilter('week')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">Weekly Sale</button>
-        <button onClick={() => applyQuickSalesFilter('month')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">Monthly Sale</button>
+      <div className="grid grid-cols-4 gap-2 bg-white dark:bg-[#111] p-3 rounded-2xl border border-neutral-200 dark:border-white/5 font-sans shadow-sm transition-colors duration-300">
+        <button onClick={() => applyQuickSalesFilter('today')} className="py-2.5 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-sm">Today's Sale</button>
+        <button onClick={() => applyQuickSalesFilter('yesterday')} className="py-2.5 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-sm">Yesterday's Sale</button>
+        <button onClick={() => applyQuickSalesFilter('week')} className="py-2.5 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-sm">Weekly Sale</button>
+        <button onClick={() => applyQuickSalesFilter('month')} className="py-2.5 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-sm">Monthly Sale</button>
       </div>
 
       {/* कस्टम डेट ऑडिट बॉक्स */}
-      <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-4">
+      <div className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-5 rounded-3xl space-y-4 shadow-sm transition-colors duration-300">
         <div className="flex flex-col gap-3">
-          <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Custom Date-Range Auditor</p>
+          <p className="text-[10px] font-black uppercase text-orange-500 dark:text-orange-400 tracking-wider">🎯 Custom Date-Range Auditor</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-bold text-gray-500 uppercase">Start Date</label>
+              <label className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Start Date</label>
               <input 
                 type="date" 
                 value={startDate} 
                 onChange={(e) => setStartDate(e.target.value)} 
-                className="bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-500 outline-none cursor-pointer"
+                className="bg-neutral-50 dark:bg-black/60 border border-neutral-200 dark:border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-600 dark:text-orange-500 outline-none cursor-pointer transition-colors duration-300"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-bold text-gray-500 uppercase">End Date</label>
+              <label className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">End Date</label>
               <input 
                 type="date" 
                 value={endDate} 
                 onChange={(e) => setEndDate(e.target.value)} 
-                className="bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-500 outline-none cursor-pointer"
+                className="bg-neutral-50 dark:bg-black/60 border border-neutral-200 dark:border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-600 dark:text-orange-500 outline-none cursor-pointer transition-colors duration-300"
               />
             </div>
           </div>
         </div>
 
         {/* स्टेट्स ग्रिड */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-white/5 pt-4">
-          <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
-            <p className="text-[9px] font-bold text-gray-500 uppercase">Range Sales</p>
-            <h3 className="text-base font-black text-green-400 mt-1">₹{auditStats.rangeRevenue}</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-neutral-100 dark:border-white/5 pt-4">
+          <div className="bg-neutral-50 dark:bg-white/[0.01] border border-neutral-200 dark:border-white/5 p-3 rounded-2xl text-center shadow-sm">
+            <p className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Range Sales</p>
+            <h3 className="text-base font-black text-green-600 dark:text-green-400 mt-1">₹{auditStats.rangeRevenue}</h3>
           </div>
-          <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
-            <p className="text-[9px] font-bold text-gray-500 uppercase">Range Orders</p>
-            <h3 className="text-base font-black text-yellow-400 mt-1">{auditStats.rangeCount}</h3>
+          <div className="bg-neutral-50 dark:bg-white/[0.01] border border-neutral-200 dark:border-white/5 p-3 rounded-2xl text-center shadow-sm">
+            <p className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Range Orders</p>
+            <h3 className="text-base font-black text-yellow-600 dark:text-yellow-400 mt-1">{auditStats.rangeCount}</h3>
           </div>
-          <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
-            <p className="text-[9px] font-bold text-gray-500 uppercase">Active Kitchen</p>
-            <h3 className="text-base font-black text-orange-500 mt-1">{auditStats.active}</h3>
+          <div className="bg-neutral-50 dark:bg-white/[0.01] border border-neutral-200 dark:border-white/5 p-3 rounded-2xl text-center shadow-sm">
+            <p className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Active Kitchen</p>
+            <h3 className="text-base font-black text-orange-600 dark:text-orange-500 mt-1">{auditStats.active}</h3>
           </div>
-          <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-2xl text-center">
-            <p className="text-[9px] font-bold text-red-400 uppercase">Today's Rejected 🚫</p>
-            <h3 className="text-base font-black text-red-500 mt-1">{auditStats.todayRejectedCount}</h3>
+          <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3 rounded-2xl text-center shadow-sm">
+            <p className="text-[9px] font-bold text-red-500 dark:text-red-400 uppercase">Today's Rejected 🚫</p>
+            <h3 className="text-base font-black text-red-600 dark:text-red-500 mt-1">{auditStats.todayRejectedCount}</h3>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-1">
-          <div className="bg-white/[0.02] border border-white/5 p-3.5 rounded-2xl flex justify-between items-center">
-            <span className="text-[10px] font-black text-gray-500 uppercase">Cash Collected:</span>
-            <span className="text-xs font-black text-green-400">₹{auditStats.cashSales}</span>
+          <div className="bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 p-3.5 rounded-2xl flex justify-between items-center shadow-sm">
+            <span className="text-[10px] font-black text-neutral-500 dark:text-gray-500 uppercase">Cash Collected:</span>
+            <span className="text-xs font-black text-green-600 dark:text-green-400">₹{auditStats.cashSales}</span>
           </div>
-          <div className="bg-white/[0.02] border border-white/5 p-3.5 rounded-2xl flex justify-between items-center">
-            <span className="text-[10px] font-black text-gray-500 uppercase">Online (UPI):</span>
-            <span className="text-xs font-black text-blue-400">₹{auditStats.upiSales}</span>
+          <div className="bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 p-3.5 rounded-2xl flex justify-between items-center shadow-sm">
+            <span className="text-[10px] font-black text-neutral-500 dark:text-gray-500 uppercase">Online (UPI):</span>
+            <span className="text-xs font-black text-blue-600 dark:text-blue-400">₹{auditStats.upiSales}</span>
           </div>
         </div>
       </div>
 
       {/* चार्ट ग्राफ़ */}
-      <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
-        <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">📈 Last 7 Days Sales Trend</p>
+      <div className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-5 rounded-3xl space-y-3 shadow-sm transition-colors duration-300">
+        <p className="text-[10px] font-black uppercase text-orange-500 dark:text-orange-400 tracking-wider">📈 Last 7 Days Sales Trend</p>
         <div className="h-44 w-full flex items-end justify-between gap-2 pt-6 pb-2 px-1">
           {last7DaysChartData.map((day, idx) => (
             <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
-              <span className="text-[8px] font-bold text-green-400 opacity-0 group-hover:opacity-100 transition-opacity">₹{day.sales}</span>
+              <span className="text-[8px] font-bold text-green-600 dark:text-green-400 opacity-0 group-hover:opacity-100 transition-opacity">₹{day.sales}</span>
               <div 
                 style={{ height: `${day.percentage}%` }} 
-                className="w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative"
+                className="w-full bg-gradient-to-t from-orange-500 to-yellow-400 dark:from-orange-600 dark:to-orange-400 rounded-t-lg min-h-[4px] relative"
               ></div>
-              <span className="text-[9px] font-bold text-gray-500 uppercase mt-1">{day.label}</span>
+              <span className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase mt-1">{day.label}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* बेस्ट सेलिंग डिशेज */}
-      <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
-        <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🔥 Top 5 Best Selling Dishes</p>
+      <div className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-5 rounded-3xl space-y-3 shadow-sm transition-colors duration-300">
+        <p className="text-[10px] font-black uppercase text-orange-500 dark:text-orange-400 tracking-wider">🔥 Top 5 Best Selling Dishes</p>
         <div className="space-y-2">
           {topSellingDishes.map((dish, idx) => (
-            <div key={idx} className="flex justify-between items-center bg-white/[0.01] border border-white/5 p-3 rounded-xl text-xs font-bold">
-              <span className="text-gray-300">{idx + 1}. {dish.name}</span>
-              <span className="bg-orange-500/10 text-orange-500 px-3 py-1 rounded-full text-[10px] font-black">{dish.qty} times</span>
+            <div key={idx} className="flex justify-between items-center bg-neutral-50 dark:bg-white/[0.01] border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs font-bold shadow-sm">
+              <span className="text-neutral-800 dark:text-gray-300">{idx + 1}. {dish.name}</span>
+              <span className="bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-500 px-3 py-1 rounded-full text-[10px] font-black">{dish.qty} times</span>
             </div>
           ))}
           {topSellingDishes.length === 0 && (
-            <p className="text-center text-[10px] text-gray-500 uppercase font-bold py-2">No sales logged yet...</p>
+            <p className="text-center text-[10px] text-neutral-500 dark:text-gray-500 uppercase font-bold py-2">No sales logged yet...</p>
           )}
         </div>
       </div>
 
       {/* डेटा मैनेजमेंट एक्शन्स */}
-      <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
-        <button onClick={handleResetSalesData} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase font-mono">
+      <div className="grid grid-cols-2 gap-3 bg-white dark:bg-[#111]/30 border border-neutral-200 dark:border-white/5 p-4 rounded-[2rem] shadow-sm transition-colors duration-300">
+        <button onClick={handleResetSalesData} className="bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-500 border border-red-200 dark:border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase font-mono shadow-sm">
           Reset All Sales Data 🚫
         </button>
-        <button onClick={handleSendDailyClosingReport} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10 font-mono">
+        <button onClick={handleSendDailyClosingReport} className="bg-green-600 hover:bg-green-500 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10 font-mono">
           📲 Send Report to Owner
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
-        <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10 font-mono">
+      <div className="grid grid-cols-2 gap-3 bg-white dark:bg-[#111]/30 border border-neutral-200 dark:border-white/5 p-4 rounded-[2rem] shadow-sm transition-colors duration-300">
+        <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-500 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10 font-mono">
           <Download size={14}/> Sales Ledger Excel
         </button>
-        <button onClick={handleExportCustomers} className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-orange-500/10">
+        <button onClick={handleExportCustomers} className="bg-orange-500 hover:bg-orange-600 text-white dark:text-black font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-orange-500/10">
           <Download size={14}/> Customer List Excel
         </button>
       </div>
 
       {/* स्थाई ट्रांजेक्शन लेजर (Permanent Ledger) */}
       <div className="space-y-4 font-mono">
-        <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
+        <h4 className="text-sm font-black text-neutral-500 dark:text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
         {orders.length === 0 ? (
-          <p className="text-center text-gray-500 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
+          <p className="text-center text-neutral-500 dark:text-gray-500 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
         ) : (
           orders.map((o) => (
-            <div key={o.id} className={`p-5 rounded-3xl flex justify-between items-center relative overflow-hidden text-xs border ${o.status === 'rejected' ? 'bg-red-500/[0.02] border-red-500/20' : 'bg-[#111] border-white/5'}`}>
+            <div key={o.id} className={`p-5 rounded-3xl flex justify-between items-center relative overflow-hidden text-xs border transition-colors duration-300 shadow-sm ${o.status === 'rejected' ? 'bg-red-50 dark:bg-red-500/[0.02] border-red-200 dark:border-red-500/20' : 'bg-white dark:bg-[#111] border-neutral-200 dark:border-white/5'}`}>
               <div className="space-y-1 pr-4">
                 {o.status === 'rejected' && (
-                  <div className="mb-2 bg-red-500/10 text-red-500 border border-red-500/20 text-[8px] font-black uppercase px-2.5 py-1 rounded-md w-max">
+                  <div className="mb-2 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 border border-red-200 dark:border-red-500/20 text-[8px] font-black uppercase px-2.5 py-1 rounded-md w-max">
                     🚫 Rejected / Fake Order
                   </div>
                 )}
                 <div className="flex gap-2.5">
-                  <span className="text-[10px] font-black uppercase text-gray-500">Bill No: #{formatBillNumber(o.billNumber || 0)}</span>
-                  <span className="text-[10px] font-black uppercase text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
+                  <span className="text-[10px] font-black uppercase text-neutral-500 dark:text-gray-500">Bill No: #{formatBillNumber(o.billNumber || 0)}</span>
+                  <span className="text-[10px] font-black uppercase text-yellow-600 dark:text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
                 </div>
-                <h4 className="font-extrabold text-sm text-gray-300">Name: {o.customerName || "Customer"}</h4>
-                <p className="text-[11px] font-bold text-orange-500 font-sans">Mobile: {o.customerPhone || "N/A"}</p>
-                <p className="text-[10px] text-gray-400 font-medium">Address: {o.address || "N/A"}</p>
+                <h4 className="font-extrabold text-sm text-neutral-900 dark:text-gray-300">Name: {o.customerName || "Customer"}</h4>
+                <p className="text-[11px] font-bold text-orange-600 dark:text-orange-500 font-sans">Mobile: {o.customerPhone || "N/A"}</p>
+                <p className="text-[10px] text-neutral-500 dark:text-gray-400 font-medium">Address: {o.address || "N/A"}</p>
                 
-                <div className="border-t border-white/5 pt-2 mt-2 space-y-0.5">
+                <div className="border-t border-neutral-200 dark:border-white/5 pt-2 mt-2 space-y-0.5">
                   {o.items?.map((item: any, idx: number) => (
-                    <p key={idx} className="text-[11px] font-bold text-gray-400 font-sans">
-                      <span className="text-orange-500">×{item.quantity}</span> {item.name}
+                    <p key={idx} className="text-[11px] font-bold text-neutral-600 dark:text-gray-400 font-sans">
+                      <span className="text-orange-600 dark:text-orange-500">×{item.quantity}</span> {item.name}
                     </p>
                   ))}
                 </div>
-                <p className="text-[9px] font-semibold text-gray-500 mt-2 font-sans">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
+                <p className="text-[9px] font-semibold text-neutral-400 dark:text-gray-500 mt-2 font-sans">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className={`font-black text-lg leading-none ${o.status === 'rejected' ? 'line-through text-red-500' : 'text-green-400'}`}>₹{o.total}</p>
-                <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-md mt-2 inline-block ${o.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-400'}`}>
+                <p className={`font-black text-lg leading-none ${o.status === 'rejected' ? 'line-through text-red-500' : 'text-green-600 dark:text-green-400'}`}>₹{o.total}</p>
+                <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-md mt-2 inline-block ${o.status === 'rejected' ? 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500' : 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400'}`}>
                   {o.status === 'rejected' ? 'REJECTED' : 'PAID'}
                 </span>
               </div>
