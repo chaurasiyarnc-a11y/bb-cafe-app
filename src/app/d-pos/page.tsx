@@ -4394,26 +4394,6 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   );
                 })}
               </nav>
-
-              <div className="pt-2 border-t border-neutral-300 dark:border-neutral-800 space-y-1.5">
-                <div className="flex justify-between items-center px-1">
-                  <span className="text-[10px] font-black uppercase text-neutral-500">POS Tools</span>
-                  <button onClick={() => { setIsHelpModalOpen(true); setIsNavOpen(false); }} className="text-[10px] text-orange-600 font-bold hover:underline flex items-center gap-1"><SafeHelpCircle size={12} /> Help [F1]</button>
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button onClick={() => { setIsHeldCartsModalOpen(true); setIsNavOpen(false); }} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1"><SafePauseCircle size={13} className="text-amber-500" /> <span className="truncate">Parked</span></button>
-                  <button onClick={() => { setIsExpenseModalOpen(true); setIsNavOpen(false); }} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1"><Receipt size={13} className="text-red-500" /> <span className="truncate">Expense</span></button>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-1.5 pt-3 border-t border-neutral-300 dark:border-neutral-800">
-              <button onClick={async () => { await syncOfflineAll(true); }} disabled={isSyncing} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase bg-amber-500/15 text-amber-700">
-                {isSyncing ? <Loader2 className="animate-spin" size={13} /> : <SafeRefreshCw size={13} />} <span className="truncate">Sync Cloud</span>
-              </button>
-              <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase text-red-600 bg-red-500/15">
-                <SafeLogOut size={13} /> <span className="truncate">Lock</span>
-              </button>
             </div>
           </aside>
           {/* MAIN WORKSPACE */}
