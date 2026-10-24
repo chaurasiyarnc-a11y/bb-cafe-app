@@ -153,9 +153,8 @@ const queueOfflineUpdate = (coll: string, id: string, data: any, action = 'updat
   q.push({ coll, id, data, action, timestamp: new Date().toISOString() });
   localStorage.setItem('bb_pos_offline_updates_queue', JSON.stringify(q));
 };
-{ id: 'admin_portal', label: 'Admin Portal (Web)', icon: Power, roles: ['admin'] },
-{ id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin'] }, 
-{ id: 'billing', label: 'Counter [F2]', icon: ShoppingBag, roles: ['admin', 'cashier', 'captain'] },
+
+export default function BbCafeDesktopPos() {
   const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
     { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
     { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
