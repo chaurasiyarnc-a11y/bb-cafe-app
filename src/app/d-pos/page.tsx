@@ -12,7 +12,7 @@ import {
   Database, RefreshCw, Layers, LogOut, Lock, ToggleLeft, ToggleRight, 
   Trash2, UserPlus, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
   PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, 
-  Share2, Receipt, Send, Check, Plus, Eye,
+ Share2, Receipt, Send, Check, Plus, Eye, Menu,
   ArrowLeftRight, History, ChevronDown, ChevronUp, BellRing, Tag, Ticket, IndianRupee, Gamepad2, Power, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
