@@ -13,7 +13,7 @@ import {
   Trash2, UserPlus, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
   PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, 
   Share2, Receipt, Send, Check, Plus, Eye,
-  ArrowLeftRight, History, ChevronDown, ChevronUp, BellRing, Tag, Ticket, IndianRupee, Gamepad2
+  ArrowLeftRight, History, ChevronDown, ChevronUp, BellRing, Tag, Ticket, IndianRupee, Gamepad2, Power, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -24,6 +24,12 @@ import QRCode from 'qrcode';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import PrintCustomerReceipt from '@/components/d-pos/PrintCustomerReceipt';
 import PrintKitchenKot from '@/components/d-pos/PrintKitchenKot';
+import DashboardStats from '@/components/admin/DashboardStats';
+import OrdersTab from '@/components/admin/OrdersTab';
+import MenuTab from '@/components/admin/MenuTab';
+import CustomersTab from '@/components/admin/CustomersTab';
+import LoyaltyTab from '@/components/admin/LoyaltyTab';
+import SettingsTab from '@/components/admin/SettingsTab';
 
 const SafeLock = Lock as any;
 const SafeDatabase = Database as any;
@@ -89,6 +95,26 @@ interface QuickCustomer {
   points?: number;
 }
 
+// 👉 ADD THIS: CSV Download & Format Helper
+const triggerCsvDownload = (data: any[], filename: string, headers: string[], keys: string[]) => {
+  if (data.length === 0) return toast.error("No data available to export!");
+  const csvRows = [];
+  csvRows.push(headers.join(','));
+  data.forEach(item => {
+    const values = keys.map(key => `"${String(item[key] || '').replace(/"/g, '""')}"`);
+    csvRows.push(values.join(','));
+  });
+  const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${filename}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  toast.success("Excel Data Exported!");
+};
+
+const formatBillNumber = (num: number | string) => String(num).padStart(4, '0');
 const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
   "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
@@ -127,7 +153,9 @@ const queueOfflineUpdate = (coll: string, id: string, data: any, action = 'updat
   q.push({ coll, id, data, action, timestamp: new Date().toISOString() });
   localStorage.setItem('bb_pos_offline_updates_queue', JSON.stringify(q));
 };
-export default function BbCafeDesktopPos() {
+{ id: 'admin_portal', label: 'Admin Portal (Web)', icon: Power, roles: ['admin'] },
+{ id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin'] }, 
+{ id: 'billing', label: 'Counter [F2]', icon: ShoppingBag, roles: ['admin', 'cashier', 'captain'] },
   const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
     { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
     { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
@@ -139,7 +167,7 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'udhari' | 'customers'>('billing');
+ const [activeTab, setActiveTab] = useState<'dashboard' | 'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'udhari' | 'customers' | 'admin_portal'>('billing');
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
   // 👉 NEW: Cash Tendered Calculator On/Off
@@ -241,6 +269,80 @@ export default function BbCafeDesktopPos() {
   const [isGameVerifying, setIsGameVerifying] = useState(false);
   const [isClaimingReward, setIsClaimingReward] = useState(false);
   const [showTodaysWinnersList, setShowTodaysWinnersList] = useState(false); 
+  // 👉 ADD THIS: Admin Portal Specific States
+  const [adminSubTab, setAdminSubTab] = useState<'dashboard' | 'orders' | 'menu' | 'customers' | 'loyalty' | 'settings'>('dashboard');
+  const [storeOpen, setStoreOpen] = useState(true);
+  const [adminStartDate, setAdminStartDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().split('T')[0]; });
+  const [adminEndDate, setAdminEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [adminOrderPeriodFilter, setAdminOrderPeriodFilter] = useState<'today' | 'yesterday' | 'week'>('today');
+  
+  // Admin Collections Data
+  const [banners, setBanners] = useState<any[]>([]);
+  const [reels, setReels] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [socialProofs, setSocialProofs] = useState<any[]>([]);
+  const [pointsClaims, setPointsClaims] = useState<any[]>([]);
+  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
+  const [transferLogs, setTransferLogs] = useState<any[]>([]);
+  const [passcodes, setPasscodes] = useState({ adminPin: "", managerPin: "" });
+
+  // 👉 ADD THIS: Fetch Admin Data only when Admin tab is active
+  useEffect(() => {
+    if (activeTab === 'admin_portal' && currentUser?.role === 'admin') {
+      const unsubs = [
+        onSnapshot(doc(db, "settings", "store"), d => d.exists() && setStoreOpen(d.data().isOpen)),
+        onSnapshot(collection(db, "banners"), s => setBanners(s.docs.map(d => ({ id: d.id, ...d.data() })))),
+        onSnapshot(collection(db, "reels"), s => setReels(s.docs.map(d => ({ id: d.id, ...d.data() })))),
+        onSnapshot(collection(db, "reviews"), s => setReviews(s.docs.map(d => ({ id: d.id, ...d.data() })))),
+        onSnapshot(collection(db, "social_proofs"), s => setSocialProofs(s.docs.map(d => ({ id: d.id, ...d.data() })))),
+        onSnapshot(collection(db, "points_claims"), s => setPointsClaims(s.docs.map(d => ({ id: d.id, ...d.data() })))),
+        onSnapshot(collection(db, "loyalty_rules"), s => setLoyaltyRules(s.docs.map(d => ({ id: d.id, ...d.data() })))),
+        onSnapshot(collection(db, "point_transfers"), s => setTransferLogs(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any, b:any) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)))),
+        onSnapshot(doc(db, "settings", "passcodes"), d => d.exists() && setPasscodes(d.data() as any))
+      ];
+      return () => unsubs.forEach(unsub => unsub());
+    }
+  }, [activeTab, currentUser]);
+
+  // 👉 ADD THIS: Admin Functions
+  const toggleStoreStatus = async () => {
+    try {
+      await setDoc(doc(db, "settings", "store"), { isOpen: !storeOpen }, { merge: true });
+      toast.success(storeOpen ? "Cafe is now OFFLINE 🔴" : "Cafe is now ONLINE 🟢");
+    } catch (e) { toast.error("Error toggling store"); }
+  };
+
+  const handleAdminExportOrders = () => {
+    const filteredOrders = reportOrders.filter((o:any) => {
+      const oDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
+      const oStr = oDate.toISOString().split('T')[0];
+      return oStr >= adminStartDate && oStr <= adminEndDate;
+    });
+    triggerCsvDownload(
+      filteredOrders.map(o => ({ ...o, billNumber: formatBillNumber(o.billNumber || 0) })),
+      `orders_report_${adminStartDate}_to_${adminEndDate}`,
+      ["Bill Number", "Customer Name", "Total Amount", "Status"],
+      ["billNumber", "customerName", "total", "status"]
+    );
+  };
+
+  const handleAdminExportCustomers = () => {
+    triggerCsvDownload(
+      allCustomers, "customers_report",
+      ["ID/Phone", "Name", "Points", "Total Spent"],
+      ["id", "name", "points", "totalSpent"]
+    );
+  };
+
+  const handleAdminStatusSync = async (order: any, newStatus: string) => {
+    try {
+      await updateDoc(doc(db, "orders", order.id), { status: newStatus });
+      toast.success("Status Updated!");
+      if (newStatus === "delivered") {
+        fetch('/api/loyverse', { method: 'POST', body: JSON.stringify(order) }).catch(() => {});
+      }
+    } catch (e) { toast.error("Failed to Sync Status."); }
+  };
 
   // आज के विजेताओं की लिस्ट ढूँढने के लिए 
   const todaysGameWinners = useMemo(() => {
@@ -5964,6 +6066,92 @@ const handleSendUdhariReminder = (targetOrder: any) => {
                       );
                     })
                   )}
+                </div>
+              </div>
+            )}
+            {/* 👉 ADD THIS: ADMIN PORTAL TAB */}
+            {activeTab === 'admin_portal' && currentUser?.role === 'admin' && (
+              <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#050505] text-white">
+                
+                {/* Admin Top Navbar */}
+                <div className="flex justify-between items-center bg-[#0a0a0a] border-b border-white/10 p-4 shrink-0">
+                  <div>
+                     <h2 className="text-xl font-black italic uppercase text-orange-500">Bum Bum Cafe Admin</h2>
+                     <p className="text-[10px] text-neutral-400 font-bold tracking-widest uppercase">Web Control Center</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button onClick={toggleStoreStatus} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase flex items-center gap-2 border ${storeOpen ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                      <Power size={14} /> Store: {storeOpen ? "Online" : "Offline"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Admin Sub-Tabs */}
+                <div className="flex gap-2 p-4 shrink-0 overflow-x-auto border-b border-white/5 no-scrollbar">
+                  {['dashboard', 'orders', 'menu', 'customers', 'loyalty', 'settings'].map(tab => (
+                    <button 
+                      key={tab} 
+                      onClick={() => setAdminSubTab(tab as any)}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition-all whitespace-nowrap ${adminSubTab === tab ? 'bg-orange-600 text-white shadow-lg' : 'bg-white/5 text-neutral-400 hover:bg-white/10'}`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Admin Sub-Tab Content Area */}
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 scrollbar-hide">
+                  <div className="max-w-5xl mx-auto">
+                    
+                    {adminSubTab === 'dashboard' && (
+                      <DashboardStats 
+                        orders={reportOrders} // POS से reportOrders पास किया
+                        startDate={adminStartDate}
+                        setStartDate={setAdminStartDate}
+                        endDate={adminEndDate}
+                        setEndDate={setAdminEndDate}
+                        applyQuickSalesFilter={(type: any) => { /* Add filter logic if needed */ }}
+                        handleResetSalesData={() => {}}
+                        handleSendDailyClosingReport={() => {}}
+                        handleExportOrders={handleAdminExportOrders}
+                        handleExportCustomers={handleAdminAdminExportCustomers}
+                        setSelectedCustomerHistory={() => {}}
+                      />
+                    )}
+
+                    {adminSubTab === 'orders' && (
+                      <OrdersTab 
+                        orders={liveOrders} // POS का liveOrders
+                        orderPeriodFilter={adminOrderPeriodFilter}
+                        setOrderPeriodFilter={setAdminOrderPeriodFilter}
+                        handlePrintReceipt={(o:any) => handlePrintReceiptDirect(o, false)}
+                        handleSendWhatsAppBill={handleSendWhatsAppBill}
+                        handleStatusChange={handleAdminStatusSync}
+                        formatBillNumber={formatBillNumber}
+                      />
+                    )}
+
+                    {adminSubTab === 'menu' && (
+                      <MenuTab menu={products} categories={categories} />
+                    )}
+
+                    {adminSubTab === 'customers' && (
+                      <CustomersTab loyaltyUsers={allCustomers} orders={reportOrders} onExportCSV={handleAdminExportCustomers} />
+                    )}
+
+                    {adminSubTab === 'loyalty' && (
+                      <LoyaltyTab loyaltyRules={loyaltyRules} transferLogs={transferLogs} />
+                    )}
+
+                    {adminSubTab === 'settings' && (
+                      <SettingsTab 
+                        banners={banners} reels={reels} coupons={liveDbCoupons} reviews={reviews} 
+                        socialProofs={socialProofs} pointsClaims={pointsClaims} staff={staffList} 
+                        cafeHelperUsers={staffList} passcodes={passcodes} userRole="admin" storeOpen={storeOpen} 
+                      />
+                    )}
+
+                  </div>
                 </div>
               </div>
             )}
