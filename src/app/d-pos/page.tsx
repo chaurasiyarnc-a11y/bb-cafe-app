@@ -171,7 +171,29 @@ export default function BbCafeDesktopPos() {
   const [gstRate, setGstRate] = useState(5);
   // 👉 NEW: Cash Tendered Calculator On/Off
   const [cashTenderEnabled, setCashTenderEnabled] = useState(false);
-  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('light');
+  const [themeMode, setThemeMode] = useState<'dark' | 'light' | 'auto'>('auto');
+  const [isSystemDark, setIsSystemDark] = useState(false);
+
+  // 👉 System Theme (Auto) को ट्रैक करने वाला लॉजिक
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsSystemDark(mediaQuery.matches);
+    
+    const handleChange = (e: MediaQueryListEvent) => setIsSystemDark(e.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  // 👉 जब भी Theme या System Theme बदले, तो HTML से 'dark' क्लास लगायें/हटाएं
+  useEffect(() => {
+    const root = document.documentElement;
+    if (themeMode === 'dark' || (themeMode === 'auto' && isSystemDark)) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [themeMode, isSystemDark]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
