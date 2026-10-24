@@ -4278,7 +4278,9 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     e.target.value = '';
   };
 
-  const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#121212] text-neutral-100" : "bg-[#f4f5f7] text-neutral-900");
+const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSystemDark);
+  const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden transition-colors duration-300 " + 
+    (isCurrentlyDark ? "dark bg-[#121212] text-neutral-100" : "bg-[#f4f5f7] text-neutral-900");
 
   return (
     <div className={mainClass}>
