@@ -6114,7 +6114,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
                         handleResetSalesData={() => {}}
                         handleSendDailyClosingReport={() => {}}
                         handleExportOrders={handleAdminExportOrders}
-                        handleExportCustomers={handleAdminAdminExportCustomers}
+                       handleExportCustomers={handleAdminExportCustomers}
                         setSelectedCustomerHistory={() => {}}
                       />
                     )}
