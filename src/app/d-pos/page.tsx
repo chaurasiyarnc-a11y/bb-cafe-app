@@ -4343,7 +4343,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
         </div>
       ) : (
         <>
-          {/* 👉 NEW TOUCH POS DRAWER (SIDEBAR) */}
+   {/* 👉 NEW TOUCH POS DRAWER (SIDEBAR) */}
           {isNavOpen && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" onClick={() => setIsNavOpen(false)} />
           )}
@@ -4390,9 +4390,6 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                         <Icon size={16} className="shrink-0" />
                         <span className="truncate">{item.label}</span>
                       </div>
-                      {item.id === 'settlement' && unsettledOrdersCount > 0 && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">{unsettledOrdersCount}</span>}
-                      {item.id === 'tables' && activeTableOrders.length > 0 && <span className="bg-amber-500 text-black text-[10px] px-2 py-0.5 rounded-full font-black">{activeTableOrders.length}</span>}
-                      {item.id === 'orders' && activeLiveOrders.length > 0 && <span className="bg-cyan-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-bounce shadow-[0_0_8px_rgba(6,182,212,0.8)]">{activeLiveOrders.length}</span>}
                     </button>
                   );
                 })}
