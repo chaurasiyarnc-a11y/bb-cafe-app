@@ -6394,9 +6394,10 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
             {activeTab === 'dashboard' && (
               <div className="flex-1 p-6 lg:p-10 h-full overflow-y-auto bg-[#f3f4f6] dark:bg-[#0a0a0a]">
                 
-                {/* 👉 DASHBOARD NAVIGATION BUTTONS (TABS) */}
+               {/* 👉 DASHBOARD NAVIGATION BUTTONS (TABS) */}
                 <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-neutral-900 p-3 rounded-2xl shadow-sm border border-neutral-200 dark:border-neutral-800">
-                   <div>
+                   <div className="flex items-center gap-3">
+                     <button onClick={() => setIsNavOpen(true)} className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"><Menu size={20} /></button>
                      <h2 className="text-xl font-black uppercase text-neutral-900 dark:text-white flex items-center gap-2">
                        <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-600 p-2 rounded-xl"><LayoutDashboard size={20} /></span>
                        Master Dashboard
