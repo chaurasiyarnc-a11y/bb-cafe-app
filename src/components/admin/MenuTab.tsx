@@ -489,15 +489,15 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 transition-colors duration-300">
       {/* --- मुख्य सब-टैब बटन्स --- */}
-      <div className="flex gap-2 border-b border-white/5 pb-2">
+      <div className="flex gap-2 border-b border-neutral-200 dark:border-white/5 pb-2 transition-colors duration-300">
         <button
           onClick={() => setMenuSubTab('items')}
           className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-150 ${
             menuSubTab === 'items' 
-              ? 'bg-orange-500 text-white shadow-lg' 
-              : 'bg-white/5 text-gray-400 hover:text-white'
+              ? 'bg-orange-600 dark:bg-orange-500 text-white shadow-lg' 
+              : 'bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:text-neutral-900 dark:hover:text-white'
           }`}
         >
           🍔 Menu Items ({menu.length})
@@ -506,8 +506,8 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
           onClick={() => setMenuSubTab('categories')}
           className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-150 ${
             menuSubTab === 'categories' 
-              ? 'bg-orange-500 text-white shadow-lg' 
-              : 'bg-white/5 text-gray-400 hover:text-white'
+              ? 'bg-orange-600 dark:bg-orange-500 text-white shadow-lg' 
+              : 'bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:text-neutral-900 dark:hover:text-white'
           }`}
         >
           📁 Categories ({categories.length})
@@ -518,129 +518,129 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
       {menuSubTab === 'items' && (
         <div className="space-y-4">
           <div className="flex flex-col gap-2">
-            <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">
+            <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md hover:bg-yellow-500">
               📥 IMPORT ALL 80+ PDF MENU ITEMS
             </button>
             
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={handleMergeDuplicates} className="bg-indigo-700 hover:bg-indigo-800 text-white py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all">
+              <button onClick={handleMergeDuplicates} className="bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all">
                 🔍 Merge Existing Duplicates
               </button>
-              <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 hover:bg-orange-500/20 active:scale-95 transition-all uppercase">
+              <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-500 border border-orange-200 dark:border-orange-500/20 py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 hover:bg-orange-200 dark:hover:bg-orange-500/20 active:scale-95 transition-all uppercase">
                 <Plus size={16}/> {showAddForm ? "CLOSE FORM" : "ADD NEW ITEM"}
               </button>
             </div>
           </div>
 
           {/* डिश सर्च बार */}
-          <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
+          <div className="sticky top-[73px] z-30 bg-white/95 dark:bg-[#050505]/95 backdrop-blur-md py-4 border-b border-neutral-200 dark:border-white/5 rounded-b-3xl shadow-sm transition-colors duration-300">
             <div className="relative group max-w-lg mx-auto">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-gray-400" size={16} />
               <input 
                 type="text" 
                 placeholder="Search item name or category..." 
                 value={menuSearchQuery} 
                 onChange={(e) => setMenuSearchQuery(e.target.value)}
-                className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none text-xs font-semibold"
+                className="w-full bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white py-3 px-11 rounded-xl outline-none text-xs font-semibold border border-transparent focus:border-orange-500 transition-colors duration-300"
               />
             </div>
           </div>
 
           {/* --- ADD NEW PRODUCT FORM --- */}
           {showAddForm && (
-            <form onSubmit={handleAddProduct} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-lg font-black text-orange-500 italic uppercase">Add Product Form</h3>
+            <form onSubmit={handleAddProduct} className="bg-white dark:bg-[#020202] border border-neutral-200 dark:border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-sm transition-colors duration-300">
+              <h3 className="text-lg font-black text-orange-600 dark:text-orange-500 italic uppercase">Add Product Form</h3>
               
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-                <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
+                <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Item Name</label>
+                <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" required />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white cursor-pointer" required>
+                <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Category</label>
+                <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white cursor-pointer focus:border-orange-500 transition-colors duration-300" required>
                   {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
-                    <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
+                    <option key={cat} value={cat} className="dark:bg-[#111]">{cat}</option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-                <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
+                <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Image URL</label>
+                <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" required />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
-                <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white cursor-pointer">
-                  <option value="none" className="bg-[#111]">None (Single Price)</option>
-                  <option value="half_full" className="bg-[#111]">Half / Full</option>
-                  <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
-                  <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes</option>
+                <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Portion Option Type</label>
+                <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white cursor-pointer focus:border-orange-500 transition-colors duration-300">
+                  <option value="none" className="dark:bg-[#111]">None (Single Price)</option>
+                  <option value="half_full" className="dark:bg-[#111]">Half / Full</option>
+                  <option value="plain_butter" className="dark:bg-[#111]">Plain / Butter</option>
+                  <option value="pizza_sizes" className="dark:bg-[#111]">Pizza Sizes</option>
                 </select>
               </div>
 
               {variantType === 'none' && (
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-404 uppercase">Price (₹)</label>
-                  <input type="number" placeholder="Item Price" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                  <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Price (₹)</label>
+                  <input type="number" placeholder="Item Price" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" />
                 </div>
               )}
 
               {(variantType === 'half_full' || variantType === 'plain_butter') && (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label>
-                    <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                    <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Half / Plain Price (₹)</label>
+                    <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label>
-                    <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                    <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Full / Butter Price (₹)</label>
+                    <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" />
                   </div>
                 </div>
               )}
 
               {variantType === 'pizza_sizes' && (
-                <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
-                  <p className="text-[10px] text-orange-400 font-extrabold uppercase font-sans">Prices (Leave blank if unavailable):</p>
+                <div className="space-y-3 bg-neutral-50 dark:bg-[#111]/40 p-4 rounded-2xl border border-neutral-200 dark:border-white/5 transition-colors duration-300">
+                  <p className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase font-sans">Prices (Leave blank if unavailable):</p>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-neutral-900 dark:text-white text-xs font-bold focus:border-orange-500 transition-colors duration-300" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-neutral-900 dark:text-white text-xs font-bold focus:border-orange-500 transition-colors duration-300" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-neutral-900 dark:text-white text-xs font-bold focus:border-orange-500 transition-colors duration-300" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-neutral-900 dark:text-white text-xs font-bold focus:border-orange-500 transition-colors duration-300" /></div>
                   </div>
                 </div>
               )}
 
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Save Product</button>
+              <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white p-4 rounded-xl font-black text-sm uppercase shadow-sm transition-colors">Save Product</button>
             </form>
           )}
 
           {/* डिशेज की रेंडरिंग लिस्ट */}
           <div className="space-y-3 pt-2">
             {searchedMenu.length === 0 ? (
-              <p className="text-center text-xs font-black uppercase text-gray-400 py-10">No matching dishes found...</p>
+              <p className="text-center text-xs font-black uppercase text-neutral-500 dark:text-gray-400 py-10">No matching dishes found...</p>
             ) : (
               searchedMenu.map((item) => (
-                <div key={item.id} className="bg-white/[0.02] p-4 rounded-3xl border border-white/5 flex items-center gap-4 hover:bg-white/[0.04] transition-all">
-                  <img src={item.image} className="w-16 h-16 rounded-2xl object-cover opacity-80" alt={item.name} />
+                <div key={item.id} className="bg-neutral-50 dark:bg-white/[0.02] p-4 rounded-3xl border border-neutral-200 dark:border-white/5 flex items-center gap-4 hover:border-orange-500 dark:hover:bg-white/[0.04] transition-all shadow-sm">
+                  <img src={item.image} className="w-16 h-16 rounded-2xl object-cover opacity-90 dark:opacity-80" alt={item.name} />
                   <div className="flex-1">
-                    <h4 className="font-bold text-sm">{item.name}</h4>
-                    <p className="text-orange-500 font-black text-xs italic capitalize">{item.category}</p>
-                    <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
+                    <h4 className="font-bold text-sm text-neutral-900 dark:text-white">{item.name}</h4>
+                    <p className="text-orange-600 dark:text-orange-500 font-black text-xs italic capitalize">{item.category}</p>
+                    <p className="text-orange-600 dark:text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => { setSopProduct(item); setSopRecipeText(item.recipe || ""); }} 
-                      className="p-3 bg-purple-500/10 text-purple-500 rounded-xl flex items-center gap-1.5"
+                      className="p-3 bg-purple-100 text-purple-600 dark:bg-purple-500/10 dark:text-purple-500 rounded-xl flex items-center gap-1.5 hover:bg-purple-200 dark:hover:bg-purple-500/20 transition-colors"
                     >
                       <BookOpen size={16}/> <span className="text-[10px] font-black">SOP</span>
                     </button>
-                    <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><Edit size={18}/></button>
-                    <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                    <button onClick={() => startEditing(item)} className="p-3 bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-500 rounded-xl hover:bg-blue-200 dark:hover:bg-blue-500/20 transition-colors"><Edit size={18}/></button>
+                    <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-100 text-green-600 dark:bg-green-500/10 dark:text-green-500 hover:bg-green-200 dark:hover:bg-green-500/20' : 'bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-500 hover:bg-red-200 dark:hover:bg-red-500/20'}`}>
                       {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                     </button>
-                    <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl"><Trash size={18}/></button>
+                    <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-500 rounded-xl hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors"><Trash size={18}/></button>
                   </div>
                 </div>
               ))
@@ -653,15 +653,15 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
       {menuSubTab === 'categories' && (
         <div className="space-y-6 pt-2">
           {/* 'All' Category Toggle Switch */}
-          <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs text-left">
+          <div className="bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs text-left shadow-sm transition-colors duration-300">
             <div>
-              <h4 className="font-black text-gray-200">Show "All" Tab on Homepage</h4>
-              <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5 font-mono">होमपेज पर 'सभी (All)' टैब को दिखाना या छुपाना यहाँ से सेट करें।</p>
+              <h4 className="font-black text-neutral-900 dark:text-gray-200">Show "All" Tab on Homepage</h4>
+              <p className="text-[9px] text-neutral-500 dark:text-gray-500 font-bold uppercase mt-0.5 font-mono">होमपेज पर 'सभी (All)' टैब को दिखाना या छुपाना यहाँ से सेट करें।</p>
             </div>
             <button 
               onClick={toggleShowAllCategory} 
               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${
-                showAllCategory ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'
+                showAllCategory ? 'bg-green-100 text-green-700 border border-green-300 dark:bg-green-500/20 dark:text-green-500 dark:border-green-500/30' : 'bg-red-100 text-red-700 border border-red-300 dark:bg-red-500/20 dark:text-red-500 dark:border-red-500/30'
               }`}
             >
               {showAllCategory ? "SHOWING" : "HIDDEN"}
@@ -673,7 +673,7 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
             <button 
               onClick={handleCleanEmptyCategories}
               type="button" 
-              className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 py-3 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 transition-all"
+              className="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 dark:bg-red-500/10 dark:hover:bg-red-500/20 dark:text-red-500 dark:border-red-500/20 py-3 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 transition-all shadow-sm"
             >
               🧹 Auto-Delete All Unused Categories ({emptyCategoriesCount} Empty)
             </button>
@@ -681,11 +681,11 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
 
           {/* रीयल-टाइम मिसिंग कैटेगरी फाइंडर */}
           {missingCategories.length > 0 && (
-            <div className="bg-yellow-500/5 border border-yellow-500/20 p-5 rounded-[2rem] space-y-3 text-left">
-              <h4 className="text-xs font-black text-yellow-500 uppercase flex items-center gap-1.5">
+            <div className="bg-yellow-50 dark:bg-yellow-500/5 border border-yellow-200 dark:border-yellow-500/20 p-5 rounded-[2rem] space-y-3 text-left shadow-sm transition-colors duration-300">
+              <h4 className="text-xs font-black text-yellow-600 dark:text-yellow-500 uppercase flex items-center gap-1.5">
                 ⚠️ Missing Categories Found in Products ({missingCategories.length})
               </h4>
-              <p className="text-[9px] text-gray-400 font-bold uppercase leading-relaxed font-mono">
+              <p className="text-[9px] text-neutral-500 dark:text-gray-400 font-bold uppercase leading-relaxed font-mono">
                 ये कैटेगरीज आपके प्रोडक्ट्स में उपयोग की गई हैं, लेकिन "categories" लिस्ट में नहीं हैं। इन्हें यहाँ से सिंक करें:
               </p>
               <div className="flex flex-wrap gap-2 pt-1">
@@ -705,7 +705,7 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
                         toast.error("Error syncing category");
                       }
                     }}
-                    className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 border border-yellow-500/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all"
+                    className="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border border-yellow-300 dark:bg-yellow-500/10 dark:hover:bg-yellow-500/20 dark:text-yellow-500 dark:border-yellow-500/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all"
                   >
                     ➕ Sync "{missingCat}"
                   </button>
@@ -716,8 +716,8 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
 
           {/* कैटेगरी फॉर्म (Add / Edit Form Switch) */}
           {!editingCatId ? (
-            <form onSubmit={handleAddCategory} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-left">
-              <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
+            <form onSubmit={handleAddCategory} className="bg-white dark:bg-[#020202] border border-neutral-200 dark:border-white/5 p-6 rounded-[2.5rem] space-y-4 text-left shadow-sm transition-colors duration-300">
+              <h3 className="text-sm font-black text-orange-600 dark:text-orange-500 uppercase flex items-center gap-1.5">
                 <ImageIcon size={14}/> Add New Category
               </h3>
               <div className="space-y-3 text-xs">
@@ -726,7 +726,7 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
                   placeholder="Category Name (e.g. Special Pizza, Momos)" 
                   value={newCatName} 
                   onChange={(e) => setNewCatName(e.target.value)} 
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
+                  className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs text-neutral-900 dark:text-white outline-none focus:border-orange-500 transition-colors duration-300" 
                   required 
                 />
                 <input 
@@ -734,16 +734,16 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
                   placeholder="Category Cover Image URL Link" 
                   value={newCatCoverUrl} 
                   onChange={(e) => setNewCatCoverUrl(e.target.value)} 
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
+                  className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs text-neutral-900 dark:text-white outline-none focus:border-orange-500 transition-colors duration-300" 
                 />
               </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase hover:bg-green-700 transition-all">
+              <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white p-3.5 rounded-xl font-black text-xs uppercase transition-colors shadow-sm">
                 Add Category
               </button>
             </form>
           ) : (
-            <form onSubmit={handleUpdateCategory} className="bg-orange-500/5 border border-orange-500/20 p-6 rounded-[2.5rem] space-y-4 text-left">
-              <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
+            <form onSubmit={handleUpdateCategory} className="bg-orange-50 dark:bg-orange-500/5 border border-orange-200 dark:border-orange-500/20 p-6 rounded-[2.5rem] space-y-4 text-left shadow-sm transition-colors duration-300">
+              <h3 className="text-sm font-black text-orange-600 dark:text-orange-500 uppercase flex items-center gap-1.5">
                 <Edit size={14}/> Edit Category / अपडेट
               </h3>
               <div className="space-y-3 text-xs">
@@ -751,21 +751,21 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
                   type="text" 
                   value={editingCatName} 
                   onChange={(e) => setEditingCatName(e.target.value)} 
-                  className="w-full bg-[#111] border border-orange-500/20 rounded-xl p-3 text-xs text-white outline-none" 
+                  className="w-full bg-white dark:bg-[#111] border border-orange-300 dark:border-orange-500/20 rounded-xl p-3 text-xs text-neutral-900 dark:text-white outline-none focus:border-orange-500 transition-colors duration-300" 
                   required 
                 />
                 <input 
                   type="url" 
                   value={editingCatCoverUrl} 
                   onChange={(e) => setEditingCatCoverUrl(e.target.value)} 
-                  className="w-full bg-[#111] border border-orange-500/20 rounded-xl p-3 text-xs text-white outline-none" 
+                  className="w-full bg-white dark:bg-[#111] border border-orange-300 dark:border-orange-500/20 rounded-xl p-3 text-xs text-neutral-900 dark:text-white outline-none focus:border-orange-500 transition-colors duration-300" 
                 />
               </div>
               <div className="flex gap-2">
-                <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-xl font-black text-xs uppercase hover:bg-green-700 transition-all">
+                <button type="submit" className="flex-1 bg-green-600 hover:bg-green-500 text-white p-3 rounded-xl font-black text-xs uppercase transition-colors shadow-sm">
                   Save Changes
                 </button>
-                <button type="button" onClick={() => setEditingCatId(null)} className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase">
+                <button type="button" onClick={() => setEditingCatId(null)} className="bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:bg-neutral-300 dark:hover:text-white p-3 rounded-xl font-black text-xs uppercase transition-colors">
                   Cancel
                 </button>
               </div>
@@ -775,12 +775,12 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
           {/* कैटेगरीज ग्रिड लिस्ट (With Analysis Badges) */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {categoriesWithAnalysis.map(cat => (
-              <div key={cat.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative text-left">
-                <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center relative">
+              <div key={cat.id} className="bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 p-3 rounded-2xl relative text-left shadow-sm transition-colors duration-300">
+                <div className="h-24 overflow-hidden rounded-xl bg-neutral-200 dark:bg-neutral-900 flex items-center justify-center relative">
                   {cat.coverUrl ? (
-                    <img src={cat.coverUrl} className="w-full h-full object-cover opacity-80" alt={cat.name} />
+                    <img src={cat.coverUrl} className="w-full h-full object-cover opacity-90 dark:opacity-80" alt={cat.name} />
                   ) : (
-                    <div className="text-[10px] text-gray-500 font-bold uppercase">No Image</div>
+                    <div className="text-[10px] text-neutral-500 dark:text-gray-500 font-bold uppercase">No Image</div>
                   )}
 
                   {/* रीयल-टाइम आइटम्स काउंट बैज */}
@@ -790,31 +790,31 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
 
                   {/* empty/unused कैटेगरी के लिए अलर्ट बैज */}
                   {cat.productCount === 0 && (
-                    <div className="absolute bottom-2 left-2 bg-red-600/90 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase">
+                    <div className="absolute bottom-2 left-2 bg-red-600/90 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase shadow-sm">
                       ⚠️ Unused
                     </div>
                   )}
                   {/* duplicate कैटेगरी के लिए अलर्ट बैज */}
                   {cat.isDuplicateName && (
-                    <div className="absolute top-2 right-2 bg-red-900 text-red-200 px-1.5 py-0.5 rounded text-[7px] font-black uppercase">
+                    <div className="absolute top-2 right-2 bg-red-900 text-red-200 px-1.5 py-0.5 rounded text-[7px] font-black uppercase shadow-sm">
                       🚨 Duplicate
                     </div>
                   )}
                 </div>
                 <div className="mt-2 text-[10px] flex justify-between items-center">
-                  <span className="font-black truncate pr-1">{cat.name}</span>
+                  <span className="font-black truncate pr-1 text-neutral-900 dark:text-white">{cat.name}</span>
                   <div className="flex gap-1">
-                    <button onClick={() => toggleCategoryVisibility(cat)} className="p-1 bg-white/5 rounded text-gray-400" title="Toggle Visibility">
+                    <button onClick={() => toggleCategoryVisibility(cat)} className="p-1.5 bg-neutral-200 dark:bg-white/5 rounded text-neutral-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Toggle Visibility">
                       {cat.isVisible !== false ? <Eye size={12}/> : <EyeOff size={12}/>}
                     </button>
                     <button onClick={() => {
                       setEditingCatId(cat.id);
                       setEditingCatName(cat.name);
                       setEditingCatCoverUrl(cat.coverUrl || "");
-                    }} className="p-1 bg-blue-500/10 text-blue-400 rounded" title="Edit">
+                    }} className="p-1.5 bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-500/20 transition-colors" title="Edit">
                       <Settings size={12}/>
                     </button>
-                    <button onClick={() => handleDeleteCategory(cat.id)} className="p-1 bg-red-500/10 text-red-500 rounded" title="Delete">
+                    <button onClick={() => handleDeleteCategory(cat.id)} className="p-1.5 bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-500 rounded hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors" title="Delete">
                       <Trash size={12}/>
                     </button>
                   </div>
@@ -822,7 +822,7 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
               </div>
             ))}
             {categories.length === 0 && (
-              <p className="col-span-full text-center text-gray-500 py-6 text-xs uppercase font-bold">No categories found in database.</p>
+              <p className="col-span-full text-center text-neutral-500 dark:text-gray-500 py-6 text-xs uppercase font-bold">No categories found in database.</p>
             )}
           </div>
         </div>
@@ -830,71 +830,71 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
 
       {/* --- OVERLAY EDIT DISH MODAL --- */}
       {editingProduct && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[200] flex items-center justify-center p-4 overflow-y-auto">
-          <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
-            <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full"><X size={18}/></button>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 overflow-y-auto">
+          <form onSubmit={handleUpdateProduct} className="bg-white dark:bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto shadow-2xl space-y-4 transition-colors duration-300">
+            <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-400 hover:text-neutral-900 dark:hover:text-white rounded-full transition-all"><X size={18}/></button>
             
-            <div className="text-center pb-2 border-b border-white/5">
-              <h3 className="text-xl font-black text-orange-500 italic uppercase">Edit Product Info</h3>
+            <div className="text-center pb-2 border-b border-neutral-200 dark:border-white/5">
+              <h3 className="text-xl font-black text-orange-600 dark:text-orange-500 italic uppercase">Edit Product Info</h3>
             </div>
             
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500" required />
+              <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Item Name</label>
+              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" required />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500 cursor-pointer" required>
+              <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Category</label>
+              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 cursor-pointer transition-colors duration-300" required>
                 {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
-                  <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
+                  <option key={cat} value={cat} className="dark:bg-[#111]">{cat}</option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-              <input type="url" value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500" required />
+              <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Image URL</label>
+              <input type="url" value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" required />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-404 uppercase">Option Type</label>
-              <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500 cursor-pointer">
-                <option value="none" className="bg-[#111]">None (Single Price)</option>
-                <option value="half_full" className="bg-[#111]">Half / Full</option>
-                <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
-                <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes</option>
+              <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Option Type</label>
+              <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 cursor-pointer transition-colors duration-300">
+                <option value="none" className="dark:bg-[#111]">None (Single Price)</option>
+                <option value="half_full" className="dark:bg-[#111]">Half / Full</option>
+                <option value="plain_butter" className="dark:bg-[#111]">Plain / Butter</option>
+                <option value="pizza_sizes" className="dark:bg-[#111]">Pizza Sizes</option>
               </select>
             </div>
 
             {editVariantType === 'none' && (
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-404 uppercase">Price (₹)</label>
-                <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                <label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Price (₹)</label>
+                <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" />
               </div>
             )}
 
             {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
-                <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
+                <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-neutral-900 dark:text-white text-xs font-bold focus:border-orange-500 transition-colors duration-300" /></div>
+                <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-neutral-900 dark:text-white text-xs font-bold focus:border-orange-500 transition-colors duration-300" /></div>
               </div>
             )}
 
             {editVariantType === 'pizza_sizes' && (
-              <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
+              <div className="space-y-3 bg-neutral-50 dark:bg-[#111]/40 p-4 rounded-2xl border border-neutral-200 dark:border-white/5 transition-colors duration-300">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Small Price</label><input type="number" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                  <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Medium Price</label><input type="number" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                  <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Large Price</label><input type="number" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                  <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Extra Large</label><input type="number" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Small Price</label><input type="number" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Medium Price</label><input type="number" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Large Price</label><input type="number" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-neutral-500 dark:text-gray-400 uppercase">Extra Large</label><input type="number" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs font-bold text-neutral-900 dark:text-white focus:border-orange-500 transition-colors duration-300" /></div>
                 </div>
               </div>
             )}
 
             <div className="flex gap-2 pt-2">
-              <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Item</button>
-              <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
+              <button type="submit" className="flex-1 bg-green-600 hover:bg-green-500 text-white p-4 rounded-xl font-black text-sm uppercase shadow-sm transition-colors duration-300">Update Item</button>
+              <button type="button" onClick={() => setEditingProduct(null)} className="flex-1 bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:bg-neutral-300 dark:hover:text-white p-4 rounded-xl font-black text-sm uppercase transition-colors duration-300">Cancel</button>
             </div>
           </form>
         </div>
@@ -903,32 +903,32 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
       {/* --- OVERLAY DIGITAL RECIPE GUIDE (SOP MODAL) --- */}
       {sopProduct && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <form onSubmit={handleSaveSopRecipe} className="bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
+          <form onSubmit={handleSaveSopRecipe} className="bg-white dark:bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 transition-colors duration-300">
             <button 
               type="button" 
               onClick={() => setSopProduct(null)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2.5 bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-400 hover:text-neutral-900 dark:hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
-            <div className="text-center pb-2 border-b border-white/5">
-              <h3 className="text-lg font-black text-orange-500 uppercase italic">Digital Cooking SOP Guide</h3>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Dish: {sopProduct.name}</p>
+            <div className="text-center pb-2 border-b border-neutral-200 dark:border-white/5">
+              <h3 className="text-lg font-black text-orange-600 dark:text-orange-500 uppercase italic">Digital Cooking SOP Guide</h3>
+              <p className="text-[10px] text-neutral-500 dark:text-gray-500 uppercase tracking-widest font-black mt-0.5">Dish: {sopProduct.name}</p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Step-by-Step Cooking Instructions</label>
+              <label className="text-[10px] font-bold text-neutral-500 dark:text-gray-400 uppercase">Step-by-Step Cooking Instructions</label>
               <textarea 
                 value={sopRecipeText} 
                 onChange={(e) => setSopRecipeText(e.target.value)} 
                 placeholder="Write down the detailed step-by-step recipe, quantity of ingredients..." 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-44 resize-none leading-relaxed"
+                className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-neutral-900 dark:text-white h-44 resize-none leading-relaxed transition-colors duration-300 placeholder:text-neutral-400 dark:placeholder:text-gray-500"
               />
             </div>
 
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Save SOP Guide</button>
-              <button type="button" onClick={() => setSopProduct(null)} className="bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
+              <button type="submit" className="flex-1 bg-green-600 hover:bg-green-500 text-white p-3.5 rounded-xl font-black text-xs uppercase shadow-sm transition-colors">Save SOP Guide</button>
+              <button type="button" onClick={() => setSopProduct(null)} className="flex-1 bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:bg-neutral-300 dark:hover:text-white p-3.5 rounded-xl font-black text-xs uppercase transition-colors">Close</button>
             </div>
           </form>
         </div>
