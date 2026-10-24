@@ -4417,19 +4417,19 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                     </div>
                   )}
 
-                 {/* SEARCH BAR & MENU BUTTON */}
+                {/* SEARCH BAR & MENU BUTTON */}
                   <div className="flex gap-2.5 mb-3 items-center shrink-0">
                     <button onClick={() => setIsNavOpen(true)} className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"><Menu size={20} /></button>
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
                       <input ref={searchInputRef} type="text" placeholder="Search item / Type Code [F2]" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearchInputKeyDown} className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-neutral-900 dark:text-white outline-none focus:border-orange-500 shadow-sm" autoFocus />
                     </div>
-                    <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow shrink-0"><SafePlus size={15} /> Add</button>
+                    <button onClick={() => setIsCatManagerModalOpen(true)} className="hidden md:flex bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2.5 rounded-xl text-xs font-black uppercase items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shrink-0"><ArrowLeftRight size={14} className="text-orange-500" /> Cats</button>
+                    <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow shrink-0"><SafePlus size={15} /> Add</button>
                   </div>
 
                   {/* 👉 TOUCH POS LAYOUT (LEFT CATEGORIES, CENTER ITEMS) */}
                   <div className="flex flex-1 overflow-hidden gap-3">
-                    
                     {/* LEFT: VERTICAL CATEGORIES */}
                     <div className="w-28 md:w-36 flex flex-col gap-2 overflow-y-auto pr-1 shrink-0 pb-20 scrollbar-hide">
                       {['⭐ Top Items', ...categories].map((cat) => {
@@ -4475,7 +4475,6 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       )}
                     </div>
                   </div>
-                </div>
 {/* RIGHT CART PANEL */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-300 dark:border-neutral-800 flex flex-col p-3 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
