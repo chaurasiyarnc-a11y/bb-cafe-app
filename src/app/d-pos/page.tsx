@@ -1649,10 +1649,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     setCashTenderEnabled(localStorage.getItem("bb_pos_cash_tender_enabled_pc") === 'true');
     setKotEnabled(localStorage.getItem("bb_pos_kot_enabled_pc") !== 'false'); 
 
-    const localTheme = localStorage.getItem("bb_pos_theme_pc") || 'light';
-    setThemeMode(localTheme as any);
-    if (localTheme === 'dark') document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
+   const localTheme = localStorage.getItem("bb_pos_theme_pc") || 'auto';
+    setThemeMode(localTheme as 'dark' | 'light' | 'auto');
 
     const savedCart = localStorage.getItem("bb_pos_saved_cart_pc");
     const savedRecents = localStorage.getItem("bb_pos_recent_customers");
