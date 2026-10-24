@@ -4345,14 +4345,12 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
         </div>
       ) : (
         <>
-          {/* 👉 NEW TOUCH POS DRAWER (SIDEBAR) */}
+          {{/* 👉 NEW TOUCH POS DRAWER (SIDEBAR) */}
           {isNavOpen && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" onClick={() => setIsNavOpen(false)} />
           )}
 
           <aside className={`fixed top-0 left-0 h-full w-64 z-[110] bg-white dark:bg-neutral-900 border-r border-neutral-300 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 select-none transition-transform duration-300 shadow-2xl ${isNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-            
-            {/* Close Button */}
             <button onClick={() => setIsNavOpen(false)} className="absolute -right-3 top-7 bg-red-600 text-white p-1 rounded-full shadow-md hover:bg-red-500 transition-all z-20">
               <SafeX size={14} />
             </button>
@@ -4394,17 +4392,9 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                         <Icon size={16} className="shrink-0" />
                         <span className="truncate">{item.label}</span>
                       </div>
-                      {item.id === 'settlement' && unsettledOrdersCount > 0 && (
-                        <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">{unsettledOrdersCount}</span>
-                      )}
-                      {item.id === 'tables' && activeTableOrders.length > 0 && (
-                        <span className="bg-amber-500 text-black text-[10px] px-2 py-0.5 rounded-full font-black">{activeTableOrders.length}</span>
-                      )}
-                      {item.id === 'orders' && activeLiveOrders.length > 0 && (
-                        <span className="bg-cyan-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-bounce shadow-[0_0_8px_rgba(6,182,212,0.8)]">
-                          {activeLiveOrders.length}
-                        </span>
-                      )}
+                      {item.id === 'settlement' && unsettledOrdersCount > 0 && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">{unsettledOrdersCount}</span>}
+                      {item.id === 'tables' && activeTableOrders.length > 0 && <span className="bg-amber-500 text-black text-[10px] px-2 py-0.5 rounded-full font-black">{activeTableOrders.length}</span>}
+                      {item.id === 'orders' && activeLiveOrders.length > 0 && <span className="bg-cyan-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-bounce shadow-[0_0_8px_rgba(6,182,212,0.8)]">{activeLiveOrders.length}</span>}
                     </button>
                   );
                 })}
@@ -4413,35 +4403,21 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
               <div className="pt-2 border-t border-neutral-300 dark:border-neutral-800 space-y-1.5">
                 <div className="flex justify-between items-center px-1">
                   <span className="text-[10px] font-black uppercase text-neutral-500">POS Tools</span>
-                  <button onClick={() => { setIsHelpModalOpen(true); setIsNavOpen(false); }} className="text-[10px] text-orange-600 font-bold hover:underline flex items-center gap-1">
-                    <SafeHelpCircle size={12} /> Help [F1]
-                  </button>
+                  <button onClick={() => { setIsHelpModalOpen(true); setIsNavOpen(false); }} className="text-[10px] text-orange-600 font-bold hover:underline flex items-center gap-1"><SafeHelpCircle size={12} /> Help [F1]</button>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
-                  <button onClick={() => { setIsHeldCartsModalOpen(true); setIsNavOpen(false); }} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
-                    <SafePauseCircle size={13} className="text-amber-500 shrink-0" />
-                    <span className="truncate">Parked ({heldCarts.length})</span>
-                  </button>
-                  <button onClick={() => { setIsExpenseModalOpen(true); setIsNavOpen(false); }} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
-                    <Receipt size={13} className="text-red-500 shrink-0" />
-                    <span className="truncate">Expense [F6]</span>
-                  </button>
+                  <button onClick={() => { setIsHeldCartsModalOpen(true); setIsNavOpen(false); }} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1"><SafePauseCircle size={13} className="text-amber-500" /> <span className="truncate">Parked</span></button>
+                  <button onClick={() => { setIsExpenseModalOpen(true); setIsNavOpen(false); }} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1"><Receipt size={13} className="text-red-500" /> <span className="truncate">Expense</span></button>
                 </div>
               </div>
             </div>
 
             <div className="space-y-1.5 pt-3 border-t border-neutral-300 dark:border-neutral-800">
-              <button 
-                onClick={async () => { await syncOfflineAll(true); }} 
-                disabled={isSyncing} 
-                className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase transition-colors duration-300 ${syncSuccess ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'text-amber-700 dark:text-yellow-500 bg-amber-500/15 hover:bg-amber-500/25'}`}
-              >
-                {isSyncing ? <Loader2 className="animate-spin shrink-0" size={13} /> : (syncSuccess ? <Check size={13} /> : <SafeRefreshCw size={13} />)}
-                <span className="truncate">{syncSuccess ? 'Synced Data ✅' : 'Sync Cloud'}</span>
+              <button onClick={async () => { await syncOfflineAll(true); }} disabled={isSyncing} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase bg-amber-500/15 text-amber-700">
+                {isSyncing ? <Loader2 className="animate-spin" size={13} /> : <SafeRefreshCw size={13} />} <span className="truncate">Sync Cloud</span>
               </button>
-              <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase text-red-600 bg-red-500/15 hover:bg-red-500/25 transition-colors">
-                <SafeLogOut size={13} className="shrink-0" />
-                <span className="truncate">Lock Terminal</span>
+              <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase text-red-600 bg-red-500/15">
+                <SafeLogOut size={13} /> <span className="truncate">Lock</span>
               </button>
             </div>
           </aside>
