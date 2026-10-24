@@ -4343,29 +4343,33 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
         </div>
       ) : (
         <>
-          {/* SIDEBAR NAVIGATION */}
-          <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-neutral-900 border-r border-neutral-300 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 select-none h-full transition-all duration-300 relative`}>
-            <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="absolute -right-3 top-7 bg-orange-600 text-white p-1 rounded-full shadow-md hover:bg-orange-500 transition-all z-20">
-              {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
+          {/* 👉 NEW TOUCH POS DRAWER (SIDEBAR) */}
+          {isNavOpen && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" onClick={() => setIsNavOpen(false)} />
+          )}
+
+          <aside className={`fixed top-0 left-0 h-full w-64 z-[110] bg-white dark:bg-neutral-900 border-r border-neutral-300 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 select-none transition-transform duration-300 shadow-2xl ${isNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            
+            {/* Close Button */}
+            <button onClick={() => setIsNavOpen(false)} className="absolute -right-3 top-7 bg-red-600 text-white p-1 rounded-full shadow-md hover:bg-red-500 transition-all z-20">
+              <SafeX size={14} />
             </button>
 
             <div className="space-y-6 overflow-hidden">
               <div className="flex items-center justify-between border-b border-neutral-300 dark:border-neutral-800 pb-4">
                 <div className="flex items-center gap-3 truncate">
                   <SafeDatabase className="text-orange-500 shrink-0" size={22} />
-                  {!isSidebarCollapsed && (
-                    <div className="truncate">
-                      <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">Bum Bum Cafe</h1>
-                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v4.4</span>
-                    </div>
-                  )}
+                  <div className="truncate">
+                    <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">Bum Bum Cafe</h1>
+                    <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">Touch POS v5.0</span>
+                  </div>
                 </div>
               </div>
 
-          <nav className="space-y-1.5">
+              <nav className="space-y-1.5">
                 {[
-                  { id: 'admin_portal', label: 'Admin Portal (Web)', icon: Power, roles: ['admin'] }, // 👉 ADDED ADMIN TAB HERE
-                  { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin'] }, // 👉 Cashier को एक्सेस दिया 
+                  { id: 'admin_portal', label: 'Admin Portal', icon: Power, roles: ['admin'] },
+                  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
                   { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag, roles: ['admin', 'cashier', 'captain'] },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock, roles: ['admin', 'cashier', 'delivery', 'captain'] },
                   { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt, roles: ['admin', 'cashier'] },
@@ -4373,31 +4377,28 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] },
                   { id: 'inventory', label: 'Menu & Stock', icon: Layers, roles: ['admin'] },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer, roles: ['admin', 'cashier'] },
-                 
                   { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText, roles: ['admin', 'cashier'] },
-                  { id: 'customers', label: 'Customers Profile', icon: SafeUserPlus, roles: ['admin', 'cashier'] },
+                  { id: 'customers', label: 'Customers', icon: SafeUserPlus, roles: ['admin', 'cashier'] },
                 ].filter((item: any) => item.roles.includes(currentUser?.role || 'cashier')).map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   return (
                     <button 
                       key={item.id} 
-                      onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); }} 
+                      onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); setIsNavOpen(false); }} 
                       className={`w-full flex items-center justify-between px-3 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${isActive ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30" : "text-neutral-800 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800"}`}
                     >
                       <div className="flex items-center gap-3 truncate">
                         <Icon size={16} className="shrink-0" />
-                        {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                        <span className="truncate">{item.label}</span>
                       </div>
-                     {!isSidebarCollapsed && item.id === 'settlement' && unsettledOrdersCount > 0 && (
+                      {item.id === 'settlement' && unsettledOrdersCount > 0 && (
                         <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">{unsettledOrdersCount}</span>
                       )}
-                      {!isSidebarCollapsed && item.id === 'tables' && activeTableOrders.length > 0 && (
+                      {item.id === 'tables' && activeTableOrders.length > 0 && (
                         <span className="bg-amber-500 text-black text-[10px] px-2 py-0.5 rounded-full font-black">{activeTableOrders.length}</span>
                       )}
-                      
-                      {/* 👉 NEW: Live Online Orders Badge (ऑनलाइन आर्डर का चमकता हुआ बैज) */}
-                      {!isSidebarCollapsed && item.id === 'orders' && activeLiveOrders.length > 0 && (
+                      {item.id === 'orders' && activeLiveOrders.length > 0 && (
                         <span className="bg-cyan-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-bounce shadow-[0_0_8px_rgba(6,182,212,0.8)]">
                           {activeLiveOrders.length}
                         </span>
@@ -4407,48 +4408,41 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 })}
               </nav>
 
-              {!isSidebarCollapsed && (
-                <div className="pt-2 border-t border-neutral-300 dark:border-neutral-800 space-y-1.5">
-                  <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-black uppercase text-neutral-500">POS Tools</span>
-                    <button onClick={() => setIsHelpModalOpen(true)} className="text-[10px] text-orange-600 font-bold hover:underline flex items-center gap-1">
-                      <SafeHelpCircle size={12} /> Help [F1]
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button onClick={() => setIsHeldCartsModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
-                      <SafePauseCircle size={13} className="text-amber-500 shrink-0" />
-                      <span className="truncate">Parked ({heldCarts.length})</span>
-                    </button>
-                    <button onClick={() => setIsExpenseModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
-                      <Receipt size={13} className="text-red-500 shrink-0" />
-                      <span className="truncate">Expense [F6]</span>
-                    </button>
-                  </div>
+              <div className="pt-2 border-t border-neutral-300 dark:border-neutral-800 space-y-1.5">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-[10px] font-black uppercase text-neutral-500">POS Tools</span>
+                  <button onClick={() => { setIsHelpModalOpen(true); setIsNavOpen(false); }} className="text-[10px] text-orange-600 font-bold hover:underline flex items-center gap-1">
+                    <SafeHelpCircle size={12} /> Help [F1]
+                  </button>
                 </div>
-              )}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button onClick={() => { setIsHeldCartsModalOpen(true); setIsNavOpen(false); }} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
+                    <SafePauseCircle size={13} className="text-amber-500 shrink-0" />
+                    <span className="truncate">Parked ({heldCarts.length})</span>
+                  </button>
+                  <button onClick={() => { setIsExpenseModalOpen(true); setIsNavOpen(false); }} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
+                    <Receipt size={13} className="text-red-500 shrink-0" />
+                    <span className="truncate">Expense [F6]</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-1.5 pt-3 border-t border-neutral-300 dark:border-neutral-800">
-             <button 
-  onClick={async () => { await syncOfflineAll(true); }} 
-  disabled={isSyncing} 
-  className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase transition-colors duration-300 ${
-    syncSuccess 
-      ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
-      : 'text-amber-700 dark:text-yellow-500 bg-amber-500/15 hover:bg-amber-500/25'
-  }`}
->
-  {isSyncing ? <Loader2 className="animate-spin shrink-0" size={13} /> : (syncSuccess ? <Check size={13} /> : <SafeRefreshCw size={13} />)}
-  {!isSidebarCollapsed && <span className="truncate">{syncSuccess ? 'Synced Data ✅' : 'Sync Cloud'}</span>}
-</button>
+              <button 
+                onClick={async () => { await syncOfflineAll(true); }} 
+                disabled={isSyncing} 
+                className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase transition-colors duration-300 ${syncSuccess ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'text-amber-700 dark:text-yellow-500 bg-amber-500/15 hover:bg-amber-500/25'}`}
+              >
+                {isSyncing ? <Loader2 className="animate-spin shrink-0" size={13} /> : (syncSuccess ? <Check size={13} /> : <SafeRefreshCw size={13} />)}
+                <span className="truncate">{syncSuccess ? 'Synced Data ✅' : 'Sync Cloud'}</span>
+              </button>
               <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase text-red-600 bg-red-500/15 hover:bg-red-500/25 transition-colors">
                 <SafeLogOut size={13} className="shrink-0" />
-                {!isSidebarCollapsed && <span className="truncate">Lock Terminal</span>}
+                <span className="truncate">Lock Terminal</span>
               </button>
             </div>
           </aside>
-
           {/* MAIN WORKSPACE */}
           <main className="flex-1 flex h-full overflow-hidden">
             
