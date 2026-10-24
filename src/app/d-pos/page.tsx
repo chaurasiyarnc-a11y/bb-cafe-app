@@ -6091,30 +6091,30 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 </div>
               </div>
             )}
-            {/* 👉 ADD THIS: ADMIN PORTAL TAB */}
+           {/* 👉 UPDATED: ADMIN PORTAL TAB (Supports Light/Dark Mode) */}
             {activeTab === 'admin_portal' && currentUser?.role === 'admin' && (
-              <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#050505] text-white">
+              <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f5f7] dark:bg-[#050505] text-neutral-900 dark:text-white transition-colors duration-300">
                 
                 {/* Admin Top Navbar */}
-                <div className="flex justify-between items-center bg-[#0a0a0a] border-b border-white/10 p-4 shrink-0">
+                <div className="flex justify-between items-center bg-white dark:bg-[#0a0a0a] border-b border-neutral-200 dark:border-white/10 p-4 shrink-0 transition-colors duration-300">
                   <div>
-                     <h2 className="text-xl font-black italic uppercase text-orange-500">Bum Bum Cafe Admin</h2>
-                     <p className="text-[10px] text-neutral-400 font-bold tracking-widest uppercase">Web Control Center</p>
+                     <h2 className="text-xl font-black italic uppercase text-orange-600 dark:text-orange-500">Bum Bum Cafe Admin</h2>
+                     <p className="text-[10px] text-neutral-500 dark:text-neutral-400 font-bold tracking-widest uppercase">Web Control Center</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button onClick={toggleStoreStatus} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase flex items-center gap-2 border ${storeOpen ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                    <button onClick={toggleStoreStatus} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase flex items-center gap-2 border transition-colors ${storeOpen ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-500/10 dark:text-green-500 dark:border-green-500/20' : 'bg-red-100 text-red-700 border-red-300 dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/20'}`}>
                       <Power size={14} /> Store: {storeOpen ? "Online" : "Offline"}
                     </button>
                   </div>
                 </div>
 
                 {/* Admin Sub-Tabs */}
-                <div className="flex gap-2 p-4 shrink-0 overflow-x-auto border-b border-white/5 no-scrollbar">
+                <div className="flex gap-2 p-4 shrink-0 overflow-x-auto border-b border-neutral-200 dark:border-white/5 no-scrollbar transition-colors duration-300">
                   {['dashboard', 'orders', 'menu', 'customers', 'loyalty', 'settings'].map(tab => (
                     <button 
                       key={tab} 
                       onClick={() => setAdminSubTab(tab as any)}
-                      className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition-all whitespace-nowrap ${adminSubTab === tab ? 'bg-orange-600 text-white shadow-lg' : 'bg-white/5 text-neutral-400 hover:bg-white/10'}`}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition-all whitespace-nowrap ${adminSubTab === tab ? 'bg-orange-600 text-white shadow-lg' : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300 dark:bg-white/5 dark:text-neutral-400 dark:hover:bg-white/10 border border-transparent dark:border-transparent'}`}
                     >
                       {tab}
                     </button>
@@ -6122,7 +6122,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 </div>
 
                 {/* Admin Sub-Tab Content Area */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 scrollbar-hide bg-neutral-50 dark:bg-transparent transition-colors duration-300">
                   <div className="max-w-5xl mx-auto">
                     
                     {adminSubTab === 'dashboard' && (
