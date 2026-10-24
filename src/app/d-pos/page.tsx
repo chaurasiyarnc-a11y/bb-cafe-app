@@ -194,9 +194,7 @@ export default function BbCafeDesktopPos() {
       root.classList.remove('dark');
     }
   }, [themeMode, isSystemDark]);
- const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isNavOpen, setIsNavOpen] = useState(false); // 👈 यह नई लाइन जोड़ें
+const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false); // 👉 NEW: टच POS के लिए छुपा हुआ मेनू
 
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
