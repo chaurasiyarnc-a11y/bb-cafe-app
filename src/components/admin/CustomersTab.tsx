@@ -6,7 +6,6 @@ import { User, Search, Share2, Edit, Trash, X, Phone, MapPin, Calendar, Check, M
 import toast from 'react-hot-toast';
 import { formatBillNumber } from '../../lib/utils'; // अपनी लोकेशन के अनुसार पाथ सेट करें
 
-// यहाँ हमने onExportCSV प्रॉप जोड़ा है ताकि डैशबोर्ड से फंक्शन यहाँ आ सके
 interface CustomersTabProps {
   loyaltyUsers: any[];
   orders: any[];
@@ -82,25 +81,19 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
     const orderCount = customerOrders.length;
     
     let tier = "Bronze Member 🥉";
-    let tierColor = "text-gray-400 border-gray-500/20 bg-gray-500/5";
+    let tierColor = "text-neutral-600 dark:text-gray-400 border-neutral-300 dark:border-gray-500/20 bg-neutral-100 dark:bg-gray-500/5";
     if (totalSpend >= 5000 || orderCount >= 25) {
       tier = "Platinum VIP 👑";
-      tierColor = "text-indigo-400 border-indigo-500/20 bg-indigo-500/10 font-black";
+      tierColor = "text-indigo-600 dark:text-indigo-400 border-indigo-300 dark:border-indigo-500/20 bg-indigo-50 dark:bg-indigo-500/10 font-black";
     } else if (totalSpend >= 2000 || orderCount >= 10) {
       tier = "Gold VIP 🥇";
-      tierColor = "text-yellow-400 border-yellow-500/20 bg-yellow-500/10 font-extrabold";
+      tierColor = "text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-500/20 bg-yellow-50 dark:bg-yellow-500/10 font-extrabold";
     } else if (totalSpend >= 800 || orderCount >= 3) {
       tier = "Silver Member 🥈";
-      tierColor = "text-gray-300 border-gray-400/20 bg-gray-400/10 font-bold";
+      tierColor = "text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-400/20 bg-gray-50 dark:bg-gray-400/10 font-bold";
     }
 
-    return {
-      orderCount,
-      totalSpend,
-      tier,
-      tierColor,
-      customerOrders
-    };
+    return { orderCount, totalSpend, tier, tierColor, customerOrders };
   };
 
   // ब्रॉडकास्ट के लिए टार्गेटेड ऑडियंस लिस्ट निकालना
@@ -116,10 +109,8 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
         if (broadcastTierFilter === 'silver' && !tLower.includes('silver')) return false;
         if (broadcastTierFilter === 'bronze' && !tLower.includes('bronze')) return false;
       }
-
       if (Number(user.points || 0) < broadcastMinPoints) return false;
       if (Number(user.metrics.totalSpend || 0) < broadcastMinSpend) return false;
-
       return true;
     });
   }, [searchedCustomers, broadcastTierFilter, broadcastMinPoints, broadcastMinSpend]);
@@ -137,9 +128,7 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
       }, { merge: true });
       setEditingCustomer(null);
       toast.success("Customer profile updated!");
-    } catch (err) {
-      toast.error("Failed to update profile.");
-    }
+    } catch (err) { toast.error("Failed to update profile."); }
   };
 
   // CSV फाइल से कस्टमर्स इम्पोर्ट करना
@@ -193,17 +182,12 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
 
           successCount++;
         }
-
-        toast.success(`Successfully imported ${successCount} customers!`, { 
-          id: "csv-import", 
-          duration: 5000 
-        });
+        toast.success(`Successfully imported ${successCount} customers!`, { id: "csv-import", duration: 5000 });
       } catch (err) {
         console.error("CSV Parsing Error:", err);
         toast.error("Failed to parse and import file.", { id: "csv-import" });
       }
     };
-
     reader.readAsText(file);
     e.target.value = ""; 
   };
@@ -213,7 +197,6 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
     const cleanPhone = String(phone).replace("+91", "").trim();
     const encodedMsg = encodeURIComponent(broadcastMessage);
     window.open(`https://wa.me/91${cleanPhone}?text=${encodedMsg}`, '_blank');
-
     if (!sentBroadcastPhones.includes(cleanPhone)) {
       setSentBroadcastPhones(prev => [...prev, cleanPhone]);
     }
@@ -230,13 +213,12 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 transition-colors duration-300">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">
           <User size={20}/> Customer Management
         </h3>
         
-        {/* === यहाँ हमने Export CSV का बटन जोड़ा है === */}
         <div className="flex gap-2">
           {onExportCSV && (
             <button 
@@ -259,36 +241,36 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
       </div>
 
       {/* सर्च बार */}
-      <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
+      <div className="sticky top-[73px] z-30 bg-white/95 dark:bg-[#050505]/95 backdrop-blur-md py-4 border-b border-neutral-200 dark:border-white/5 rounded-b-3xl shadow-sm transition-colors duration-300">
         <div className="relative group max-w-lg mx-auto">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-gray-400" size={16} />
           <input 
             type="text" 
             placeholder="Search customer by name or mobile number..." 
             value={customerSearchQuery} 
             onChange={(e) => setCustomerSearchQuery(e.target.value)}
-            className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none text-xs font-semibold"
+            className="w-full bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white py-3 px-11 rounded-xl outline-none text-xs font-semibold border border-transparent focus:border-orange-500 transition-colors duration-300"
           />
         </div>
       </div>
       
       {/* कस्टमर डिटेल्स एडिट करने का फॉर्म */}
       {editingCustomer && (
-        <form onSubmit={handleUpdateCustomer} className="bg-[#151515] border-2 border-orange-500 p-6 rounded-[2.5rem] space-y-4">
+        <form onSubmit={handleUpdateCustomer} className="bg-white dark:bg-[#151515] border-2 border-orange-500 p-6 rounded-[2.5rem] space-y-4 shadow-sm transition-colors duration-300">
           <h4 className="text-sm font-black text-orange-500 uppercase">Edit Customer Profile</h4>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-500 uppercase">Customer Name</label>
-              <input type="text" value={editCustomerName} onChange={(e) => setEditCustomerName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
+              <label className="text-[10px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Customer Name</label>
+              <input type="text" value={editCustomerName} onChange={(e) => setEditCustomerName(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-xs font-black text-neutral-900 dark:text-white transition-colors duration-300" required />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-500 uppercase">Adjust Points</label>
-              <input type="number" value={editCustomerPoints} onChange={(e) => setEditCustomerPoints(Number(e.target.value))} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
+              <label className="text-[10px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Adjust Points</label>
+              <input type="number" value={editCustomerPoints} onChange={(e) => setEditCustomerPoints(Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 outline-none text-xs font-black text-neutral-900 dark:text-white transition-colors duration-300" required />
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-xl font-black text-xs uppercase">Save Changes</button>
-            <button type="button" onClick={() => setEditingCustomer(null)} className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase">Cancel</button>
+            <button type="submit" className="flex-1 bg-green-600 hover:bg-green-500 text-white p-3 rounded-xl font-black text-xs uppercase shadow-sm">Save Changes</button>
+            <button type="button" onClick={() => setEditingCustomer(null)} className="bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:bg-neutral-300 dark:hover:text-white p-3 rounded-xl font-black text-xs uppercase transition-colors">Cancel</button>
           </div>
         </form>
       )}
@@ -296,32 +278,32 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
       {/* कस्टमर्स की लिस्ट */}
       <div className="space-y-4">
         {searchedCustomers.length === 0 ? (
-          <p className="text-center text-xs font-bold text-gray-500 py-10 uppercase">No matching customers found...</p>
+          <p className="text-center text-xs font-bold text-neutral-500 dark:text-gray-500 py-10 uppercase">No matching customers found...</p>
         ) : (
           searchedCustomers
             .map(user => ({ ...user, metrics: getCustomerLoyaltyMetrics(user.phone) }))
             .sort((a, b) => b.metrics.totalSpend - a.metrics.totalSpend)
             .map(user => (
-              <div key={user.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:border-white/10">
+              <div key={user.id} className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-5 rounded-3xl flex justify-between items-center hover:border-orange-500 dark:hover:border-white/10 shadow-sm transition-colors duration-300">
                 <div className="space-y-1 cursor-pointer flex-1" onClick={() => setSelectedCustomerHistory(user)}>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="font-extrabold text-sm text-white hover:text-orange-500">{user.name} ➡️</h4>
+                    <h4 className="font-extrabold text-sm text-neutral-900 dark:text-white hover:text-orange-500 transition-colors">{user.name} ➡️</h4>
                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${user.metrics.tierColor}`}>
                       {user.metrics.tier}
                     </span>
                   </div>
                   <p className="text-[10px] font-bold text-orange-500">+{user.phone}</p>
                   
-                  <div className="flex gap-3 text-[10px] text-gray-400 font-bold pt-1.5 border-t border-white/5 mt-2">
-                    <p>Orders: <span className="text-white font-black">{user.metrics.orderCount}</span></p>
-                    <p>Total Spend: <span className="text-green-400 font-black">₹{user.metrics.totalSpend}</span></p>
+                  <div className="flex gap-3 text-[10px] text-neutral-500 dark:text-gray-400 font-bold pt-1.5 border-t border-neutral-200 dark:border-white/5 mt-2 transition-colors">
+                    <p>Orders: <span className="text-neutral-900 dark:text-white font-black">{user.metrics.orderCount}</span></p>
+                    <p>Total Spend: <span className="text-green-600 dark:text-green-400 font-black">₹{user.metrics.totalSpend}</span></p>
                   </div>
                 </div>
 
                 <div className="text-right flex items-center gap-4 flex-shrink-0">
                   <div>
-                    <p className="text-[9px] font-bold text-gray-500 uppercase">Available Points</p>
-                    <h4 className="text-lg font-black text-yellow-400">{user.points || 0} Pts</h4>
+                    <p className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Available Points</p>
+                    <h4 className="text-lg font-black text-yellow-500 dark:text-yellow-400">{user.points || 0} Pts</h4>
                   </div>
                   <button 
                     onClick={() => {
@@ -329,7 +311,7 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
                       setEditCustomerName(user.name);
                       setEditCustomerPoints(user.points || 0);
                     }}
-                    className="p-3 bg-orange-500/10 text-orange-500 rounded-xl"
+                    className="p-3 bg-orange-100 text-orange-600 dark:bg-orange-500/10 dark:text-orange-500 rounded-xl hover:bg-orange-200 dark:hover:bg-orange-500/20 transition-colors"
                   >
                     <Edit size={16}/>
                   </button>
@@ -342,48 +324,48 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
       {/* --- CUSTOMER ORDER HISTORY MODAL --- */}
       {selectedCustomerHistory && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[85vh] overflow-y-auto shadow-2xl space-y-4">
+          <div className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[85vh] overflow-y-auto shadow-2xl space-y-4 transition-colors duration-300">
             <button 
               onClick={() => setSelectedCustomerHistory(null)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-400 hover:text-neutral-900 dark:hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
-            <div className="text-center pb-2 border-b border-white/5">
+            <div className="text-center pb-2 border-b border-neutral-200 dark:border-white/5">
               <h3 className="text-lg font-black text-orange-500 uppercase">{selectedCustomerHistory.name} - Order History</h3>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Mobile: +{selectedCustomerHistory.phone}</p>
+              <p className="text-[10px] text-neutral-500 dark:text-gray-500 font-bold uppercase tracking-widest mt-0.5">Mobile: +{selectedCustomerHistory.phone}</p>
             </div>
 
             <div className="space-y-3">
               {selectedCustomerHistory.metrics?.customerOrders.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-500 py-8">No historical transactions logged.</p>
+                <p className="text-center text-xs font-bold text-neutral-500 dark:text-gray-500 py-8">No historical transactions logged.</p>
               ) : (
                 selectedCustomerHistory.metrics?.customerOrders.map((o: any) => (
-                  <div key={o.id} className={`p-4 rounded-2xl flex justify-between items-center text-xs border ${o.status === 'rejected' ? 'bg-red-500/[0.02] border-red-500/20' : 'bg-white/[0.01] border-white/5'}`}>
+                  <div key={o.id} className={`p-4 rounded-2xl flex justify-between items-center text-xs border ${o.status === 'rejected' ? 'bg-red-50 dark:bg-red-500/[0.02] border-red-200 dark:border-red-500/20' : 'bg-neutral-50 dark:bg-white/[0.01] border-neutral-200 dark:border-white/5'}`}>
                     <div>
                       {o.status === 'rejected' && (
-                        <div className="mb-2 bg-red-500/10 text-red-500 border border-red-500/20 text-[8px] font-black uppercase px-2 py-0.5 rounded-md w-max">
+                        <div className="mb-2 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 border border-red-200 dark:border-red-500/20 text-[8px] font-black uppercase px-2 py-0.5 rounded-md w-max">
                           🚫 Rejected / Fake
                         </div>
                       )}
                       <div className="flex gap-2">
-                        <span className="text-[9px] font-black uppercase text-gray-500">Bill: #{formatBillNumber(o.billNumber || 0)}</span>
-                        <span className="text-[9px] font-black uppercase text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
+                        <span className="text-[9px] font-black uppercase text-neutral-500 dark:text-gray-500">Bill: #{formatBillNumber(o.billNumber || 0)}</span>
+                        <span className="text-[9px] font-black uppercase text-yellow-600 dark:text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
                       </div>
                       <div className="space-y-0.5 mt-1.5">
                         {o.items?.map((item: any, idx: number) => (
-                          <p key={idx} className="text-xs text-gray-400 font-medium">
+                          <p key={idx} className="text-xs text-neutral-600 dark:text-gray-400 font-medium">
                             <span className="text-orange-500">×{item.quantity}</span> {item.name}
                           </p>
                         ))}
                       </div>
-                      <span className="text-[8px] text-gray-500 block mt-2">
+                      <span className="text-[8px] text-neutral-400 dark:text-gray-500 block mt-2">
                         {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}
                       </span>
                     </div>
                     <div className="text-right">
-                      <p className={`font-black text-sm ${o.status === 'rejected' ? 'line-through text-red-500' : 'text-green-400'}`}>₹{o.total}</p>
-                      <span className={`text-[8px] px-2 py-0.5 rounded uppercase font-bold mt-1 inline-block ${o.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-400'}`}>
+                      <p className={`font-black text-sm ${o.status === 'rejected' ? 'line-through text-red-500' : 'text-green-600 dark:text-green-400'}`}>₹{o.total}</p>
+                      <span className={`text-[8px] px-2 py-0.5 rounded uppercase font-bold mt-1 inline-block ${o.status === 'rejected' ? 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500' : 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400'}`}>
                         {o.status === 'rejected' ? 'REJECTED' : (o.status || 'Completed')}
                       </span>
                     </div>
@@ -398,30 +380,30 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
       {/* --- SMART BROADCAST MODAL --- */}
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto transition-colors duration-300">
             <button 
               onClick={() => setShowBroadcastModal(false)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-400 hover:text-neutral-900 dark:hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
-            <div className="text-center pb-2 border-b border-white/5">
+            <div className="text-center pb-2 border-b border-neutral-200 dark:border-white/5">
               <h3 className="text-lg font-black text-orange-500 uppercase">Smart Marketing Blast</h3>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Target the Right Loyal Customers</p>
+              <p className="text-[10px] text-neutral-500 dark:text-gray-500 uppercase tracking-widest font-black mt-0.5">Target the Right Loyal Customers</p>
             </div>
 
-            <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl space-y-3">
-              <p className="text-[10px] font-black uppercase text-orange-400 flex items-center gap-1">
+            <div className="bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 p-4 rounded-2xl space-y-3">
+              <p className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 flex items-center gap-1">
                 <Filter size={12}/> Target Segment Filters
               </p>
               
               <div className="grid grid-cols-3 gap-2">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-500 uppercase font-sans">VIP Tier</label>
+                  <label className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase font-sans">VIP Tier</label>
                   <select 
                     value={broadcastTierFilter} 
                     onChange={(e) => setBroadcastTierFilter(e.target.value)}
-                    className="w-full bg-black/60 border border-white/10 text-[10px] font-bold rounded-lg p-2 text-white outline-none cursor-pointer"
+                    className="w-full bg-white dark:bg-black/60 border border-neutral-300 dark:border-white/10 text-[10px] font-bold rounded-lg p-2 text-neutral-900 dark:text-white outline-none cursor-pointer"
                   >
                     <option value="all">All Tiers</option>
                     <option value="platinum">👑 Platinum</option>
@@ -432,52 +414,52 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-500 uppercase">Min Points</label>
+                  <label className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Min Points</label>
                   <input 
                     type="number" 
                     placeholder="Min Points"
                     value={broadcastMinPoints || ""}
                     onChange={(e) => setBroadcastMinPoints(Number(e.target.value))}
-                    className="w-full bg-black/60 border border-white/10 text-[10px] font-bold rounded-lg p-2 text-white outline-none"
+                    className="w-full bg-white dark:bg-black/60 border border-neutral-300 dark:border-white/10 text-[10px] font-bold rounded-lg p-2 text-neutral-900 dark:text-white outline-none"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-500 uppercase">Min Spend (₹)</label>
+                  <label className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Min Spend (₹)</label>
                   <input 
                     type="number" 
                     placeholder="Min Spend"
                     value={broadcastMinSpend || ""}
                     onChange={(e) => setBroadcastMinSpend(Number(e.target.value))}
-                    className="w-full bg-black/60 border border-white/10 text-[10px] font-bold rounded-lg p-2 text-white outline-none"
+                    className="w-full bg-white dark:bg-black/60 border border-neutral-300 dark:border-white/10 text-[10px] font-bold rounded-lg p-2 text-neutral-900 dark:text-white outline-none"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold border-t border-white/5 pt-2.5">
+              <div className="flex justify-between items-center text-[10px] text-neutral-600 dark:text-gray-400 font-bold border-t border-neutral-200 dark:border-white/5 pt-2.5">
                 <span>Targets Found: <strong className="text-orange-500">{broadcastTargetedCustomers.length}</strong></span>
-                <span>Sent: <strong className="text-green-500">{broadcastTargetedCustomers.filter(c => sentBroadcastPhones.includes(c.phone)).length}</strong></span>
-                <span>Remaining: <strong className="text-yellow-500">{broadcastTargetedCustomers.filter(c => !sentBroadcastPhones.includes(c.phone)).length}</strong></span>
+                <span>Sent: <strong className="text-green-600 dark:text-green-500">{broadcastTargetedCustomers.filter(c => sentBroadcastPhones.includes(c.phone)).length}</strong></span>
+                <span>Remaining: <strong className="text-yellow-600 dark:text-yellow-500">{broadcastTargetedCustomers.filter(c => !sentBroadcastPhones.includes(c.phone)).length}</strong></span>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Write Promotional Message</label>
+              <label className="text-[10px] font-bold text-neutral-500 dark:text-gray-400 uppercase">Write Promotional Message</label>
               <textarea 
                 value={broadcastMessage} 
                 onChange={(e) => setBroadcastMessage(e.target.value)} 
                 placeholder="Type your special discount offer or festive wishes here..." 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-24 resize-none leading-relaxed animate-none"
+                className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-neutral-900 dark:text-white h-24 resize-none leading-relaxed animate-none transition-colors duration-300"
               />
             </div>
 
-            <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-2xl space-y-3 text-center">
-              <p className="text-[10px] text-orange-400 font-extrabold uppercase tracking-wide">⚡ One-Click Queue Sender Assistant</p>
+            <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 p-4 rounded-2xl space-y-3 text-center">
+              <p className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase tracking-wide">⚡ One-Click Queue Sender Assistant</p>
               <div className="flex gap-2">
                 <button 
                   onClick={handleSendNextUnsentBroadcast}
                   type="button"
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-black font-black text-xs uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md animate-none"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white dark:text-black font-black text-xs uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md animate-none"
                 >
                   💬 Send Next (Unsent Queue)
                 </button>
@@ -485,7 +467,7 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
                   onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
                   title="Reset session"
                   type="button"
-                  className="bg-white/5 text-gray-400 transition-all active:scale-95"
+                  className="bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:text-neutral-900 dark:hover:text-white p-3 rounded-xl transition-all active:scale-95"
                 >
                   <RefreshCw size={16} />
                 </button>
@@ -493,36 +475,36 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
             </div>
 
             {/* कस्टमर ब्रॉडकास्ट स्टेटस लिस्ट */}
-            <div className="border-t border-white/5 pt-4">
+            <div className="border-t border-neutral-200 dark:border-white/5 pt-4">
               <div className="flex justify-between items-center mb-2">
-                <p className="text-[10px] text-gray-400 font-extrabold uppercase">Target Audience List ({broadcastTargetedCustomers.length})</p>
+                <p className="text-[10px] text-neutral-500 dark:text-gray-400 font-extrabold uppercase">Target Audience List ({broadcastTargetedCustomers.length})</p>
               </div>
               
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                 {broadcastTargetedCustomers.length === 0 ? (
-                  <p className="text-center text-[10px] text-gray-500 py-6 uppercase font-bold">No customers match...</p>
+                  <p className="text-center text-[10px] text-neutral-500 dark:text-gray-500 py-6 uppercase font-bold">No customers match...</p>
                 ) : (
                   broadcastTargetedCustomers.map((user) => {
                     const isAlreadySent = sentBroadcastPhones.includes(user.phone);
                     return (
-                      <div key={user.phone} className={`flex justify-between items-center p-2 rounded-xl text-xs font-bold border transition-colors ${isAlreadySent ? 'bg-green-500/[0.02] border-green-500/10' : 'bg-white/[0.01] border-white/5'}`}>
+                      <div key={user.phone} className={`flex justify-between items-center p-2 rounded-xl text-xs font-bold border transition-colors ${isAlreadySent ? 'bg-green-50 dark:bg-green-500/[0.02] border-green-200 dark:border-green-500/10' : 'bg-neutral-50 dark:bg-white/[0.01] border-neutral-200 dark:border-white/5'}`}>
                         <div className="flex flex-col">
-                          <span className={`${isAlreadySent ? 'text-gray-500' : 'text-gray-300'}`}>{user.name} (+{user.phone})</span>
-                          <span className="text-[8px] text-gray-500 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
+                          <span className={`${isAlreadySent ? 'text-neutral-500 dark:text-gray-500' : 'text-neutral-900 dark:text-gray-300'}`}>{user.name} (+{user.phone})</span>
+                          <span className="text-[8px] text-neutral-500 dark:text-gray-500 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {isAlreadySent ? (
-                            <span className="text-[9px] text-green-500 font-extrabold uppercase flex items-center gap-1 bg-green-500/10 px-2 py-1 rounded-md">
+                            <span className="text-[9px] text-green-700 dark:text-green-500 font-extrabold uppercase flex items-center gap-1 bg-green-100 dark:bg-green-500/10 px-2 py-1 rounded-md">
                               <Check size={10}/> Sent
                             </span>
                           ) : (
-                            <span className="text-[9px] text-yellow-500 font-extrabold uppercase flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
+                            <span className="text-[9px] text-yellow-700 dark:text-yellow-500 font-extrabold uppercase flex items-center gap-1 bg-yellow-100 dark:bg-yellow-500/10 px-2 py-1 rounded-md">
                               Unsent
                             </span>
                           )}
                           <button 
                             onClick={() => triggerWhatsAppBroadcast(user.phone)}
-                            className={`font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${isAlreadySent ? 'bg-white/5 text-gray-500' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                            className={`font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${isAlreadySent ? 'bg-neutral-200 dark:bg-white/5 text-neutral-500 dark:text-gray-500' : 'bg-green-600 hover:bg-green-700 text-white shadow-sm'}`}
                           >
                             <MessageSquare size={10}/> Send
                           </button>
@@ -534,7 +516,7 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
               </div>
             </div>
 
-            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
+            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:bg-neutral-300 dark:hover:bg-white/10 p-3.5 rounded-xl font-black text-xs uppercase transition-colors">Close</button>
           </div>
         </div>
       )}
