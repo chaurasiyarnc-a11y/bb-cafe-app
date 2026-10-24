@@ -4339,8 +4339,9 @@ const handleSendUdhariReminder = (targetOrder: any) => {
                 </div>
               </div>
 
-           <nav className="space-y-1.5">
+          <nav className="space-y-1.5">
                 {[
+                  { id: 'admin_portal', label: 'Admin Portal (Web)', icon: Power, roles: ['admin'] }, // 👉 ADDED ADMIN TAB HERE
                   { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin'] }, // 👉 Cashier को एक्सेस दिया 
                   { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag, roles: ['admin', 'cashier', 'captain'] },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock, roles: ['admin', 'cashier', 'delivery', 'captain'] },
