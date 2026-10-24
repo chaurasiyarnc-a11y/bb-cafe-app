@@ -62,20 +62,20 @@ export default function SocialCountsEditor() {
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center">
+      <div className="p-6 flex items-center justify-center transition-colors duration-300">
         <Loader2 className="animate-spin text-orange-500 mr-2" size={20} />
-        <span className="text-xs font-bold">डेटा लोड हो रहा है...</span>
+        <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">डेटा लोड हो रहा है...</span>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto p-5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl shadow-sm space-y-4 font-sans">
-      <div className="flex items-center gap-2 border-b border-neutral-100 dark:border-neutral-800 pb-3">
+    <div className="max-w-md mx-auto p-5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl shadow-sm space-y-4 font-sans transition-colors duration-300">
+      <div className="flex items-center gap-2 border-b border-neutral-100 dark:border-neutral-800 pb-3 transition-colors duration-300">
         <Globe className="text-orange-500" size={20} />
         <div className="text-left">
-          <h3 className="text-sm font-black text-neutral-900 dark:text-white uppercase tracking-wider">Social Counts Editor</h3>
-          <p className="text-[10px] text-neutral-500">होम पेज के सोशल मीडिया फॉलोअर्स की संख्या बदलें</p>
+          <h3 className="text-sm font-black text-neutral-900 dark:text-white uppercase tracking-wider transition-colors duration-300">Social Counts Editor</h3>
+          <p className="text-[10px] text-neutral-500 dark:text-neutral-400 transition-colors duration-300">होम पेज के सोशल मीडिया फॉलोअर्स की संख्या बदलें</p>
         </div>
       </div>
 
@@ -85,7 +85,7 @@ export default function SocialCountsEditor() {
             const label = platform === 'whatsapp_channel' ? 'WhatsApp Channel' : platform.charAt(0).toUpperCase() + platform.slice(1);
             return (
               <div key={platform} className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-neutral-600 dark:text-neutral-400">
+                <label className="text-[10px] font-black uppercase text-neutral-600 dark:text-neutral-400 transition-colors duration-300">
                   {label} Followers Count
                 </label>
                 <input
@@ -93,7 +93,7 @@ export default function SocialCountsEditor() {
                   placeholder="उदा: 1.2K+ Followers"
                   value={counts[platform] || ''}
                   onChange={(e) => setSocialCounts(prev => ({ ...prev, [platform]: e.target.value }))}
-                  className="w-full text-xs p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 dark:text-white outline-none focus:border-orange-500 font-bold"
+                  className="w-full text-xs p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-white outline-none focus:border-orange-500 font-bold transition-colors duration-300 placeholder:text-neutral-400 dark:placeholder:text-neutral-600"
                   required
                 />
               </div>
