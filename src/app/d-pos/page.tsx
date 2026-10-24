@@ -4444,64 +4444,25 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
 
                  {/* SEARCH BAR (F2) & QUICK ACTIONS + MENU BUTTON */}
                   <div className="flex gap-2.5 mb-3 items-center shrink-0">
-                    
-                    {/* 👉 NEW: MENU BUTTON (टच POS के लिए) */}
-                    <button 
-                      onClick={() => setIsNavOpen(true)} 
-                      className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                    >
-                      <Menu size={20} />
-                    </button>
-
+                    <button onClick={() => setIsNavOpen(true)} className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"><Menu size={20} /></button>
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
-                      <input 
-                        ref={searchInputRef}
-                        type="text" 
-                        placeholder="Search item / Type Code or Qty*Code (e.g. 101 or 3*101) & hit [Enter]... [F2]" 
-                        value={searchQuery} 
-                        onChange={e => setSearchQuery(e.target.value)}
-                        onKeyDown={handleSearchInputKeyDown} 
-                        className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-neutral-900 dark:text-white outline-none focus:border-orange-500 shadow-sm" 
-                        autoFocus
-                      />
+                      <input ref={searchInputRef} type="text" placeholder="Search item / Type Code [F2]" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearchInputKeyDown} className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-neutral-900 dark:text-white outline-none focus:border-orange-500 shadow-sm" autoFocus />
                     </div>
-                    <button 
-                      onClick={() => setIsCatManagerModalOpen(true)} 
-                      className="hidden md:flex bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2.5 rounded-xl text-xs font-black uppercase items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shrink-0"
-                    >
-                      <ArrowLeftRight size={14} className="text-orange-500" /> Cats
-                    </button>
-                    <button 
-                      onClick={() => handleOpenItemEditor(null)} 
-                      className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow shrink-0"
-                    >
-                      <SafePlus size={15} /> Add
-                    </button>
+                    <button onClick={() => setIsCatManagerModalOpen(true)} className="hidden md:flex bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2.5 rounded-xl text-xs font-black uppercase items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shrink-0"><ArrowLeftRight size={14} className="text-orange-500" /> Cats</button>
+                    <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow shrink-0"><SafePlus size={15} /> Add</button>
                   </div>
 
-                  {/* 👉 NEW: TOUCH POS LAYOUT (LEFT CATEGORIES, CENTER ITEMS) */}
+                  {/* 👉 TOUCH POS LAYOUT (LEFT CATEGORIES, CENTER ITEMS) */}
                   <div className="flex flex-1 overflow-hidden gap-3">
-                    
                     {/* LEFT: VERTICAL CATEGORIES */}
                     <div className="w-28 md:w-36 flex flex-col gap-2 overflow-y-auto pr-1 shrink-0 pb-20 scrollbar-hide">
                       {['⭐ Top Items', ...categories].map((cat) => {
                         const isSelected = selectedCategory === cat;
                         const count = cat === 'All' ? products.length : products.filter(p => p.category?.toLowerCase() === cat.toLowerCase()).length;
                         return (
-                          <button 
-                            key={cat}
-                            onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} 
-                            className={`px-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex flex-col items-center text-center gap-1.5 shadow-sm ${
-                              isSelected 
-                                ? "bg-orange-600 text-white border-orange-600 shadow-md scale-[1.02]" 
-                                : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                            }`}
-                          >
-                            <span>{cat}</span>
-                            <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold ${isSelected ? 'bg-black/20 text-white' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-500'}`}>
-                              {count}
-                            </span>
+                          <button key={cat} onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} className={`px-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex flex-col items-center text-center gap-1.5 shadow-sm ${isSelected ? "bg-orange-600 text-white border-orange-600 shadow-md scale-[1.02]" : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800"}`}>
+                            <span>{cat}</span><span className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold ${isSelected ? 'bg-black/20 text-white' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-500'}`}>{count}</span>
                           </button>
                         );
                       })}
@@ -4518,55 +4479,18 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             const imgUrl = item.image || item.imageUrl || item.img;
                             const displayName = item.name || item.title || item.itemName || "Cafe Item";
                             const displayPrice = Number(item.price) || (item.variants && Object.values(item.variants)[0]) || 0;
-
                             return (
-                              <button 
-                                key={item.id} 
-                                disabled={!isAvail} 
-                                onClick={() => handleItemClick(item)} 
-                                className={`border rounded-2xl text-left flex flex-col overflow-hidden h-[155px] min-h-[155px] transition-all duration-150 hover:scale-[1.02] active:scale-95 shadow-sm relative ${
-                                  isAvail 
-                                    ? "bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 hover:border-orange-500" 
-                                    : "opacity-40 bg-neutral-200 dark:bg-neutral-950 pointer-events-none"
-                                }`}
-                              >
+                              <button key={item.id} disabled={!isAvail} onClick={() => handleItemClick(item)} className={`border rounded-2xl text-left flex flex-col overflow-hidden h-[155px] min-h-[155px] transition-all duration-150 hover:scale-[1.02] active:scale-95 shadow-sm relative ${isAvail ? "bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 hover:border-orange-500" : "opacity-40 bg-neutral-200 dark:bg-neutral-950 pointer-events-none"}`}>
                                <div className="w-full h-[82px] max-h-[82px] min-h-[82px] bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
-                                  {imgUrl ? (
-                                    <>
-                                      <img 
-                                        src={imgUrl} 
-                                        alt={displayName} 
-                                        className="w-full h-full object-cover absolute inset-0 z-10" 
-                                        loading="lazy" 
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }} 
-                                      />
-                                      <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center absolute inset-0 flex items-center justify-center z-0">
-                                        {item.category || "Cafe Item"}
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center absolute inset-0 flex items-center justify-center">
-                                      {item.category || "Cafe Item"}
-                                    </span>
-                                  )}
-                                  {item.itemCode && (
-                                    <span className="absolute top-1 right-1 bg-black/90 text-yellow-400 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-yellow-500/50 shadow z-10">
-                                      #{item.itemCode}
-                                    </span>
-                                  )}
+                                  {imgUrl ? <img src={imgUrl} alt={displayName} className="w-full h-full object-cover absolute inset-0 z-10" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : null}
+                                  <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center absolute inset-0 flex items-center justify-center z-0">{item.category || "Cafe Item"}</span>
+                                  {item.itemCode && <span className="absolute top-1 right-1 bg-black/90 text-yellow-400 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-yellow-500/50 shadow z-10">#{item.itemCode}</span>}
                                 </div>
-
                                 <div className="p-2 flex-1 flex flex-col justify-between w-full bg-white dark:bg-neutral-900 min-h-[65px]">
-                                  <p className="font-bold text-[11px] line-clamp-2 text-neutral-900 dark:text-white leading-tight">
-                                    {displayName}
-                                  </p>
+                                  <p className="font-bold text-[11px] line-clamp-2 text-neutral-900 dark:text-white leading-tight">{displayName}</p>
                                   <div className="flex justify-between items-center pt-1 border-t border-neutral-100 dark:border-neutral-800">
-                                    <span className="text-xs font-mono font-black text-orange-600 dark:text-orange-400">
-                                      ₹{displayPrice}
-                                    </span>
-                                    <span className="text-[8px] font-bold text-neutral-500 truncate max-w-[70px]">
-                                      {item.category || 'General'}
-                                    </span>
+                                    <span className="text-xs font-mono font-black text-orange-600 dark:text-orange-400">₹{displayPrice}</span>
+                                    <span className="text-[8px] font-bold text-neutral-500 truncate max-w-[70px]">{item.category || 'General'}</span>
                                   </div>
                                 </div>
                               </button>
@@ -4576,7 +4500,6 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       )}
                     </div>
                   </div>
-                </div>
 {/* RIGHT CART PANEL */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-300 dark:border-neutral-800 flex flex-col p-3 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
