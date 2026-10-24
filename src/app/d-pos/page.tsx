@@ -194,7 +194,8 @@ export default function BbCafeDesktopPos() {
       root.classList.remove('dark');
     }
   }, [themeMode, isSystemDark]);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+ const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isNavOpen, setIsNavOpen] = useState(false); // 👉 NEW: टच POS के लिए छुपा हुआ मेनू
 
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
   const [upiIdConfig, setUpiIdConfig] = useState<string>('Q991347275@ybl');
