@@ -12,7 +12,7 @@ import {
   Database, RefreshCw, Layers, LogOut, Lock, ToggleLeft, ToggleRight, 
   Trash2, UserPlus, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
   PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, 
- Share2, Receipt, Send, Check, Plus, Eye, Menu,
+  Share2, Receipt, Send, Check, Plus, Eye,
   ArrowLeftRight, History, ChevronDown, ChevronUp, BellRing, Tag, Ticket, IndianRupee, Gamepad2, Power, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -194,8 +194,7 @@ export default function BbCafeDesktopPos() {
       root.classList.remove('dark');
     }
   }, [themeMode, isSystemDark]);
-const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isNavOpen, setIsNavOpen] = useState(false); // 👉 NEW: टच POS के लिए छुपा हुआ मेनू
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
   const [upiIdConfig, setUpiIdConfig] = useState<string>('Q991347275@ybl');
@@ -4343,31 +4342,29 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
         </div>
       ) : (
         <>
-   {/* 👉 NEW TOUCH POS DRAWER (SIDEBAR) */}
-          {isNavOpen && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" onClick={() => setIsNavOpen(false)} />
-          )}
-
-          <aside className={`fixed top-0 left-0 h-full w-64 z-[110] bg-white dark:bg-neutral-900 border-r border-neutral-300 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 select-none transition-transform duration-300 shadow-2xl ${isNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-            <button onClick={() => setIsNavOpen(false)} className="absolute -right-3 top-7 bg-red-600 text-white p-1 rounded-full shadow-md hover:bg-red-500 transition-all z-20">
-              <SafeX size={14} />
+          {/* SIDEBAR NAVIGATION */}
+          <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-neutral-900 border-r border-neutral-300 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 select-none h-full transition-all duration-300 relative`}>
+            <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="absolute -right-3 top-7 bg-orange-600 text-white p-1 rounded-full shadow-md hover:bg-orange-500 transition-all z-20">
+              {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
             </button>
 
             <div className="space-y-6 overflow-hidden">
               <div className="flex items-center justify-between border-b border-neutral-300 dark:border-neutral-800 pb-4">
                 <div className="flex items-center gap-3 truncate">
                   <SafeDatabase className="text-orange-500 shrink-0" size={22} />
-                  <div className="truncate">
-                    <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">Bum Bum Cafe</h1>
-                    <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">Touch POS v5.0</span>
-                  </div>
+                  {!isSidebarCollapsed && (
+                    <div className="truncate">
+                      <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">Bum Bum Cafe</h1>
+                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v4.4</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <nav className="space-y-1.5">
+          <nav className="space-y-1.5">
                 {[
-                  { id: 'admin_portal', label: 'Admin Portal', icon: Power, roles: ['admin'] },
-                  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
+                  { id: 'admin_portal', label: 'Admin Portal (Web)', icon: Power, roles: ['admin'] }, // 👉 ADDED ADMIN TAB HERE
+                  { id: 'dashboard', label: 'Smart Dashboard', icon: LayoutDashboard, roles: ['admin'] }, // 👉 Cashier को एक्सेस दिया 
                   { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag, roles: ['admin', 'cashier', 'captain'] },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock, roles: ['admin', 'cashier', 'delivery', 'captain'] },
                   { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt, roles: ['admin', 'cashier'] },
@@ -4375,27 +4372,82 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] },
                   { id: 'inventory', label: 'Menu & Stock', icon: Layers, roles: ['admin'] },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer, roles: ['admin', 'cashier'] },
+                 
                   { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText, roles: ['admin', 'cashier'] },
-                  { id: 'customers', label: 'Customers', icon: SafeUserPlus, roles: ['admin', 'cashier'] },
+                  { id: 'customers', label: 'Customers Profile', icon: SafeUserPlus, roles: ['admin', 'cashier'] },
                 ].filter((item: any) => item.roles.includes(currentUser?.role || 'cashier')).map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   return (
                     <button 
                       key={item.id} 
-                      onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); setIsNavOpen(false); }} 
+                      onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); }} 
                       className={`w-full flex items-center justify-between px-3 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${isActive ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30" : "text-neutral-800 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800"}`}
                     >
                       <div className="flex items-center gap-3 truncate">
                         <Icon size={16} className="shrink-0" />
-                        <span className="truncate">{item.label}</span>
+                        {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
                       </div>
+                     {!isSidebarCollapsed && item.id === 'settlement' && unsettledOrdersCount > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">{unsettledOrdersCount}</span>
+                      )}
+                      {!isSidebarCollapsed && item.id === 'tables' && activeTableOrders.length > 0 && (
+                        <span className="bg-amber-500 text-black text-[10px] px-2 py-0.5 rounded-full font-black">{activeTableOrders.length}</span>
+                      )}
+                      
+                      {/* 👉 NEW: Live Online Orders Badge (ऑनलाइन आर्डर का चमकता हुआ बैज) */}
+                      {!isSidebarCollapsed && item.id === 'orders' && activeLiveOrders.length > 0 && (
+                        <span className="bg-cyan-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-bounce shadow-[0_0_8px_rgba(6,182,212,0.8)]">
+                          {activeLiveOrders.length}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
               </nav>
+
+              {!isSidebarCollapsed && (
+                <div className="pt-2 border-t border-neutral-300 dark:border-neutral-800 space-y-1.5">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-black uppercase text-neutral-500">POS Tools</span>
+                    <button onClick={() => setIsHelpModalOpen(true)} className="text-[10px] text-orange-600 font-bold hover:underline flex items-center gap-1">
+                      <SafeHelpCircle size={12} /> Help [F1]
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button onClick={() => setIsHeldCartsModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
+                      <SafePauseCircle size={13} className="text-amber-500 shrink-0" />
+                      <span className="truncate">Parked ({heldCarts.length})</span>
+                    </button>
+                    <button onClick={() => setIsExpenseModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
+                      <Receipt size={13} className="text-red-500 shrink-0" />
+                      <span className="truncate">Expense [F6]</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5 pt-3 border-t border-neutral-300 dark:border-neutral-800">
+             <button 
+  onClick={async () => { await syncOfflineAll(true); }} 
+  disabled={isSyncing} 
+  className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase transition-colors duration-300 ${
+    syncSuccess 
+      ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
+      : 'text-amber-700 dark:text-yellow-500 bg-amber-500/15 hover:bg-amber-500/25'
+  }`}
+>
+  {isSyncing ? <Loader2 className="animate-spin shrink-0" size={13} /> : (syncSuccess ? <Check size={13} /> : <SafeRefreshCw size={13} />)}
+  {!isSidebarCollapsed && <span className="truncate">{syncSuccess ? 'Synced Data ✅' : 'Sync Cloud'}</span>}
+</button>
+              <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase text-red-600 bg-red-500/15 hover:bg-red-500/25 transition-colors">
+                <SafeLogOut size={13} className="shrink-0" />
+                {!isSidebarCollapsed && <span className="truncate">Lock Terminal</span>}
+              </button>
             </div>
           </aside>
+
           {/* MAIN WORKSPACE */}
           <main className="flex-1 flex h-full overflow-hidden">
             
@@ -4417,64 +4469,126 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                     </div>
                   )}
 
-                {/* SEARCH BAR & MENU BUTTON */}
-                  <div className="flex gap-2.5 mb-3 items-center shrink-0">
-                    <button onClick={() => setIsNavOpen(true)} className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"><Menu size={20} /></button>
+                  {/* SEARCH BAR (F2) & QUICK ACTIONS */}
+                  <div className="flex gap-2.5 mb-2.5 items-center shrink-0">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
-                      <input ref={searchInputRef} type="text" placeholder="Search item / Type Code [F2]" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearchInputKeyDown} className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-neutral-900 dark:text-white outline-none focus:border-orange-500 shadow-sm" autoFocus />
+                      <input 
+                        ref={searchInputRef}
+                        type="text" 
+                        placeholder="Search item / Type Code or Qty*Code (e.g. 101 or 3*101) & hit [Enter]... [F2]" 
+                        value={searchQuery} 
+                        onChange={e => setSearchQuery(e.target.value)}
+                        onKeyDown={handleSearchInputKeyDown} 
+                        className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-neutral-900 dark:text-white outline-none focus:border-orange-500 shadow-sm" 
+                        autoFocus
+                      />
                     </div>
-                    <button onClick={() => setIsCatManagerModalOpen(true)} className="hidden md:flex bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2.5 rounded-xl text-xs font-black uppercase items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shrink-0"><ArrowLeftRight size={14} className="text-orange-500" /> Cats</button>
-                    <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow shrink-0"><SafePlus size={15} /> Add</button>
+                    <button 
+                      onClick={() => setIsCatManagerModalOpen(true)} 
+                      className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shrink-0"
+                    >
+                      <ArrowLeftRight size={14} className="text-orange-500" /> Reorder Cats
+                    </button>
+                    <button 
+                      onClick={() => handleOpenItemEditor(null)} 
+                      className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow shrink-0"
+                    >
+                      <SafePlus size={15} /> Add Item
+                    </button>
                   </div>
 
-                  {/* 👉 TOUCH POS LAYOUT (LEFT CATEGORIES, CENTER ITEMS) */}
-                  <div className="flex flex-1 overflow-hidden gap-3">
-                    {/* LEFT: VERTICAL CATEGORIES */}
-                    <div className="w-28 md:w-36 flex flex-col gap-2 overflow-y-auto pr-1 shrink-0 pb-20 scrollbar-hide">
-                      {['⭐ Top Items', ...categories].map((cat) => {
-                        const isSelected = selectedCategory === cat;
-                        const count = cat === 'All' ? products.length : products.filter(p => p.category?.toLowerCase() === cat.toLowerCase()).length;
+                  {/* CATEGORIES BAR */}
+                  <div className="flex flex-wrap gap-1.5 pb-2 shrink-0 max-h-24 overflow-y-auto pr-1">
+                    {['⭐ Top Items', ...categories].map((cat) => {
+                      const isSelected = selectedCategory === cat;
+                      const count = cat === 'All' ? products.length : products.filter(p => p.category?.toLowerCase() === cat.toLowerCase()).length;
+                      return (
+                        <button 
+                          key={cat}
+                          onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} 
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 shadow-sm ${
+                            isSelected 
+                              ? "bg-orange-600 text-white border-orange-600 shadow-md scale-[1.02]" 
+                              : "bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700"
+                          }`}
+                        >
+                          <span>{cat}</span>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${isSelected ? 'bg-black/30 text-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* PRODUCTS GRID (100% Guaranteed Name & Price Display with Fixed 82px Image Height) */}
+                  {loading ? (
+                    <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6 gap-2.5 overflow-y-auto flex-1 pr-1.5 content-start">
+                      {filteredMenu.map((item) => {
+                        const isAvail = item.isAvailable !== false;
+                        const imgUrl = item.image || item.imageUrl || item.img;
+                        const displayName = item.name || item.title || item.itemName || "Cafe Item";
+                        const displayPrice = Number(item.price) || (item.variants && Object.values(item.variants)[0]) || 0;
+
                         return (
-                          <button key={cat} onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} className={`px-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex flex-col items-center text-center gap-1.5 shadow-sm ${isSelected ? "bg-orange-600 text-white border-orange-600 shadow-md scale-[1.02]" : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800"}`}>
-                            <span>{cat}</span><span className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold ${isSelected ? 'bg-black/20 text-white' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-500'}`}>{count}</span>
+                          <button 
+                            key={item.id} 
+                            disabled={!isAvail} 
+                            onClick={() => handleItemClick(item)} 
+                            className={`border rounded-2xl text-left flex flex-col overflow-hidden h-[155px] min-h-[155px] transition-all duration-150 hover:scale-[1.02] active:scale-95 shadow-sm relative ${
+                              isAvail 
+                                ? "bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 hover:border-orange-500" 
+                                : "opacity-40 bg-neutral-200 dark:bg-neutral-950 pointer-events-none"
+                            }`}
+                          >
+                           <div className="w-full h-[82px] max-h-[82px] min-h-[82px] bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
+                              {imgUrl ? (
+                                <>
+                                  <img 
+                                    src={imgUrl} 
+                                    alt={displayName} 
+                                    className="w-full h-full object-cover absolute inset-0 z-10" 
+                                    loading="lazy" 
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+                                  />
+                                  <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center absolute inset-0 flex items-center justify-center z-0">
+                                    {item.category || "Cafe Item"}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center absolute inset-0 flex items-center justify-center">
+                                  {item.category || "Cafe Item"}
+                                </span>
+                              )}
+                              {item.itemCode && (
+                                <span className="absolute top-1 right-1 bg-black/90 text-yellow-400 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-yellow-500/50 shadow z-10">
+                                  #{item.itemCode}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="p-2 flex-1 flex flex-col justify-between w-full bg-white dark:bg-neutral-900 min-h-[65px]">
+                              <p className="font-bold text-[11px] line-clamp-2 text-neutral-900 dark:text-white leading-tight">
+                                {displayName}
+                              </p>
+                              <div className="flex justify-between items-center pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                                <span className="text-xs font-mono font-black text-orange-600 dark:text-orange-400">
+                                  ₹{displayPrice}
+                                </span>
+                                <span className="text-[8px] font-bold text-neutral-500 truncate max-w-[70px]">
+                                  {item.category || 'General'}
+                                </span>
+                              </div>
+                            </div>
                           </button>
                         );
                       })}
                     </div>
-
-                    {/* CENTER: PRODUCTS GRID */}
-                    <div className="flex-1 overflow-y-auto pr-1.5 pb-20">
-                      {loading ? (
-                        <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
-                      ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-2.5 content-start">
-                          {filteredMenu.map((item) => {
-                            const isAvail = item.isAvailable !== false;
-                            const imgUrl = item.image || item.imageUrl || item.img;
-                            const displayName = item.name || item.title || item.itemName || "Cafe Item";
-                            const displayPrice = Number(item.price) || (item.variants && Object.values(item.variants)[0]) || 0;
-                            return (
-                              <button key={item.id} disabled={!isAvail} onClick={() => handleItemClick(item)} className={`border rounded-2xl text-left flex flex-col overflow-hidden h-[155px] min-h-[155px] transition-all duration-150 hover:scale-[1.02] active:scale-95 shadow-sm relative ${isAvail ? "bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 hover:border-orange-500" : "opacity-40 bg-neutral-200 dark:bg-neutral-950 pointer-events-none"}`}>
-                               <div className="w-full h-[82px] max-h-[82px] min-h-[82px] bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
-                                  {imgUrl ? <img src={imgUrl} alt={displayName} className="w-full h-full object-cover absolute inset-0 z-10" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : null}
-                                  <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center absolute inset-0 flex items-center justify-center z-0">{item.category || "Cafe Item"}</span>
-                                  {item.itemCode && <span className="absolute top-1 right-1 bg-black/90 text-yellow-400 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-yellow-500/50 shadow z-10">#{item.itemCode}</span>}
-                                </div>
-                                <div className="p-2 flex-1 flex flex-col justify-between w-full bg-white dark:bg-neutral-900 min-h-[65px]">
-                                  <p className="font-bold text-[11px] line-clamp-2 text-neutral-900 dark:text-white leading-tight">{displayName}</p>
-                                  <div className="flex justify-between items-center pt-1 border-t border-neutral-100 dark:border-neutral-800">
-                                    <span className="text-xs font-mono font-black text-orange-600 dark:text-orange-400">₹{displayPrice}</span>
-                                    <span className="text-[8px] font-bold text-neutral-500 truncate max-w-[70px]">{item.category || 'General'}</span>
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
+                </div>
 {/* RIGHT CART PANEL */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-300 dark:border-neutral-800 flex flex-col p-3 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
@@ -5025,14 +5139,12 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
               </div>
             )}
 
-           {/* TAB: DAILY BILLS & SETTLEMENT */}
+            {/* TAB: DAILY BILLS & SETTLEMENT */}
             {activeTab === 'settlement' && (
               <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
                 <div className="flex justify-between items-center border-b pb-3 shrink-0">
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setIsNavOpen(true)} className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"><Menu size={20} /></button>
-                    <div>
-                      <h2 className="text-base font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-2">
+                  <div>
+                    <h2 className="text-base font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-2">
                       <Receipt size={20} /> Daily Bills & Settlement (दैनिक बिल व भुगतान सेटलमेंट)
                     </h2>
                     <p className="text-xs text-neutral-600 dark:text-neutral-400">
@@ -5174,14 +5286,12 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
               </div>
             )}
 
-           {/* TAB 2: INVENTORY & STOCK */}
+            {/* TAB 2: INVENTORY & STOCK */}
             {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto space-y-4">
                 <div className="flex justify-between items-center border-b pb-3">
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setIsNavOpen(true)} className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"><Menu size={20} /></button>
-                    <div>
-                      <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">Inventory & Stock Manager</h2>
+                  <div>
+                    <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">Inventory & Stock Manager</h2>
                     <p className="text-xs text-neutral-600 dark:text-neutral-400">Add food items, manage raw materials and recipes.</p>
                   </div>
                   <div className="flex gap-2">
@@ -6071,10 +6181,8 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
             {activeTab === 'customers' && (
               <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
                 <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3 shrink-0">
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setIsNavOpen(true)} className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"><Menu size={20} /></button>
-                    <div>
-                      <h2 className="text-lg font-black uppercase text-orange-600 flex items-center gap-2">
+                  <div>
+                    <h2 className="text-lg font-black uppercase text-orange-600 flex items-center gap-2">
                       <SafeUserPlus size={20} /> Customers Directory
                     </h2>
                     <p className="text-xs text-neutral-600 dark:text-neutral-400">सभी ग्राहकों की प्रोफाइल देखें और पॉइंट्स मैनेज करें।</p>
@@ -6270,10 +6378,9 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
             {activeTab === 'dashboard' && (
               <div className="flex-1 p-6 lg:p-10 h-full overflow-y-auto bg-[#f3f4f6] dark:bg-[#0a0a0a]">
                 
-               {/* 👉 DASHBOARD NAVIGATION BUTTONS (TABS) */}
+                {/* 👉 DASHBOARD NAVIGATION BUTTONS (TABS) */}
                 <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-neutral-900 p-3 rounded-2xl shadow-sm border border-neutral-200 dark:border-neutral-800">
-                   <div className="flex items-center gap-3">
-                     <button onClick={() => setIsNavOpen(true)} className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white px-3 py-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"><Menu size={20} /></button>
+                   <div>
                      <h2 className="text-xl font-black uppercase text-neutral-900 dark:text-white flex items-center gap-2">
                        <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-600 p-2 rounded-xl"><LayoutDashboard size={20} /></span>
                        Master Dashboard
