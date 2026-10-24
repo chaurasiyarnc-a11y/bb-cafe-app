@@ -7226,9 +7226,10 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                         </div>
                         <div className="space-y-3">
                           <p className="text-xs font-bold uppercase text-neutral-500">UI Display Theme:</p>
-                          <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl max-w-[250px]">
-                            <button onClick={() => { setThemeMode('light'); localStorage.setItem("bb_pos_theme_pc", 'light'); document.documentElement.classList.remove('dark'); }} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase transition-all ${themeMode === 'light' ? 'bg-white text-orange-600 shadow' : 'text-neutral-500'}`}>Light Mode</button>
-                            <button onClick={() => { setThemeMode('dark'); localStorage.setItem("bb_pos_theme_pc", 'dark'); document.documentElement.classList.add('dark'); }} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase transition-all ${themeMode === 'dark' ? 'bg-neutral-900 text-amber-400 shadow' : 'text-neutral-500'}`}>Dark Mode</button>
+                          <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl max-w-[300px]">
+                            <button onClick={() => { setThemeMode('light'); localStorage.setItem("bb_pos_theme_pc", 'light'); }} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${themeMode === 'light' ? 'bg-white text-orange-600 shadow' : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}`}>☀️ Light</button>
+                            <button onClick={() => { setThemeMode('dark'); localStorage.setItem("bb_pos_theme_pc", 'dark'); }} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${themeMode === 'dark' ? 'bg-neutral-900 text-amber-400 shadow' : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}`}>🌙 Dark</button>
+                            <button onClick={() => { setThemeMode('auto'); localStorage.setItem("bb_pos_theme_pc", 'auto'); }} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${themeMode === 'auto' ? 'bg-white dark:bg-neutral-700 text-blue-600 dark:text-blue-400 shadow' : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'}`}>⚙️ Auto</button>
                           </div>
                         </div>
                       </div>
