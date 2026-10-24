@@ -106,6 +106,7 @@ export default function SettingsTab({
 
   // --- REAL-TIME DATA SYNC EFFECT ---
   useEffect(() => {
+    // 1. Store Configs Sync
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -113,14 +114,25 @@ export default function SettingsTab({
         if (data.timingHindi) setStoreTimingHindi(data.timingHindi);
         if (data.timingEnglish) setStoreTimingEnglish(data.timingEnglish);
         if (data.googleMapUrl) setGoogleMapUrl(data.googleMapUrl);
-        if (data.instagramCount) setInstagramCount(data.instagramCount);
-        if (data.youtubeCount) setYoutubeCount(data.youtubeCount);
-        if (data.facebookCount) setFacebookCount(data.facebookCount);
-        if (data.whatsappCount) setWhatsAppCount(data.whatsappCount);
-        if (data.snapchatCount) setSnapchatCount(data.snapchatCount);
       }
     });
-    return () => unsubStore();
+
+    // 2. 👉 FIX: Social Counts Sync (New Database Path)
+    const unsubSocial = onSnapshot(doc(db, "settings", "social_counts"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.instagram) setInstagramCount(data.instagram);
+        if (data.youtube) setYoutubeCount(data.youtube);
+        if (data.facebook) setFacebookCount(data.facebook);
+        if (data.whatsapp_channel) setWhatsAppCount(data.whatsapp_channel); // Correct mapped key
+        if (data.snapchat) setSnapchatCount(data.snapchat);
+      }
+    });
+
+    return () => {
+      unsubStore();
+      unsubSocial();
+    };
   }, []);
 
   // --- CRUD HANDLERS ---
@@ -185,10 +197,17 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to update store data."); }
   };
 
+  // 👉 FIX: Update Social Counts with new keys and path
   const handleUpdateSocialCounts = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await setDoc(doc(db, "settings", "store"), { instagramCount, youtubeCount, facebookCount, whatsappCount, snapchatCount }, { merge: true });
+      await setDoc(doc(db, "settings", "social_counts"), { 
+        instagram: instagramCount, 
+        youtube: youtubeCount, 
+        facebook: facebookCount, 
+        whatsapp_channel: whatsappCount, 
+        snapchat: snapchatCount 
+      }, { merge: true });
       toast.success("Social Media counts updated! 📊🎉");
     } catch (err) { toast.error("Failed to update social counts."); }
   };
@@ -373,7 +392,7 @@ export default function SettingsTab({
       {activeSubTab === 'banners' && (
         <div className="space-y-6">
           <form onSubmit={handleAddBanner} className="bg-white dark:bg-[#020202] border border-neutral-200 dark:border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-sm">
-            <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5"><ImageIcon size={14}/> Add Promo Banner</h3>
+            <h3 className="text-sm font-black text-orange-600 dark:text-orange-500 uppercase flex items-center gap-1.5"><ImageIcon size={14}/> Add Promo Banner</h3>
             <div className="space-y-3 text-xs">
               <input type="text" placeholder="Banner Title (e.g. Free Delivery above ₹99)" value={newBannerTitle} onChange={(e) => setNewBannerTitle(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs text-neutral-900 dark:text-white outline-none" required />
               <input type="url" placeholder="Paste Image link or Video URL..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs text-neutral-900 dark:text-white outline-none" required />
@@ -411,7 +430,7 @@ export default function SettingsTab({
       {activeSubTab === 'reels' && (
         <div className="space-y-6">
           <form onSubmit={handleAddReel} className="bg-white dark:bg-[#020202] border border-neutral-200 dark:border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-sm">
-            <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5"><Play size={14}/> Add Food Reel</h3>
+            <h3 className="text-sm font-black text-orange-600 dark:text-orange-500 uppercase flex items-center gap-1.5"><Play size={14}/> Add Food Reel</h3>
             <div className="grid grid-cols-2 gap-3 text-xs font-bold">
               <input type="text" placeholder="Title/Dish Name" value={newReelTitle} onChange={(e) => setNewReelTitle(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-neutral-900 dark:text-white outline-none" required />
               <input type="number" placeholder="Item Price (₹)" value={newReelPrice} onChange={(e) => setNewReelPrice(e.target.value)} className="w-full bg-neutral-100 dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-neutral-900 dark:text-white outline-none" required />
@@ -449,7 +468,7 @@ export default function SettingsTab({
       {activeSubTab === 'footer' && (
         <div className="space-y-6">
           <form onSubmit={handleUpdateSocialCounts} className="bg-white dark:bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left border border-neutral-200 dark:border-white/5 shadow-sm">
-            <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
+            <h3 className="text-sm font-black text-orange-600 dark:text-orange-500 uppercase flex items-center gap-1.5">
               📊 Social Media Counts
             </h3>
             <p className="text-[10px] text-neutral-500 dark:text-gray-500 font-bold uppercase leading-relaxed font-mono">
