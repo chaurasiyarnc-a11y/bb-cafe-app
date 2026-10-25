@@ -892,11 +892,8 @@ export default function BbCafeHome() {
         customerName: customerDetails.name, 
         customerPhone: customerDetails.phone,
         address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
-        
-        // --- LATITUDE AND LONGITUDE GPS FIELDS ADDED TO FIRESTORE OBJECT ---
         latitude: customerCoordinates?.lat || null,
         longitude: customerCoordinates?.lng || null,
-
         items: cart, 
         subtotal, 
         discount: couponDiscount, 
@@ -915,30 +912,36 @@ export default function BbCafeHome() {
         screenshotUrl: screenshotUrl || ""
       };
 
-      await addDoc(collection(db, "orders"), orderObj);
       const phoneClean = customerDetails.phone.replace("+91", "");
-      if (pointsEarned > 0 || totalPointsCost > 0) {
-        await setDoc(doc(db, "customer_points", phoneClean), {
-          name: customerDetails.name, phone: phoneClean, points: increment(pointsEarned - totalPointsCost), lastActive: new Date()
-        }, { merge: true });
 
-        if (pointsEarned > 0) {
-          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
-            type: 'earn',
-            points: pointsEarned,
-            description: `Ordered Bill #${formattedBillStr} 🍕`,
-            timestamp: new Date()
-          });
+      // 🔴 यहाँ बदलाव हुआ है (सुरक्षित API कॉल) 🔴
+      try {
+        const response = await fetch('/api/place-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            orderObj,
+            phoneClean,
+            pointsEarned,
+            totalPointsCost
+          }),
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+           toast.error(isHindi ? "ऑर्डर सर्वर पर सेव नहीं हो सका!" : "Failed to save order securely!");
+           setIsSubmittingOrder(false);
+           return;
         }
-        if (totalPointsCost > 0) {
-          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
-            type: 'redeem',
-            points: totalPointsCost,
-            description: `Redeemed rewards on Bill #${formattedBillStr} 🎁`,
-            timestamp: new Date()
-          });
-        }
+      } catch(apiError) {
+        console.error(apiError);
+        toast.error("Server API Error!");
+        setIsSubmittingOrder(false);
+        return;
       }
+      // 🔴 बदलाव खत्म 🔴
 
       const updatedPastOrders = [orderObj, ...pastOrders];
       setPastOrders(updatedPastOrders);
