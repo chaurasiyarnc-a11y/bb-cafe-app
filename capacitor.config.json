@@ -1,0 +1,6 @@
+{
+  "appId": "com.bumbumcafe.app",
+  "appName": "Bum Bum Cafe",
+  "webDir": "out",
+  "bundledWebRuntime": false
+}
