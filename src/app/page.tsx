@@ -1888,11 +1888,17 @@ export default function BbCafeHome() {
         />
 
         {distanceKm !== null && (
-          <div className="bg-orange-500/10 border border-orange-500/20 p-3.5 rounded-2xl flex items-center gap-3 font-bold">
-            <span className="text-xl font-bold">📍</span>
+          <div className={`border p-3.5 rounded-2xl flex items-center gap-3 font-bold shadow-sm ${distanceKm > 15 ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30' : 'bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20'}`}>
+            <span className="text-xl font-bold">{distanceKm > 15 ? '⚠️' : '📍'}</span>
             <div className="space-y-0.5">
-              <p className="text-[10px] font-black text-orange-500 dark:text-orange-400 uppercase font-sans font-bold">{isHindi ? "अनुमानित दूरी" : "Estimated Distance"}</p>
-              <p className="text-[9px] text-neutral-700 dark:text-gray-400 font-sans font-bold">{isHindi ? `आप बम बम कैफे से लगभग ${distanceKm} KM की दूरी पर हैं।` : `You are approximately ${distanceKm} KM away from Bum Bum Cafe.`}</p>
+              <p className={`text-[10px] font-black uppercase font-sans ${distanceKm > 15 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                {isHindi ? "अनुमानित दूरी (Estimated Distance)" : "Estimated Distance"}
+              </p>
+              <p className="text-[9px] text-neutral-700 dark:text-gray-400 font-sans font-bold leading-tight">
+                {distanceKm > 15 
+                  ? (isHindi ? `दूरी ${distanceKm} KM दिख रही है! अगर आप पास में हैं, तो कृपया कार्ट में जाकर मैप पर सही पिन (Pin) सेट करें।` : `Distance shows ${distanceKm} KM. If incorrect, please drag the pin on the map in your cart!`)
+                  : (isHindi ? `आप बम बम कैफे से लगभग ${distanceKm} KM की दूरी पर हैं।` : `You are approximately ${distanceKm} KM away from Bum Bum Cafe.`)}
+              </p>
             </div>
           </div>
         )}
