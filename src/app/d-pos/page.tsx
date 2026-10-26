@@ -6739,6 +6739,10 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'yesterday' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Yesterday</button>
                             <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
                             <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1 ${reportFilter === 'custom' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>📅 Custom</button>
+                            <div className="w-px h-6 bg-neutral-300 dark:bg-neutral-600 mx-1 my-auto"></div>
+                            <button onClick={() => fetchReportData(true)} className="px-3 py-1.5 text-[10px] font-black uppercase rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1" title="Force Refresh Data">
+                              <SafeRefreshCw size={12}/> Refresh
+                            </button>
                           </div>
                         </div>
                         {reportFilter === 'custom' && (
