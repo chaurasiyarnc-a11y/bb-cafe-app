@@ -6068,6 +6068,15 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                                <button onClick={() => handleSendUdhariReminder(order)} className="px-3 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 hover:bg-green-500 hover:text-white border border-green-500/30 rounded-xl text-xs font-black uppercase shadow-sm transition-colors flex items-center gap-1" title="WhatsApp पर सारे बिल भेजकर पैसे मांगें">
                                  <SafeSend size={14} /> Send Reminder
                                </button>
+   
+                               {/* 👉 NEW: Print Bill Button */}
+                               <button 
+                                 onClick={() => handlePrintReceiptDirect(order, false)} 
+                                 className="px-3 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white hover:bg-neutral-300 dark:hover:bg-neutral-700 border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase shadow-sm transition-colors flex items-center gap-1" 
+                                 title="बिल प्रिंट करें"
+                               >
+                                 <SafePrinter size={14} /> Print Bill
+                              </button>
                                <button onClick={() => {
                                  if(window.confirm(`क्या आप ${order.customerName} का ₹${order.total} का उधार CASH में जमा करना चाहते हैं?`)) {
                                    handleClearUdhari(order.id, 'cash');
