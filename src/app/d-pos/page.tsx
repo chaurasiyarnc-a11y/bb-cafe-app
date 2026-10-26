@@ -9163,7 +9163,69 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
           </div>
         )}
       </AnimatePresence>
+      {/* POPUP: PAST RECEIPT VIEW MODAL */}
+      <AnimatePresence>
+        {isReceiptModalOpen && selectedReceipt && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <div>
+                  <h3 className="font-black text-sm uppercase text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
+                    <SafePrinter size={18} /> Receipt Details
+                  </h3>
+                  <p className="text-[10px] text-neutral-500 font-mono mt-1">Bill #{selectedReceipt.billNumber || 'N/A'}</p>
+                </div>
+                <button onClick={() => setIsReceiptModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+              </div>
 
+              <div className="space-y-3">
+                <div className="bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                   <p className="font-bold text-xs text-neutral-900 dark:text-white uppercase">👤 {selectedReceipt.customerName || 'Walk-in Guest'}</p>
+                   {selectedReceipt.customerPhone && <p className="text-[10px] text-neutral-500 font-mono mt-1">📞 {selectedReceipt.customerPhone}</p>}
+                   <p className="text-[10px] text-neutral-500 mt-1">📅 {selectedReceipt.timestamp?.toDate ? selectedReceipt.timestamp.toDate().toLocaleString() : new Date(selectedReceipt.timestamp || Date.now()).toLocaleString()}</p>
+                   <p className="text-[10px] font-black uppercase mt-2"><span className="text-neutral-400">Type:</span> {selectedReceipt.fulfillmentType || 'pickup'} | <span className="text-neutral-400">Pay:</span> {selectedReceipt.paymentMethod || 'cash'}</p>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto pr-1 space-y-1.5 border-t border-b border-dashed border-neutral-200 dark:border-neutral-700 py-2">
+                  {selectedReceipt.items?.map((it: any, idx: number) => (
+                    <div key={idx} className="flex justify-between text-xs font-medium">
+                      <div className="flex-1">
+                        <span>{it.name}</span>
+                        {it.note && <span className="block text-[9px] text-neutral-400 italic">{it.note}</span>}
+                      </div>
+                      <div className="text-right shrink-0 ml-2">
+                         <span className="text-neutral-500 mr-2">{it.quantity}x</span>
++                         <span className="font-bold text-neutral-900 dark:text-white">₹{it.price * it.quantity}</span>
++                      </div>
++                    </div>
++                  ))}
++                </div>
++
++                <div className="space-y-1 text-xs font-bold text-right pt-2">
++                   <div className="flex justify-between text-neutral-500"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>
++                   {(selectedReceipt.discountAmount > 0) && <div className="flex justify-between text-orange-500"><span>Discount:</span><span>-₹{selectedReceipt.discountAmount}</span></div>}
++                   {(selectedReceipt.pointsRedeemed > 0) && <div className="flex justify-between text-amber-500"><span>Points Redeemed:</span><span>-₹{selectedReceipt.pointsRedeemed}</span></div>}
++                   {(selectedReceipt.gstAmount > 0) && <div className="flex justify-between text-red-500"><span>GST:</span><span>+₹{selectedReceipt.gstAmount}</span></div>}
++                   {(selectedReceipt.deliveryFee > 0) && <div className="flex justify-between text-blue-500"><span>Delivery:</span><span>+₹{selectedReceipt.deliveryFee}</span></div>}
++                   {(selectedReceipt.packingCharge > 0) && <div className="flex justify-between text-orange-500"><span>Packing:</span><span>+₹{selectedReceipt.packingCharge}</span></div>}
++                   <div className="flex justify-between text-lg font-black text-green-600 dark:text-green-500 border-t border-neutral-200 dark:border-neutral-700 pt-1 mt-1">
++                      <span>Total:</span><span>₹{selectedReceipt.total}</span>
++                   </div>
++                </div>
++              </div>
++
++              <div className="flex gap-2 pt-2">
++                <button onClick={() => { setIsReceiptModalOpen(false); handlePrintReceiptDirect(selectedReceipt, true); }} className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] rounded-xl shadow-lg transition-colors flex items-center justify-center gap-1">
++                   <SafePrinter size={14}/> Print KOT
++                </button>
++                <button onClick={() => { setIsReceiptModalOpen(false); handlePrintReceiptDirect(selectedReceipt, false); }} className="flex-1 py-2.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase text-[10px] rounded-xl shadow border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors flex items-center justify-center gap-1">
++                   <SafePrinter size={14}/> Print Bill
++                </button>
++              </div>
++            </motion.div>
++          </div>
++        )}
++      </AnimatePresence>
     </div>
   );
 }
