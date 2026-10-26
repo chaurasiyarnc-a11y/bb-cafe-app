@@ -222,7 +222,7 @@ export default function BbCafeHome() {
   // --- MAPPLS MAP STATES & REFS ---
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [tempMapAddress, setTempMapAddress] = useState("");
-  const [mapLoadError, setMapLoadError] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false); // 👉 नया एरर चेकर
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapplsMapRef = useRef<any>(null);
   const mapplsMarkerRef = useRef<any>(null);
@@ -231,6 +231,7 @@ export default function BbCafeHome() {
   useEffect(() => {
     let checkInterval: any;
 
+    // अगर पॉपअप बंद हो, तो मैप को क्लियर कर दें ताकि दोबारा खुलने पर नया मैप लोड हो सके
     if (!isMapOpen) {
       mapplsMapRef.current = null;
       mapplsMarkerRef.current = null;
@@ -247,11 +248,13 @@ export default function BbCafeHome() {
         const centerLat = customerCoordinates?.lat || storeCoordinates.lat;
         const centerLng = customerCoordinates?.lng || storeCoordinates.lng;
 
+        // 1. मैप शुरू करें
         mapplsMapRef.current = new (window as any).mappls.Map(mapContainerRef.current, {
           center: [centerLat, centerLng],
           zoom: 16,
         });
 
+        // 2. मार्कर (पिन) लगाएं
         mapplsMarkerRef.current = new (window as any).mappls.Marker({
           map: mapplsMapRef.current,
           position: { lat: centerLat, lng: centerLng },
@@ -280,6 +283,7 @@ export default function BbCafeHome() {
           fetchAddress(pos.lat, pos.lng);
         });
 
+        // अगर ग्राहक की लोकेशन पहले से नहीं है, तो GPS से निकालें
         if (!customerCoordinates && navigator.geolocation) {
            navigator.geolocation.getCurrentPosition((pos) => {
              const { latitude, longitude } = pos.coords;
@@ -297,6 +301,7 @@ export default function BbCafeHome() {
       }
     };
 
+    // अगर Mappls की स्क्रिप्ट नहीं डली है, तो उसे हेड (Head) में डालें
     if (!document.getElementById("mappls-script")) {
       const script = document.createElement('script');
       script.id = "mappls-script";
@@ -306,13 +311,14 @@ export default function BbCafeHome() {
       document.head.appendChild(script);
     }
 
+    // लूप लगाकर चेक करें कि मैप का कोड इंटरनेट से डाउनलोड हुआ या नहीं (हर 0.5 सेकंड में चेक करेगा)
     let attempts = 0;
     checkInterval = setInterval(() => {
       attempts++;
       if ((window as any).mappls && mapContainerRef.current) {
         initializeMappls();
         clearInterval(checkInterval);
-      } else if (attempts > 20) { 
+      } else if (attempts > 20) { // 10 सेकंड तक इंतज़ार करेगा, फिर एरर दिखाएगा
         clearInterval(checkInterval);
         setMapLoadError(true);
         setTempMapAddress(isHindi ? "नेटवर्क धीमा है या API Key गलत है।" : "Map loading timeout. API Key might be invalid.");
@@ -1219,7 +1225,7 @@ export default function BbCafeHome() {
   // --- MAPPLS MAP STATES & REFS ---
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [tempMapAddress, setTempMapAddress] = useState("");
-  const [mapLoadError, setMapLoadError] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false); // 👉 नया एरर चेकर
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapplsMapRef = useRef<any>(null);
   const mapplsMarkerRef = useRef<any>(null);
@@ -1228,6 +1234,7 @@ export default function BbCafeHome() {
   useEffect(() => {
     let checkInterval: any;
 
+    // अगर पॉपअप बंद हो, तो मैप को क्लियर कर दें ताकि दोबारा खुलने पर नया मैप लोड हो सके
     if (!isMapOpen) {
       mapplsMapRef.current = null;
       mapplsMarkerRef.current = null;
@@ -1244,11 +1251,13 @@ export default function BbCafeHome() {
         const centerLat = customerCoordinates?.lat || storeCoordinates.lat;
         const centerLng = customerCoordinates?.lng || storeCoordinates.lng;
 
+        // 1. मैप शुरू करें
         mapplsMapRef.current = new (window as any).mappls.Map(mapContainerRef.current, {
           center: [centerLat, centerLng],
           zoom: 16,
         });
 
+        // 2. मार्कर (पिन) लगाएं
         mapplsMarkerRef.current = new (window as any).mappls.Marker({
           map: mapplsMapRef.current,
           position: { lat: centerLat, lng: centerLng },
@@ -1277,6 +1286,7 @@ export default function BbCafeHome() {
           fetchAddress(pos.lat, pos.lng);
         });
 
+        // अगर ग्राहक की लोकेशन पहले से नहीं है, तो GPS से निकालें
         if (!customerCoordinates && navigator.geolocation) {
            navigator.geolocation.getCurrentPosition((pos) => {
              const { latitude, longitude } = pos.coords;
@@ -1294,6 +1304,7 @@ export default function BbCafeHome() {
       }
     };
 
+    // अगर Mappls की स्क्रिप्ट नहीं डली है, तो उसे हेड (Head) में डालें
     if (!document.getElementById("mappls-script")) {
       const script = document.createElement('script');
       script.id = "mappls-script";
@@ -1303,13 +1314,14 @@ export default function BbCafeHome() {
       document.head.appendChild(script);
     }
 
+    // लूप लगाकर चेक करें कि मैप का कोड इंटरनेट से डाउनलोड हुआ या नहीं (हर 0.5 सेकंड में चेक करेगा)
     let attempts = 0;
     checkInterval = setInterval(() => {
       attempts++;
       if ((window as any).mappls && mapContainerRef.current) {
         initializeMappls();
         clearInterval(checkInterval);
-      } else if (attempts > 20) { 
+      } else if (attempts > 20) { // 10 सेकंड तक इंतज़ार करेगा, फिर एरर दिखाएगा
         clearInterval(checkInterval);
         setMapLoadError(true);
         setTempMapAddress(isHindi ? "नेटवर्क धीमा है या API Key गलत है।" : "Map loading timeout. API Key might be invalid.");
@@ -1336,176 +1348,6 @@ export default function BbCafeHome() {
     setAddress(finalAddressText);
     setIsMapOpen(false);
     toast.success(isHindi ? "लोकेशन सफलतापूर्वक सेट हो गई!" : "Location set successfully!");
-  };
-
-  const handleShareApp = async () => {
-    triggerHaptic();
-    const shareText = isHindi 
-      ? `बम बम कैफ़े से स्वादिष्ट भोजन आर्डर करें! मेरा इनवाइट कोड इस्तेमाल करें: ${getReferralCode()} 🍕` 
-      : `Order delicious food from Bum Bum Cafe! Use my invite code: ${getReferralCode()} 🍕`;
-    
-    const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://bbcafe.in';
-
-    const performClipboardCopy = () => {
-      navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-      toast.success(isHindi ? "शेयर लिंक क्लिपबोर्ड पर कॉपी हो गया!" : "Share link copied to clipboard!");
-      updateShareCount();
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Bum Bum Cafe',
-          text: shareText,
-          url: shareUrl,
-        });
-        updateShareCount();
-      } catch (err) {
-        performClipboardCopy();
-      }
-    } else {
-      performClipboardCopy();
-    }
-  };
-
-  const updateShareCount = async () => {
-    const nextCount = shareCount + 1;
-    setShareCount(nextCount);
-    if (nextCount % 5 === 0 && customerDetails?.phone) {
-      const phoneClean = customerDetails.phone.replace("+91", "").trim();
-      const userDocRef = doc(db, "customer_points", phoneClean);
-      try {
-        await setDoc(userDocRef, {
-          points: increment(1)
-        }, { merge: true });
-        
-        await addDoc(collection(db, "customer_points", phoneClean, "history"), {
-          type: 'earn',
-          points: 1,
-          description: `Shared app 5 times! 🎁`,
-          timestamp: new Date()
-        });
-        setCustomerPoints(p => p + 1);
-        toast.success(isHindi ? "मुफ़्त +1 पॉइंट आपके अकाउंट में जोड़ा गया!" : "Free +1 point added to your account!");
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  };
-
-  const handleCustomerRedeem = (ruleId: string, rewardName: string, pointsCost: number) => {
-    triggerHaptic();
-    if (!customerDetails?.phone) {
-      toast.error(isHindi ? "कृपया पहले प्रोफाइल बनाएं!" : "Please create profile first!");
-      return;
-    }
-    
-    addItem({
-      id: ruleId,
-      name: rewardName,
-      price: 0,
-      quantity: 1,
-      isReward: true,
-      pointsCost: pointsCost,
-      category: "Special"
-    });
-    
-    toast.success(isHindi ? `${rewardName} आपके कार्ट में मुफ़्त जोड़ा गया!` : `${rewardName} added to your cart for free!`);
-  };
-
-  const handleAddDiyPizzaToCart = () => {
-    triggerHaptic();
-    if (calculatedDiyPizzaPrice <= 0) {
-      toast.error(isHindi ? "कृपया कोई आकार और सामग्री चुनें!" : "Please choose a size and toppings!");
-      return;
-    }
-
-    const toppingsList: string[] = [];
-    Object.entries(diyVegSelection).forEach(([v, selected]) => { if (selected) toppingsList.push(v); });
-    Object.entries(diyPremiumToppings).forEach(([t, selected]) => { if (selected) toppingsList.push(t); });
-    
-    const description = `${diySize.toUpperCase()} Base, Sauce: ${diySauce ? 'Yes' : 'No'}, Cheese: ${diyMozzarella ? 'Yes' : 'No'}, Toppings: ${toppingsList.join(', ') || 'None'}`;
-
-    addItem({
-      id: `diy-pizza-${Date.now()}`,
-      name: isHindi ? `डीआईवाई पिज्जा (${diySize})` : `DIY Pizza (${diySize})`,
-      price: calculatedDiyPizzaPrice,
-      quantity: 1,
-      note: diyChefNote || description,
-      category: "DIY Pizza"
-    });
-
-    setDiySize("small");
-    setDiySauce(true);
-    setDiyMozzarella(true);
-    setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
-    setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
-    setDiyChefNote("");
-
-    toast.success(isHindi ? "कास्ट पिज्जा कार्ट में जोड़ा गया!" : "Your custom Pizza has been added to cart!");
-  };
-
-  const handleNormalPizzaAdd = () => {
-    triggerHaptic();
-    if (!normalPizzaSize) {
-      toast.error(isHindi ? "कृपया साइज चुनें!" : "Please select size!");
-      return;
-    }
-
-    let finalPrice = normalPizzaPrice;
-    const selectedAddons: string[] = [];
-    
-    Object.entries(normalPizzaAddons).forEach(([addon, isSelected]) => {
-      if (isSelected) {
-        const cost = PIZZA_ADDONS[normalPizzaSize.toLowerCase()]?.[addon] || 0;
-        finalPrice += cost;
-        selectedAddons.push(addon);
-      }
-    });
-
-    const noteParts = [];
-    if (selectedAddons.length > 0) noteParts.push(`Add-ons: ${selectedAddons.join(', ')}`);
-    if (chefNote) noteParts.push(`Note: ${chefNote}`);
-
-    addItem({
-      id: `${selectedProduct.id}-${normalPizzaSize.toLowerCase()}`,
-      name: `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`,
-      price: finalPrice,
-      quantity: 1,
-      note: noteParts.join(' | '),
-      category: selectedProduct.category
-    });
-
-    setSelectedProduct(null);
-    setNormalPizzaSize("");
-    setNormalPizzaPrice(0);
-    setNormalPizzaAddons({});
-    setChefNote("");
-
-    toast.success(isHindi ? "कस्टमाइज्ड पिज्जा कार्ट में जोड़ा गया!" : "Customized Pizza added to cart!");
-  };
-
-  const handleReelEnded = () => {
-    triggerHaptic();
-    setActiveStory(null);
-  };
-
-  const handleQuickAddFromStory = (title: string, price: number) => {
-    triggerHaptic();
-    const matchedItem = menu.find(item => item.name?.toLowerCase() === title?.toLowerCase());
-    if (matchedItem) {
-      addItem(matchedItem);
-    } else {
-      addItem({
-        id: `story-${title.replace(/\s+/g, '-').toLowerCase()}`,
-        name: title,
-        price: price,
-        quantity: 1,
-        category: "Fast Food"
-      });
-    }
-    setActiveStory(null);
-    toast.success(isHindi ? "आइटम कार्ट में जोड़ा गया!" : "Item added to cart!");
   };
 
   // --- Real-time Watchers ---
@@ -2991,3 +2833,4 @@ export default function BbCafeHome() {
     </div>
   );
 }
+
