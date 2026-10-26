@@ -6062,7 +6062,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   ) : dueOrders.filter(o => !udhariSearchQuery || String(o.customerName).toLowerCase().includes(udhariSearchQuery.toLowerCase()) || String(o.customerPhone).includes(udhariSearchQuery) || String(o.billNumber).includes(udhariSearchQuery)).length === 0 ? (
                     <div className="text-center py-24 text-neutral-500 font-bold text-xs">कोई भी उधार (Due) पेंडिंग नहीं है। 🎉</div>
                   ) : (
-                    dueOrders.filter(o => !udhariSearchQuery || String(o.customerName).toLowerCase().includes(udhariSearchQuery.toLowerCase()) || String(o.customerPhone).includes(udhariSearchQuery) || String(o.billNumber).includes(udhariSearchQuery)).map(order => {
+                   dueOrders.filter(o => !udhariSearchQuery || String(o.customerName).toLowerCase().includes(udhariSearchQuery.toLowerCase()) || String(o.customerPhone).includes(udhariSearchQuery) || String(o.billNumber).includes(udhariSearchQuery)).map(order => {
                       const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp || Date.now());
                       
                       // 👉 NEW: दिन गिनने का लॉजिक (पता करें कि उधार कितना पुराना है)
@@ -6071,6 +6071,16 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       const orderMidnight = new Date(orderDate);
                       orderMidnight.setHours(0, 0, 0, 0);
                       const daysPending = Math.round((todayMidnight.getTime() - orderMidnight.getTime()) / (1000 * 3600 * 24));
+
+                      // 👉 NEW: इस ग्राहक का कुल उधार (Total Due) और बिलों की संख्या निकालना
+                      const cleanTargetPhone = String(order.customerPhone || '').replace(/\D/g, '').slice(-10);
+                      const customerAllBills = dueOrders.filter(o => {
+                        const p = String(o.customerPhone || '').replace(/\D/g, '').slice(-10);
+                        if (cleanTargetPhone && p) return p === cleanTargetPhone;
+                        return o.customerName === order.customerName; 
+                      });
+                      const customerTotalDue = customerAllBills.reduce((acc, o) => acc + Number(o.total || 0), 0);
+                      const customerBillCount = customerAllBills.length;
 
                       return (
                         <div key={order.id} className={`bg-white dark:bg-neutral-900 border p-4 rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4 shadow-sm transition-all hover:border-red-500 ${daysPending > 15 ? 'border-red-500 bg-red-50 dark:bg-red-950/20 shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 'border-red-200 dark:border-red-900/50'}`}>
@@ -6099,6 +6109,16 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                              <span className="text-[10px] text-neutral-500 block mt-1.5 font-bold">
                                📅 Date: {orderDate.toLocaleString()}
                              </span>
+
+                             {/* 👉 NEW: इस ग्राहक का कुल उधार दिखाने वाला स्मार्ट टैग */}
+                             {customerBillCount > 1 && (
+                               <div className="mt-2 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800/50 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1.5 shadow-sm">
+                                 <span className="text-red-600">🧾</span>
+                                 <p className="text-[10px] font-black text-red-700 dark:text-red-400">
+                                   इस ग्राहक का कुल उधार: <span className="text-sm font-mono mx-1">₹{customerTotalDue}</span> ({customerBillCount} बिल पेंडिंग)
+                                 </p>
+                               </div>
+                             )}
                            </div>
                            <div className="flex items-center gap-4">
                              <div className="text-right mr-2">
