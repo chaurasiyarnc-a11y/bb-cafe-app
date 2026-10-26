@@ -6064,16 +6064,39 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   ) : (
                     dueOrders.filter(o => !udhariSearchQuery || String(o.customerName).toLowerCase().includes(udhariSearchQuery.toLowerCase()) || String(o.customerPhone).includes(udhariSearchQuery) || String(o.billNumber).includes(udhariSearchQuery)).map(order => {
                       const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp || Date.now());
+                      
+                      // 👉 NEW: दिन गिनने का लॉजिक (पता करें कि उधार कितना पुराना है)
+                      const todayMidnight = new Date();
+                      todayMidnight.setHours(0, 0, 0, 0);
+                      const orderMidnight = new Date(orderDate);
+                      orderMidnight.setHours(0, 0, 0, 0);
+                      const daysPending = Math.round((todayMidnight.getTime() - orderMidnight.getTime()) / (1000 * 3600 * 24));
+
                       return (
-                        <div key={order.id} className="bg-white dark:bg-neutral-900 border border-red-200 dark:border-red-900/50 hover:border-red-500 p-4 rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4 shadow-sm transition-all">
+                        <div key={order.id} className={`bg-white dark:bg-neutral-900 border p-4 rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4 shadow-sm transition-all hover:border-red-500 ${daysPending > 15 ? 'border-red-500 bg-red-50 dark:bg-red-950/20 shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 'border-red-200 dark:border-red-900/50'}`}>
                            <div>
-                             <div className="flex items-center gap-2">
+                             <div className="flex items-center gap-2 flex-wrap">
                                <span className="font-mono font-black text-red-600 dark:text-red-400 text-sm">Bill #{order.billNumber}</span>
                                <span className="text-neutral-400">•</span>
                                <span className="font-bold text-sm text-neutral-900 dark:text-white">{order.customerName || 'Unknown Guest'}</span>
                                {order.customerPhone && <span className="text-[11px] text-neutral-500 font-mono">({order.customerPhone})</span>}
+                               
+                               {/* 👉 NEW: Udhari Alert Tags */}
+                               {daysPending > 15 ? (
+                                 <span className="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 border border-red-400 dark:border-red-600 text-[10px] font-black uppercase px-2 py-0.5 rounded-lg animate-pulse flex items-center gap-1 shadow-sm">
+                                   ⚠️ {daysPending} दिन से गायब
+                                 </span>
+                               ) : daysPending > 0 ? (
+                                 <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border border-orange-300 dark:border-orange-800 text-[9px] font-bold px-1.5 py-0.5 rounded-lg">
+                                   {daysPending} दिन पुराना
+                                 </span>
+                               ) : (
+                                 <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-800 text-[9px] font-bold px-1.5 py-0.5 rounded-lg">
+                                   आज का
+                                 </span>
+                               )}
                              </div>
-                             <span className="text-[10px] text-neutral-500 block mt-1 font-bold">
+                             <span className="text-[10px] text-neutral-500 block mt-1.5 font-bold">
                                📅 Date: {orderDate.toLocaleString()}
                              </span>
                            </div>
