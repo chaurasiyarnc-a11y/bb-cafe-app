@@ -6579,8 +6579,12 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                               <div className="flex bg-neutral-100 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-inner">
                                 <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Today</button>
                                 <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Yesterday</button>
-                                <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
+                               <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
                                 <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1 ${reportFilter === 'custom' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>📅 Custom</button>
+                                <div className="w-px h-6 bg-neutral-300 dark:bg-neutral-700 mx-1 my-auto"></div>
+                                <button onClick={() => fetchReportData(true)} className="px-3 py-1.5 text-[10px] font-black uppercase rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1" title="Force Refresh Data">
+                                  <SafeRefreshCw size={12}/> Refresh
+                                </button>
                               </div>
                               {reportFilter === 'custom' && (
                                 <div className="flex items-center gap-2 bg-neutral-50 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
