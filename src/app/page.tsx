@@ -328,123 +328,124 @@ export default function BbCafeHome() {
        if (checkInterval) clearInterval(checkInterval);
      };
    }, [isMapOpen]);
--          center: [centerLat, centerLng],
--          zoom: 16,
--        });
--
--        mapplsMarkerRef.current = new (window as any).mappls.Marker({
--          map: mapplsMapRef.current,
--          position: { lat: centerLat, lng: centerLng },
--// --- MAPPLS MAP STATES & REFS ---
--  const [isMapOpen, setIsMapOpen] = useState(false);
--  const [tempMapAddress, setTempMapAddress] = useState("");
--  const [mapLoadError, setMapLoadError] = useState(false);
--  const mapContainerRef = useRef<HTMLDivElement>(null);
--  const mapplsMapRef = useRef<any>(null);
--  const mapplsMarkerRef = useRef<any>(null);
--  const MAPPLS_KEY = "xxytvmxywdbfxyfzujfatkuxnfaxyenmwwuu"; // Your API Key
--
--  useEffect(() => {
--    let checkInterval: any;
--
--    // अगर पॉपअप बंद हो, तो मैप को क्लियर कर दें ताकि दोबारा खुलने पर नया मैप लोड हो सके
--    if (!isMapOpen) {
--      mapplsMapRef.current = null;
--      mapplsMarkerRef.current = null;
--      return;
--    }
--
--    setMapLoadError(false);
--    setTempMapAddress(isHindi ? "मैप लोड हो रहा है..." : "Loading Map...");
--
--    const initializeMappls = () => {
--      if (!(window as any).mappls || mapplsMapRef.current || !mapContainerRef.current) return;
--      
--      try {
--        const centerLat = customerCoordinates?.lat || storeCoordinates.lat;
--        const centerLng = customerCoordinates?.lng || storeCoordinates.lng;
--
--        // 1. मैप शुरू करें
--        mapplsMapRef.current = new (window as any).mappls.Map(mapContainerRef.current, {
--          center: [centerLat, centerLng],
--          zoom: 16,
--        });
--
--        // 2. मार्कर (पिन) लगाएं
--        mapplsMarkerRef.current = new (window as any).mappls.Marker({
--          map: mapplsMapRef.current,
--          position: { lat: centerLat, lng: centerLng },
--          draggable: true,
--        });
--
--        const fetchAddress = async (lat: number, lng: number) => {
--          setTempMapAddress(isHindi ? "पता खोज रहे हैं..." : "Finding address...");
--          try {
--             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=en`);
--             const data = await res.json();
--             if (data && data.display_name) {
--               setTempMapAddress(data.display_name);
--             } else {
--               setTempMapAddress(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
--             }
--          } catch (e) {
--             setTempMapAddress(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
--          }
--        };
--
--        fetchAddress(centerLat, centerLng);
--
--        mapplsMarkerRef.current.addListener('dragend', () => {
--          const pos = mapplsMarkerRef.current.getPosition();
--          fetchAddress(pos.lat, pos.lng);
--        });
--
--        // अगर ग्राहक की लोकेशन पहले से नहीं है, तो GPS से निकालें
--        if (!customerCoordinates && navigator.geolocation) {
--           navigator.geolocation.getCurrentPosition((pos) => {
--             const { latitude, longitude } = pos.coords;
--             if (mapplsMapRef.current && mapplsMarkerRef.current) {
--                mapplsMapRef.current.setCenter({ lat: latitude, lng: longitude });
--                mapplsMarkerRef.current.setPosition({ lat: latitude, lng: longitude });
--                fetchAddress(latitude, longitude);
--             }
--           }, () => {}, { enableHighAccuracy: true });
--        }
--      } catch (error) {
--        console.error("Mappls Initialization Error:", error);
--        setMapLoadError(true);
--        setTempMapAddress(isHindi ? "मैप लोड करने में समस्या। कृपया इंटरनेट या API Key जांचें।" : "Failed to load map. Check API Key.");
--      }
--    };
--
--    // अगर Mappls की स्क्रिप्ट नहीं डली है, तो उसे हेड (Head) में डालें
--    if (!document.getElementById("mappls-script")) {
--      const script = document.createElement('script');
--      script.id = "mappls-script";
--      script.src = `https://apis.mappls.com/advancedmaps/api/${MAPPLS_KEY}/map_sdk?layer=vector&v=3.0`;
--      script.async = true;
--      script.defer = true;
--      document.head.appendChild(script);
--    }
--
--    // लूप लगाकर चेक करें कि मैप का कोड इंटरनेट से डाउनलोड हुआ या नहीं (हर 0.5 सेकंड में चेक करेगा)
--    let attempts = 0;
--    checkInterval = setInterval(() => {
--      attempts++;
--      if ((window as any).mappls && mapContainerRef.current) {
--        initializeMappls();
--        clearInterval(checkInterval);
--      } else if (attempts > 20) { // 10 सेकंड तक इंतज़ार करेगा, फिर एरर दिखाएगा
--        clearInterval(checkInterval);
--        setMapLoadError(true);
--        setTempMapAddress(isHindi ? "नेटवर्क धीमा है या API Key गलत है।" : "Map loading timeout. API Key might be invalid.");
--      }
--    }, 500);
--
--    return () => {
--      if (checkInterval) clearInterval(checkInterval);
--    };
--  }, [isMapOpen]);
+          center: [centerLat, centerLng],
+          zoom: 16,
+        });
+
+        mapplsMarkerRef.current = new (window as any).mappls.Marker({
+          map: mapplsMapRef.current,
+          position: { lat: centerLat, lng: centerLng },
+
+// --- MAPPLS MAP STATES & REFS ---
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [tempMapAddress, setTempMapAddress] = useState("");
+  const [mapLoadError, setMapLoadError] = useState(false); // 👉 नया एरर चेकर
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapplsMapRef = useRef<any>(null);
+  const mapplsMarkerRef = useRef<any>(null);
+  const MAPPLS_KEY = "xxytvmxywdbfxyfzujfatkuxnfaxyenmwwuu"; // Your API Key
+
+  useEffect(() => {
+    let checkInterval: any;
+
+    // अगर पॉपअप बंद हो, तो मैप को क्लियर कर दें ताकि दोबारा खुलने पर नया मैप लोड हो सके
+    if (!isMapOpen) {
+      mapplsMapRef.current = null;
+      mapplsMarkerRef.current = null;
+      return;
+    }
+
+    setMapLoadError(false);
+    setTempMapAddress(isHindi ? "मैप लोड हो रहा है..." : "Loading Map...");
+
+    const initializeMappls = () => {
+      if (!(window as any).mappls || mapplsMapRef.current || !mapContainerRef.current) return;
+      
+      try {
+        const centerLat = customerCoordinates?.lat || storeCoordinates.lat;
+        const centerLng = customerCoordinates?.lng || storeCoordinates.lng;
+
+        // 1. मैप शुरू करें
+        mapplsMapRef.current = new (window as any).mappls.Map(mapContainerRef.current, {
+          center: [centerLat, centerLng],
+          zoom: 16,
+        });
+
+        // 2. मार्कर (पिन) लगाएं
+        mapplsMarkerRef.current = new (window as any).mappls.Marker({
+          map: mapplsMapRef.current,
+          position: { lat: centerLat, lng: centerLng },
+          draggable: true,
+        });
+
+        const fetchAddress = async (lat: number, lng: number) => {
+          setTempMapAddress(isHindi ? "पता खोज रहे हैं..." : "Finding address...");
+          try {
+             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=en`);
+             const data = await res.json();
+             if (data && data.display_name) {
+               setTempMapAddress(data.display_name);
+             } else {
+               setTempMapAddress(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+             }
+          } catch (e) {
+             setTempMapAddress(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+          }
+        };
+
+        fetchAddress(centerLat, centerLng);
+
+        mapplsMarkerRef.current.addListener('dragend', () => {
+          const pos = mapplsMarkerRef.current.getPosition();
+          fetchAddress(pos.lat, pos.lng);
+        });
+
+        // अगर ग्राहक की लोकेशन पहले से नहीं है, तो GPS से निकालें
+        if (!customerCoordinates && navigator.geolocation) {
+           navigator.geolocation.getCurrentPosition((pos) => {
+             const { latitude, longitude } = pos.coords;
+             if (mapplsMapRef.current && mapplsMarkerRef.current) {
+                mapplsMapRef.current.setCenter({ lat: latitude, lng: longitude });
+                mapplsMarkerRef.current.setPosition({ lat: latitude, lng: longitude });
+                fetchAddress(latitude, longitude);
+             }
+           }, () => {}, { enableHighAccuracy: true });
+        }
+      } catch (error) {
+        console.error("Mappls Initialization Error:", error);
+        setMapLoadError(true);
+        setTempMapAddress(isHindi ? "मैप लोड करने में समस्या। कृपया इंटरनेट या API Key जांचें।" : "Failed to load map. Check API Key.");
+      }
+    };
+
+    // अगर Mappls की स्क्रिप्ट नहीं डली है, तो उसे हेड (Head) में डालें
+    if (!document.getElementById("mappls-script")) {
+      const script = document.createElement('script');
+      script.id = "mappls-script";
+      script.src = `https://apis.mappls.com/advancedmaps/api/${MAPPLS_KEY}/map_sdk?layer=vector&v=3.0`;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+
+    // लूप लगाकर चेक करें कि मैप का कोड इंटरनेट से डाउनलोड हुआ या नहीं (हर 0.5 सेकंड में चेक करेगा)
+    let attempts = 0;
+    checkInterval = setInterval(() => {
+      attempts++;
+      if ((window as any).mappls && mapContainerRef.current) {
+        initializeMappls();
+        clearInterval(checkInterval);
+      } else if (attempts > 20) { // 10 सेकंड तक इंतज़ार करेगा, फिर एरर दिखाएगा
+        clearInterval(checkInterval);
+        setMapLoadError(true);
+        setTempMapAddress(isHindi ? "नेटवर्क धीमा है या API Key गलत है।" : "Map loading timeout. API Key might be invalid.");
+      }
+    }, 500);
+
+    return () => {
+      if (checkInterval) clearInterval(checkInterval);
+    };
+  }, [isMapOpen]);
  
    const handleConfirmMapLocation = () => {
     triggerHaptic();
