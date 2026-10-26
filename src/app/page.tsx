@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -218,6 +217,97 @@ export default function BbCafeHome() {
 
   // UI States
   const [showGreeting, setShowGreeting] = useState(true);
+
+  // --- MAPPLS MAP STATES & REFS ---
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [tempMapAddress, setTempMapAddress] = useState("");
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapplsMapRef = useRef<any>(null);
+  const mapplsMarkerRef = useRef<any>(null);
+  const MAPPLS_KEY = "xxytvmxywdbfxyfzujfatkuxnfaxyenmwwuu"; // Your API Key
+
+  useEffect(() => {
+    if (isMapOpen) {
+      const loadMap = () => {
+        if (!(window as any).mappls) return;
+        const centerLat = customerCoordinates?.lat || storeCoordinates.lat;
+        const centerLng = customerCoordinates?.lng || storeCoordinates.lng;
+
+        mapplsMapRef.current = new (window as any).mappls.Map(mapContainerRef.current, {
+          center: [centerLat, centerLng],
+          zoom: 16,
+        });
+
+        mapplsMarkerRef.current = new (window as any).mappls.Marker({
+          map: mapplsMapRef.current,
+          position: { lat: centerLat, lng: centerLng },
+          draggable: true,
+        });
+
+        const fetchAddress = async (lat: number, lng: number) => {
+          setTempMapAddress(isHindi ? "पता खोज रहे हैं..." : "Finding address...");
+          try {
+             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=en`);
+             const data = await res.json();
+             if (data && data.display_name) {
+               setTempMapAddress(data.display_name);
+             } else {
+               setTempMapAddress(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+             }
+          } catch (e) {
+             setTempMapAddress(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+          }
+        };
+
+        fetchAddress(centerLat, centerLng);
+
+        mapplsMarkerRef.current.addListener('dragend', () => {
+          const pos = mapplsMarkerRef.current.getPosition();
+          fetchAddress(pos.lat, pos.lng);
+        });
+
+        // Auto GPS if no customer coords yet
+        if (!customerCoordinates && navigator.geolocation) {
+           navigator.geolocation.getCurrentPosition((pos) => {
+             const { latitude, longitude } = pos.coords;
+             if (mapplsMapRef.current && mapplsMarkerRef.current) {
+                mapplsMapRef.current.setCenter({ lat: latitude, lng: longitude });
+                mapplsMarkerRef.current.setPosition({ lat: latitude, lng: longitude });
+                fetchAddress(latitude, longitude);
+             }
+           }, () => {}, { enableHighAccuracy: true });
+        }
+      };
+
+      if (!document.getElementById("mappls-script")) {
+        const script = document.createElement('script');
+        script.id = "mappls-script";
+        script.src = `https://apis.mappls.com/advancedmaps/api/${MAPPLS_KEY}/map_sdk?layer=vector&v=3.0`;
+        script.async = true;
+        script.onload = loadMap;
+        document.body.appendChild(script);
+      } else {
+        loadMap();
+      }
+    }
+  }, [isMapOpen]);
+
+  const handleConfirmMapLocation = () => {
+    triggerHaptic();
+    if (!mapplsMarkerRef.current) return;
+    const pos = mapplsMarkerRef.current.getPosition();
+    
+    const distance = calculateDistanceInKm(pos.lat, pos.lng, storeCoordinates.lat, storeCoordinates.lng);
+    setDistanceKm(Number(distance.toFixed(2)));
+    setCustomerCoordinates({ lat: pos.lat, lng: pos.lng });
+    
+    const mapLink = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
+    const finalAddressText = `📍 ${tempMapAddress}\n🔗 Maps Link: ${mapLink}`;
+    
+    setAddress(finalAddressText);
+    setIsMapOpen(false);
+    toast.success(isHindi ? "लोकेशन सफलतापूर्वक सेट हो गई!" : "Location set successfully!");
+  };
 
   // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
 
@@ -1094,153 +1184,10 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  // --- RE-MODULARIZED AND BRACKET-BALANCED COMPACT HYBRID GEOLOCATION HANDLER ---
+  // --- MAPPLS INTERACTIVE MAP OPENER ---
   const handleDetectLocation = () => {
     triggerHaptic();
-    if (typeof window === "undefined") return;
-
-    setAddress(isHindi ? "⏳ सटीक लोकेशन खोजी जा रही है (GPS)..." : "⏳ Finding highly accurate location (GPS)...");
-    const toastId = toast.loading(isHindi ? "सटीक लोकेशन खोजी जा रही है..." : "Finding accurate location...");
-
-    const fallbackToIP = () => {
-      setAddress(isHindi ? "⏳ नेटवर्क लोकेशन खोजी जा रही है (Approx)..." : "⏳ Finding network location...");
-      fetch('https://ipapi.co/json/')
-        .then((res) => {
-          if (res.ok) return res.json();
-          throw new Error("IP Geolocation failed");
-        })
-        .then((ipData) => {
-          const lat = ipData.latitude;
-          const lon = ipData.longitude;
-          const city = ipData.city || "";
-          const region = ipData.region || "";
-
-          setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
-          setCustomerCoordinates({ lat, lng: lon });
-
-          const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
-          const finalAddressText = city 
-            ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
-            : `My GPS Location: ${mapLink}`;
-
-          setAddress(finalAddressText);
-          toast.dismiss(toastId);
-          toast.success(isHindi ? "लोकेशन डिटेक्ट की गई!" : "Location successfully detected!");
-        })
-        .catch(() => {
-          setAddress("");
-          toast.dismiss(toastId);
-          toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
-        });
-    };
-
-    if (!navigator.geolocation) {
-      fallbackToIP();
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
-        setDistanceKm(Number(distance.toFixed(2)));
-        setCustomerCoordinates({ lat: latitude, lng: longitude });
-
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
-          headers: { 'User-Agent': 'BumBumCafeApp/1.0' }
-        })
-          .then((res) => {
-            if (res.ok) return res.json();
-            return null;
-          })
-          .then((data) => {
-            const textAddress = data?.display_name || "";
-            const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-            const finalAddressText = textAddress 
-              ? `📍 Accurate Address: ${textAddress}\n🔗 Maps Link: ${mapLink}`
-              : `My GPS Location: ${mapLink}`;
-
-            setAddress(finalAddressText);
-            toast.dismiss(toastId);
-            toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
-          })
-          .catch(() => {
-            const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-            setAddress(`My GPS Location: ${mapLink}`);
-            toast.dismiss(toastId);
-            toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
-          });
-      },
-      () => {
-        setAddress(isHindi ? "⏳ वैकल्पिक लोकेशन खोजी जा रही है (Network)..." : "⏳ Finding alternative location...");
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
-            setDistanceKm(Number(distance.toFixed(2)));
-            setCustomerCoordinates({ lat: latitude, lng: longitude });
-
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
-              headers: { 'User-Agent': 'BumBumCafeApp/1.0' }
-            })
-              .then((res) => {
-                if (res.ok) return res.json();
-                return null;
-              })
-              .then((data) => {
-                const textAddress = data?.display_name || "";
-                const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-                const finalAddressText = textAddress 
-                  ? `📍 Address (approx): ${textAddress}\n🔗 Maps Link: ${mapLink}`
-                  : `My GPS Location: ${mapLink}`;
-
-                setAddress(finalAddressText);
-                toast.dismiss(toastId);
-                toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
-              })
-              .catch(() => {
-                const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-                setAddress(`My GPS Location: ${mapLink}`);
-                toast.dismiss(toastId);
-                toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
-              });
-          },
-          () => {
-            setAddress(isHindi ? "⏳ नेटवर्क लोकेशन खोजी जा रही है (Approx)..." : "⏳ Finding network location...");
-            fetch('https://ipapi.co/json/')
-              .then((res) => {
-                if (res.ok) return res.json();
-                throw new Error("IP Geolocation failed");
-              })
-              .then((ipData) => {
-                const lat = ipData.latitude;
-                const lon = ipData.longitude;
-                const city = ipData.city || "";
-                const region = ipData.region || "";
-
-                setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
-                setCustomerCoordinates({ lat, lng: lon });
-
-                const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
-                const finalAddressText = city 
-                  ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
-                  : `My GPS Location: ${mapLink}`;
-
-                setAddress(finalAddressText);
-                toast.dismiss(toastId);
-                toast.success(isHindi ? "लोकेशन डिटेक्ट की गई!" : "Location successfully detected!");
-              })
-              .catch(() => {
-                setAddress("");
-                toast.dismiss(toastId);
-                toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
-              });
-          },
-          { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-        );
-      },
-      { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
-    );
+    setIsMapOpen(true);
   };
 
   const handleShareApp = async () => {
@@ -2162,7 +2109,7 @@ export default function BbCafeHome() {
               
               <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
                 {isHindi ? 
-                  "हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए।  यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है।  हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ।  ❤️" :
+                  "हमने BAM BAM CAFE की शुरुआत एक ছোটे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए।  यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है।  हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ।  ❤️" :
                   "We started BAM BAM CAFE with a simple dream - to serve hygienic, delicious, home-style fast food in Mohandra town. Every slice of pizza and plate of thali here is crafted with ultimate love, purity and hygiene. Feel free to dine-in or order online! ❤️"
                 }
               </p>
@@ -2831,8 +2778,48 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* MAPPLS INTERACTIVE MAP MODAL */}
+      <AnimatePresence>
+        {isMapOpen && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[300] flex items-center justify-center p-4 font-sans">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }} 
+              className="bg-white dark:bg-[#111] w-full max-w-md p-4 rounded-3xl border dark:border-white/10 border-neutral-200 shadow-2xl flex flex-col gap-3"
+            >
+              <div className="flex justify-between items-center px-1">
+                <div>
+                  <h3 className="font-black text-sm text-orange-600 uppercase flex items-center gap-1.5"><MapPin size={16}/> {isHindi ? "डिलीवरी लोकेशन चुनें" : "Select Location"}</h3>
+                  <p className="text-[10px] text-neutral-500 font-bold">{isHindi ? "लाल पिन को अपने घर/पते पर खिसकाएं" : "Drag the red pin to your exact location"}</p>
+                </div>
+                <button type="button" onClick={() => setIsMapOpen(false)} className="bg-neutral-100 dark:bg-white/10 p-1.5 rounded-full text-neutral-600 dark:text-neutral-300">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div 
+                ref={mapContainerRef} 
+                className="w-full h-72 rounded-2xl overflow-hidden border-2 border-orange-500/30 relative z-10"
+              />
+
+              <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-500/30 p-3 rounded-xl">
+                <p className="text-[9px] font-black uppercase text-orange-500 mb-0.5">{isHindi ? "चुना गया पता:" : "Selected Address:"}</p>
+                <p className="text-xs font-bold text-neutral-800 dark:text-gray-200 leading-tight line-clamp-2">{tempMapAddress}</p>
+              </div>
+
+              <button 
+                type="button"
+                onClick={handleConfirmMapLocation}
+                className="w-full bg-orange-600 hover:bg-orange-500 text-white p-3.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2"
+              >
+                <MapPin size={16}/> {isHindi ? "लोकेशन कन्फर्म करें" : "Confirm Location"}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
-
-
