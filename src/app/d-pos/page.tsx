@@ -1289,6 +1289,11 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   // 👉 NEW: बाहर क्लिक करने पर ड्रॉपडाउन बंद करने का Ref
   const custDropdownRef = useRef<HTMLDivElement | null>(null);
 
+  // 👉 NEW: Memory Cache for Dashboard Reports (ताकि बार-बार लोड न हो और Dashboard तुरंत खुले)
+  const reportAllOrdersRef = useRef<any[]>([]);
+  const reportAllExpensesRef = useRef<any[]>([]);
+  const reportLastFetchTimeRef = useRef<number>(0);
+
   // 👉 NEW: बाहर क्लिक करने को पकड़ने वाला लॉजिक
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
