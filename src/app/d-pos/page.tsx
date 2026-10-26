@@ -6925,13 +6925,20 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                     
                     let newCustomers7Days = 0;
                     
-                    const fomoCustomers: any[] = [];
+                   const fomoCustomers: any[] = [];
                     const acqTrend = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 };
-                    const now = Date.now();
+                    
+                    // ✅ FIX: सही कैलेंडर दिन (Midnight) से समय गिनना
+                    const todayMidnight = new Date();
+                    todayMidnight.setHours(0, 0, 0, 0);
 
                     allCustomers.forEach(c => {
-                      const lastAct = c.lastActive?.toDate ? c.lastActive.toDate().getTime() : new Date(c.lastActive || 0).getTime();
-                      const daysSince = Math.floor((now - lastAct) / (1000 * 3600 * 24));
+                      const lastActDate = c.lastActive?.toDate ? c.lastActive.toDate() : new Date(c.lastActive || 0);
+                      const lastActMidnight = new Date(lastActDate);
+                      lastActMidnight.setHours(0, 0, 0, 0);
+                      
+                      const daysSince = Math.round((todayMidnight.getTime() - lastActMidnight.getTime()) / (1000 * 3600 * 24));
+                      
                       const visits = c.totalVisits || 0;
                       const spent = c.totalSpent || 0;
 
@@ -6950,7 +6957,11 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       else if (daysSince > 30) sleepingList.push(c);
                       else if (daysSince >= 15 && daysSince <= 30) atRiskList.push(c);
                       else regularList.push(c);
-                      if (visits === 1 && daysSince <= 6) {
+                      
+                      // ✅ FIX: Loyverse से इम्पोर्ट हुए ग्राहकों को झूठा (Fake) "New Customer" बनने से रोकना
+                      const isRealNewCustomer = !c.isImported || (c.isImported && c.lastBillNumber);
+                      
+                      if (visits === 1 && isRealNewCustomer && daysSince >= 0 && daysSince <= 6) {
                         newCustomers7Days++;
                         acqTrend[daysSince as keyof typeof acqTrend]++;
                       }
