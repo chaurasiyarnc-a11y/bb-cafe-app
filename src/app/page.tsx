@@ -2899,9 +2899,23 @@ export default function BbCafeHome() {
               </div>
 
               <div 
+                id="mappls-map-container"
                 ref={mapContainerRef} 
-                className="w-full h-72 rounded-2xl overflow-hidden border-2 border-orange-500/30 relative z-10"
-              />
+                className="w-full h-72 rounded-2xl overflow-hidden border-2 border-orange-500/30 relative z-10 bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center"
+              >
+                {!mapplsMapRef.current && !mapLoadError && (
+                  <div className="flex flex-col items-center gap-2 text-orange-500">
+                    <Loader2 className="animate-spin" size={24} />
+                    <span className="text-xs font-bold">{isHindi ? "मैप लोड हो रहा है..." : "Loading Map..."}</span>
+                  </div>
+                )}
+                {mapLoadError && (
+                  <div className="text-center p-4">
+                    <p className="text-red-500 text-xs font-bold mb-2">⚠️ {isHindi ? "मैप लोड नहीं हो सका" : "Map failed to load"}</p>
+                    <p className="text-[9px] text-neutral-500">नेटवर्क बहुत धीमा है या API Key गलत है।</p>
+                  </div>
+                )}
+              </div>
 
               <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-500/30 p-3 rounded-xl">
                 <p className="text-[9px] font-black uppercase text-orange-500 mb-0.5">{isHindi ? "चुना गया पता:" : "Selected Address:"}</p>
