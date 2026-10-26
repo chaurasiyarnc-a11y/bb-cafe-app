@@ -3504,14 +3504,117 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       toast.error("Failed to record expense");
     }
   };
- // 🚀 OFFLINE & ONLINE REPORTS DATA FETCHING (FIXED DATE ISSUE)
-  const fetchReportData = async () => {
-    setIsReportLoading(true);
+// 🚀 INSTANT MEMORY CACHE & REPORTS DATA FETCHING
+  const fetchReportData = async (forceRefresh = false) => {
+    // अगर हमारे पास पहले से डेटा है और हम ज़बरदस्ती रिफ्रेश नहीं कर रहे, तो लोडिंग स्पिनर मत दिखाओ (Instant Load)
+    if (!reportAllOrdersRef.current.length || forceRefresh) {
+      setIsReportLoading(true);
+    }
+    
     try {
       let startTarget = new Date();
       let endTarget = new Date();
 
       if (reportFilter === 'today') {
+        startTarget.setHours(0, 0, 0, 0); endTarget.setHours(23, 59, 59, 999);
+      } else if (reportFilter === 'yesterday') {
+        startTarget.setDate(startTarget.getDate() - 1); startTarget.setHours(0, 0, 0, 0);
+        endTarget.setDate(endTarget.getDate() - 1); endTarget.setHours(23, 59, 59, 999);
+      } else if (reportFilter === 'last7days') {
+        startTarget.setDate(startTarget.getDate() - 6); startTarget.setHours(0, 0, 0, 0);
+        endTarget.setHours(23, 59, 59, 999);
+      } else if (reportFilter === 'last30days') {
+        startTarget.setDate(startTarget.getDate() - 29); startTarget.setHours(0, 0, 0, 0);
+        endTarget.setHours(23, 59, 59, 999);
+      } else if (reportFilter === 'custom' && customStartDate && customEndDate) {
+        const startParts = customStartDate.split('-');
+        startTarget = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
+        const endParts = customEndDate.split('-');
+        endTarget = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]), 23, 59, 59, 999);
+      }
+
+      // 5 मिनट तक कैश इस्तेमाल करें, या अगर forceRefresh हो तो नया डेटा लाएं
+      const needsFetch = forceRefresh || reportAllOrdersRef.current.length === 0 || (Date.now() - reportLastFetchTimeRef.current > 5 * 60 * 1000);
+
+      if (needsFetch) {
+        if (navigator.onLine) {
+          const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(2000));
+          const snapOrders = await getDocs(qOrders);
+          reportAllOrdersRef.current = snapOrders.docs.map(d => {
+            const data = d.data();
+            const correctTime = data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : (typeof data.timestamp === 'string' ? data.timestamp : new Date(data.timestamp || Date.now()).toISOString());
+            return { ...data, id: d.id, timestamp: correctTime };
+          });
+          localStorage.setItem("bb_pos_cached_report_orders", JSON.stringify(reportAllOrdersRef.current));
+
+          const qExpenses = query(collection(db, "daily_expenses"), orderBy("timestamp", "desc"), limit(200));
+          const snapExpenses = await getDocs(qExpenses);
+          reportAllExpensesRef.current = snapExpenses.docs.map(d => {
+            const data = d.data();
+            const correctTime = data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : (typeof data.timestamp === 'string' ? data.timestamp : new Date(data.timestamp || Date.now()).toISOString());
+            return { ...data, id: d.id, timestamp: correctTime };
+          });
+          localStorage.setItem("bb_pos_cached_report_expenses", JSON.stringify(reportAllExpensesRef.current));
+          
+          reportLastFetchTimeRef.current = Date.now();
+        } else {
+          const cachedOrders = localStorage.getItem("bb_pos_cached_report_orders");
+          if (cachedOrders) reportAllOrdersRef.current = JSON.parse(cachedOrders);
+
+          const cachedExpenses = localStorage.getItem("bb_pos_cached_report_expenses");
+          if (cachedExpenses) reportAllExpensesRef.current = JSON.parse(cachedExpenses);
+        }
+      }
+
+      const offlineOrdersQueue = JSON.parse(localStorage.getItem("bb_pos_offline_orders_queue") || "[]");
+      const offlineExpensesQueue = JSON.parse(localStorage.getItem("bb_pos_offline_expenses_queue") || "[]");
+
+      // 👉 JADU: liveOrders को मिला दें ताकि आज का डेटा रियल-टाइम दिखे बिना डेटाबेस कॉल के!
+      const combinedOrders = [...offlineOrdersQueue, ...liveOrders, ...reportAllOrdersRef.current];
+      const combinedExpenses = [...offlineExpensesQueue, ...reportAllExpensesRef.current];
+
+      const uniqueOrdersMap = new Map();
+      combinedOrders.forEach(o => uniqueOrdersMap.set(o.id || o.billNumber, o));
+      const finalOrders = Array.from(uniqueOrdersMap.values());
+
+      const uniqueExpMap = new Map();
+      combinedExpenses.forEach(e => uniqueExpMap.set(e.id || e.title, e));
+      const finalExpenses = Array.from(uniqueExpMap.values());
+
+      // 👉 SAFE DATE PARSER (यह टूटी हुई डेट्स को फिक्स करेगा)
+      const getSafeTime = (ts: any) => {
+        if (!ts) return Date.now();
+        if (ts.toDate) return ts.toDate().getTime();
+        if (typeof ts === 'object' && ts.seconds) return ts.seconds * 1000;
+        return new Date(ts).getTime();
+      };
+
+      const filteredOrders = finalOrders.filter((o: any) => {
+        const timeMs = getSafeTime(o.timestamp);
+        return timeMs >= startTarget.getTime() && timeMs <= endTarget.getTime();
+      });
+      setReportOrders(filteredOrders);
+
+      const filteredExp = finalExpenses.filter((exp: any) => {
+        const timeMs = getSafeTime(exp.timestamp);
+        return timeMs >= startTarget.getTime() && timeMs <= endTarget.getTime();
+      });
+      setDailyExpenses(filteredExp);
+
+    } catch (err) {
+      console.error(err);
+      toast.error("रिपोर्ट लोड करने में समस्या आई!");
+    } finally {
+      setIsReportLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // 👉 अब Reports और Dashboard में जाते ही तुरंत मेमोरी से लोड होगा (बिना लोडिंग के)
+    if (activeTab === 'reports' || activeTab === 'dashboard') {
+      fetchReportData(false);
+    }
+  }, [activeTab, reportFilter, customStartDate, customEndDate, liveOrders]);
         startTarget.setHours(0, 0, 0, 0); endTarget.setHours(23, 59, 59, 999);
       } else if (reportFilter === 'yesterday') {
         startTarget.setDate(startTarget.getDate() - 1); startTarget.setHours(0, 0, 0, 0);
