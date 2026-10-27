@@ -1227,7 +1227,7 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  // --- MAPPLS MAP STATES & REFS ---
+// --- MAPPLS MAP STATES & REFS ---
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [tempMapAddress, setTempMapAddress] = useState("");
   const [mapLoadError, setMapLoadError] = useState(false); // 👉 नया एरर चेकर
@@ -1354,6 +1354,8 @@ export default function BbCafeHome() {
     setIsMapOpen(false);
     toast.success(isHindi ? "लोकेशन सफलतापूर्वक सेट हो गई!" : "Location set successfully!");
   };
+
+ 
 
   // --- Real-time Watchers ---
   useEffect(() => {
