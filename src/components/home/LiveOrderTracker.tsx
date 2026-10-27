@@ -25,6 +25,9 @@ export default function LiveOrderTracker({
   const [mapLoadError, setMapLoadError] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
 
+  // Mappls API Key
+  const MAPPLS_KEY = "xxytvmxywdbfxyfzujfatkuxnfaxyenmwwuu";
+
   // कैफे की फिक्स लोकेशन (मोहांद्रा)
   const CAFE_LAT = 24.2863;
   const CAFE_LNG = 80.1245;
@@ -72,6 +75,16 @@ export default function LiveOrderTracker({
         setMapLoadError(true);
       }
     };
+
+    // 👉 मैप की स्क्रिप्ट लोड करें (अगर पहले से लोड नहीं है)
+    if (!document.getElementById("mappls-script")) {
+      const script = document.createElement('script');
+      script.id = "mappls-script";
+      script.src = `https://apis.mappls.com/advancedmaps/api/${MAPPLS_KEY}/map_sdk?layer=vector&v=3.0`;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
 
     // हर 0.5 सेकंड में चेक करें कि MapmyIndia का बेस कोड आ गया या नहीं
     checkInterval = setInterval(() => {
