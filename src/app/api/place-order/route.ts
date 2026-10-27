@@ -1,59 +1,65 @@
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-
-// Firebase Admin Initialize (सर्वर को सुरक्षित चाबी देना)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
-
-const db = admin.firestore();
+import { db } from '../../../lib/firebase'; 
+import { collection, addDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    const { orderObj, phoneClean, pointsEarned, totalPointsCost } = data;
+    // 1. फ्रंटएंड से आया हुआ डेटा पढ़ें
+    const body = await request.json();
+    const { orderObj, phoneClean, pointsEarned, totalPointsCost } = body;
 
-    // 1. आर्डर सेव करें (बैकएंड से सुरक्षित)
-    const orderRef = await db.collection("orders").add(orderObj);
-
-    // 2. कस्टमर के पॉइंट्स अपडेट करें
-    if (pointsEarned > 0 || totalPointsCost > 0) {
-      const customerRef = db.collection("customer_points").doc(phoneClean);
-      
-      await customerRef.set({
-        name: orderObj.customerName,
-        phone: phoneClean,
-        points: admin.firestore.FieldValue.increment(pointsEarned - totalPointsCost),
-        lastActive: new Date()
-      }, { merge: true });
-
-      if (pointsEarned > 0) {
-        await customerRef.collection("history").add({
-          type: 'earn',
-          points: pointsEarned,
-          description: `Ordered Bill #${orderObj.billNumber} 🍕`,
-          timestamp: new Date()
-        });
-      }
-      if (totalPointsCost > 0) {
-        await customerRef.collection("history").add({
-          type: 'redeem',
-          points: totalPointsCost,
-          description: `Redeemed rewards on Bill #${orderObj.billNumber} 🎁`,
-          timestamp: new Date()
-        });
-      }
+    if (!orderObj) {
+      return NextResponse.json({ success: false, message: "Order data missing" }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, orderId: orderRef.id });
-  } catch (error) {
-    console.error("Backend Error:", error);
-    return NextResponse.json({ success: false, error: "Order failed" }, { status: 500 });
+    // 2. Firebase Database में ऑर्डर सेव करें (Backend से)
+    // हम timestamp को backend के टाइम से बदल रहे हैं ताकि कोई गलत टाइम न भेज सके
+    const newOrder = {
+      ...orderObj,
+      timestamp: new Date()
+    };
+    
+    const docRef = await addDoc(collection(db, "orders"), newOrder);
+
+    // 3. Customer Points और Profile अपडेट करें
+    if (phoneClean && phoneClean.length === 10) {
+      const userRef = doc(db, "customer_points", phoneClean);
+      const userSnap = await getDoc(userRef);
+
+      let prevPoints = 0;
+      let prevSpent = 0;
+      let prevVisits = 0;
+
+      // अगर ग्राहक पहले से मौजूद है, तो पुराना डेटा निकालें
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        prevPoints = Number(data.points) || 0;
+        prevSpent = Number(data.totalSpent) || 0;
+        prevVisits = Number(data.totalVisits) || 0;
+      }
+
+      // नए पॉइंट्स और खर्चे का हिसाब लगायें
+      const finalTotal = Number(orderObj.total) || 0;
+      const newSpent = prevSpent + finalTotal;
+      const remainingPts = Math.max(0, prevPoints - (Number(totalPointsCost) || 0)) + (Number(pointsEarned) || 0);
+
+      // डेटाबेस में अपडेट करें
+      await setDoc(userRef, {
+        name: orderObj.customerName || "Walk-in Guest",
+        points: remainingPts,
+        totalSpent: newSpent,
+        totalVisits: prevVisits + 1,
+        lastBillNumber: orderObj.billNumber,
+        lastBillAmount: finalTotal,
+        lastActive: new Date()
+      }, { merge: true });
+    }
+
+    // 4. सफलतापूर्वक रिस्पांस वापस फ्रंटएंड को भेजें
+    return NextResponse.json({ success: true, orderId: docRef.id });
+
+  } catch (error: any) {
+    console.error("Backend Error (Place Order):", error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
