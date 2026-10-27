@@ -347,6 +347,11 @@ export default function BbCafeHome() {
     toast.success(isHindi ? "लोकेशन सफलतापूर्वक सेट हो गई!" : "Location set successfully!");
   };
 
+  const handleDetectLocation = () => {
+    triggerHaptic();
+    setIsMapOpen(true);
+  };
+
   // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
 
   const triggerHaptic = (ms = 35) => {
