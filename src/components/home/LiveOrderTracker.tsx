@@ -21,12 +21,9 @@ export default function LiveOrderTracker({
   triggerHaptic
 }: LiveOrderTrackerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapplsMapRef = useRef<any>(null);
+  const mapInstanceRef = useRef<any>(null);
   const [mapLoadError, setMapLoadError] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
-
-  // Mappls API Key
-  const MAPPLS_KEY = "xxytvmxywdbfxyfzujfatkuxnfaxyenmwwuu";
 
   // कैफे की फिक्स लोकेशन (मोहांद्रा)
   const CAFE_LAT = 24.2863;
@@ -35,72 +32,92 @@ export default function LiveOrderTracker({
   useEffect(() => {
     if (!liveOrder || liveOrder.fulfillmentType !== 'delivery') return;
 
-    let checkInterval: any;
+    // 1. फ्री और फ़ास्ट मैप (Leaflet) की CSS लोड करें
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
 
-    const initMap = () => {
-      if (!(window as any).mappls || mapplsMapRef.current || !mapContainerRef.current) return;
-      
-      try {
-        // ग्राहक की लोकेशन (अगर न मिले तो कैफे से थोड़ा दूर सेट करें)
-        const custLat = liveOrder.latitude || CAFE_LAT + 0.0060;
-        const custLng = liveOrder.longitude || CAFE_LNG + 0.0060;
-
-        // कैफे और घर के बीच का सेंटर निकालें
-        const centerLat = (CAFE_LAT + custLat) / 2;
-        const centerLng = (CAFE_LNG + custLng) / 2;
-
-        // 1. मैप लोड करें
-        mapplsMapRef.current = new (window as any).mappls.Map(mapContainerRef.current, {
-          center: [centerLat, centerLng],
-          zoom: 14,
-        });
-
-        // 2. कैफे का मार्कर (पिन)
-        new (window as any).mappls.Marker({
-          map: mapplsMapRef.current,
-          position: { lat: CAFE_LAT, lng: CAFE_LNG },
-          draggable: false,
-        });
-
-        // 3. कस्टमर के घर का मार्कर (पिन)
-        new (window as any).mappls.Marker({
-          map: mapplsMapRef.current,
-          position: { lat: custLat, lng: custLng },
-          draggable: false,
-        });
-
-        setIsMapReady(true);
-      } catch (err) {
-        console.error("Tracker Map Error:", err);
-        setMapLoadError(true);
-      }
-    };
-
-    // 👉 मैप की स्क्रिप्ट लोड करें (अगर पहले से लोड नहीं है)
-    if (!document.getElementById("mappls-script")) {
+    // 2. फ्री और फ़ास्ट मैप (Leaflet) की JS लोड करें
+    if (!document.getElementById('leaflet-js')) {
       const script = document.createElement('script');
-      script.id = "mappls-script";
-      script.src = `https://apis.mappls.com/advancedmaps/api/${MAPPLS_KEY}/map_sdk?layer=vector&v=3.0`;
+      script.id = 'leaflet-js';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
       script.async = true;
-      script.defer = true;
       document.head.appendChild(script);
     }
 
-    // हर 0.5 सेकंड में चेक करें कि MapmyIndia का बेस कोड आ गया या नहीं
-    checkInterval = setInterval(() => {
-      if ((window as any).mappls && mapContainerRef.current) {
-        initMap();
+    // ग्राहक की लोकेशन (अगर न मिले तो कैफे से थोड़ी दूर सेट करें)
+    const custLat = liveOrder.latitude || CAFE_LAT + 0.0070;
+    const custLng = liveOrder.longitude || CAFE_LNG + 0.0070;
+
+    const checkInterval = setInterval(() => {
+      // जैसे ही मैप का कोड लोड हो जाए, मैप बना दें
+      if ((window as any).L && mapContainerRef.current) {
         clearInterval(checkInterval);
+        
+        try {
+          if (mapInstanceRef.current) {
+             mapInstanceRef.current.remove();
+          }
+
+          const L = (window as any).L;
+          
+          // मैप को लॉक करें ताकि ग्राहक उसे खिसका न सके (सिर्फ ट्रैकिंग देखे)
+          const map = L.map(mapContainerRef.current, {
+             zoomControl: false,
+             attributionControl: false,
+             dragging: false, 
+             touchZoom: false,
+             scrollWheelZoom: false,
+             doubleClickZoom: false,
+          });
+
+          // खूबसूरत और फ़ास्ट मैप टाइल्स (Free & No API Key required)
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+          }).addTo(map);
+
+          // कैफे का मार्कर (Orange)
+          L.circleMarker([CAFE_LAT, CAFE_LNG], {
+            color: '#ea580c', fillColor: '#ea580c', fillOpacity: 1, radius: 6
+          }).addTo(map);
+
+          // ग्राहक का मार्कर (Blue)
+          L.circleMarker([custLat, custLng], {
+            color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 1, radius: 6
+          }).addTo(map);
+
+          // दोनों के बीच एक डैश वाली लाइन (Route) बनाएं
+          L.polyline([[CAFE_LAT, CAFE_LNG], [custLat, custLng]], {
+             color: '#ea580c',
+             weight: 3,
+             dashArray: '6, 8'
+          }).addTo(map);
+
+          // मैप को ऐसे ज़ूम करें कि कैफे और घर दोनों एक साथ स्क्रीन पर दिखें
+          const bounds = L.latLngBounds([[CAFE_LAT, CAFE_LNG], [custLat, custLng]]);
+          map.fitBounds(bounds, { padding: [30, 30] });
+
+          mapInstanceRef.current = map;
+          setIsMapReady(true);
+        } catch (err) {
+           console.error(err);
+           setMapLoadError(true);
+        }
       }
     }, 500);
 
-    // 10 सेकंड बाद भी लोड न हो, तो एरर दिखा दें
+    // अगर 8 सेकंड में भी मैप लोड न हो (धीमा नेट), तो एरर सेट कर दें (ताकि पुराना डिज़ाइन आ जाए)
     const timeout = setTimeout(() => {
-      if (!mapplsMapRef.current) {
-        clearInterval(checkInterval);
-        setMapLoadError(true);
-      }
-    }, 10000);
+       if (!isMapReady) {
+          clearInterval(checkInterval);
+          setMapLoadError(true);
+       }
+    }, 8000);
 
     return () => {
       clearInterval(checkInterval);
@@ -109,6 +126,14 @@ export default function LiveOrderTracker({
   }, [liveOrder]);
 
   if (!liveOrder) return null;
+
+  // प्रोग्रेस के हिसाब से स्कूटर की पोजीशन सेट करें
+  const getScooterPosition = () => {
+    if (liveOrder.status === 'pending') return '15%';
+    if (liveOrder.status === 'preparing') return '25%';
+    if (liveOrder.status === 'out_for_delivery') return '60%';
+    return '85%';
+  };
 
   return (
     <AnimatePresence>
@@ -130,34 +155,26 @@ export default function LiveOrderTracker({
           </span>
         </div>
 
-        {/* 🗺️ MAPPLS LIVE TRACKING MAP (केवल डिलीवरी के लिए) */}
-        {liveOrder.fulfillmentType === 'delivery' && (
+        {/* 🗺️ LIVE TRACKING MAP (केवल डिलीवरी के लिए, एरर न होने पर) */}
+        {liveOrder.fulfillmentType === 'delivery' && !mapLoadError && (
           <div className="w-full h-40 bg-neutral-800 rounded-2xl overflow-hidden relative border-2 border-neutral-700 shadow-inner">
             
-            {/* लोडिंग स्टेट */}
-            {!isMapReady && !mapLoadError && (
+            {!isMapReady && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-500 bg-neutral-900 z-10">
                 <Loader2 className="animate-spin mb-2" size={24} />
                 <span className="text-[10px] font-bold uppercase">{isHindi ? "लाइव मैप कनेक्ट हो रहा है..." : "Connecting to Live Map..."}</span>
               </div>
             )}
             
-            {/* एरर स्टेट */}
-            {mapLoadError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-red-500 bg-neutral-900 z-10">
-                <span className="text-[10px] font-bold uppercase">⚠️ {isHindi ? "मैप लोड नहीं हो सका" : "Map failed to load"}</span>
-              </div>
-            )}
-            
-            {/* असली मैप (Mappls Container) */}
+            {/* असली मैप */}
             <div ref={mapContainerRef} className="w-full h-full absolute inset-0 z-0"></div>
 
             {/* स्कूटर एनीमेशन ओवरले (हवा में चलता हुआ स्कूटर) */}
-            <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-center px-4">
+            <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-center px-6">
               <motion.div 
                 className="absolute z-20"
                 animate={{ 
-                  left: liveOrder.status === 'pending' ? '10%' : liveOrder.status === 'preparing' ? '20%' : liveOrder.status === 'out_for_delivery' ? '60%' : '88%',
+                  left: getScooterPosition(),
                   scale: liveOrder.status === 'preparing' ? [1, 1.15, 1] : 1
                 }}
                 transition={{ 
@@ -165,16 +182,16 @@ export default function LiveOrderTracker({
                   scale: { repeat: Infinity, duration: 1.5 }
                 }}
               >
-                <div className="bg-white p-1.5 rounded-full shadow-lg border-2 border-orange-500 flex items-center justify-center -translate-y-4">
-                  <span className="text-xl">🛵</span>
+                <div className="bg-white p-1.5 rounded-full shadow-[0_5px_15px_rgba(234,88,12,0.5)] border-2 border-orange-500 flex items-center justify-center -translate-y-4">
+                  <span className="text-lg">🛵</span>
                 </div>
               </motion.div>
             </div>
           </div>
         )}
 
-        {/* अगर पिकअप/डाइन-इन है, तो पुरानी सड़क वाला डिज़ाइन दिखेगा */}
-        {liveOrder.fulfillmentType !== 'delivery' && (
+        {/* अगर पिकअप/डाइन-इन है या मैप लोड होने में एरर आ गया, तो पुरानी सड़क वाला डिज़ाइन दिखेगा */}
+        {(liveOrder.fulfillmentType !== 'delivery' || mapLoadError) && (
           <div className="relative w-full h-8 flex items-center mt-3">
             <div className="absolute inset-x-4 h-1 border-t-2 border-dashed border-gray-600 top-1/2 -translate-y-1/2" />
             
@@ -199,7 +216,9 @@ export default function LiveOrderTracker({
                 scale: { repeat: Infinity, duration: 1.5 }
               }}
             >
-              <span className="text-2xl drop-shadow-md inline-block -translate-y-3.5">🍳</span>
+              <span className="text-2xl drop-shadow-md inline-block -translate-y-3.5">
+                {liveOrder.fulfillmentType === 'delivery' ? '🛵' : '🍳'}
+              </span>
             </motion.div>
           </div>
         )}
