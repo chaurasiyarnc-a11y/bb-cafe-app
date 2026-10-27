@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Phone, Lock, MapPin, Loader2 } from 'lucide-react';
+import { Phone, Lock, Loader2 } from 'lucide-react';
 
 interface LiveOrderTrackerProps {
   isHindi: boolean;
@@ -22,66 +22,77 @@ export default function LiveOrderTracker({
 }: LiveOrderTrackerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapplsMapRef = useRef<any>(null);
-  const routingPluginRef = useRef<any>(null);
   const [mapLoadError, setMapLoadError] = useState(false);
-  const MAPPLS_KEY = "xxytvmxywdbfxyfzujfatkuxnfaxyenmwwuu"; // Your API Key
+  const [isMapReady, setIsMapReady] = useState(false);
 
   // कैफे की फिक्स लोकेशन (मोहांद्रा)
   const CAFE_LAT = 24.2863;
   const CAFE_LNG = 80.1245;
 
-  // ग्राहक की लोकेशन (अगर उपलब्ध हो)
-  const custLat = liveOrder?.latitude || CAFE_LAT + 0.0050; // डमी लोकेशन अगर न मिले
-  const custLng = liveOrder?.longitude || CAFE_LNG + 0.0050;
-
   useEffect(() => {
-    if (!liveOrder) return;
-    if (liveOrder.fulfillmentType !== 'delivery') return; // सिर्फ डिलीवरी पर मैप दिखेगा
+    if (!liveOrder || liveOrder.fulfillmentType !== 'delivery') return;
 
-    const loadMap = () => {
+    let checkInterval: any;
+
+    const initMap = () => {
       if (!(window as any).mappls || mapplsMapRef.current || !mapContainerRef.current) return;
-
+      
       try {
+        // ग्राहक की लोकेशन (अगर न मिले तो कैफे से थोड़ा दूर सेट करें)
+        const custLat = liveOrder.latitude || CAFE_LAT + 0.0060;
+        const custLng = liveOrder.longitude || CAFE_LNG + 0.0060;
+
+        // कैफे और घर के बीच का सेंटर निकालें
+        const centerLat = (CAFE_LAT + custLat) / 2;
+        const centerLng = (CAFE_LNG + custLng) / 2;
+
         // 1. मैप लोड करें
         mapplsMapRef.current = new (window as any).mappls.Map(mapContainerRef.current, {
-          center: [CAFE_LAT, CAFE_LNG],
+          center: [centerLat, centerLng],
           zoom: 14,
         });
 
-        // 2. राउटिंग प्लगइन (Routing Plugin) लोड करें (ताकि लाइन बन सके)
-        (window as any).mappls.direction({
+        // 2. कैफे का मार्कर (पिन)
+        new (window as any).mappls.Marker({
           map: mapplsMapRef.current,
-          start: { label: 'Bum Bum Cafe', geoposition: `${CAFE_LAT},${CAFE_LNG}` },
-          end: { label: 'Customer Home', geoposition: `${custLat},${custLng}` },
-          Profile: ['driving'],
-          callback: function (data: any) {
-            routingPluginRef.current = data;
-          }
+          position: { lat: CAFE_LAT, lng: CAFE_LNG },
+          draggable: false,
         });
+
+        // 3. कस्टमर के घर का मार्कर (पिन)
+        new (window as any).mappls.Marker({
+          map: mapplsMapRef.current,
+          position: { lat: custLat, lng: custLng },
+          draggable: false,
+        });
+
+        setIsMapReady(true);
       } catch (err) {
-        console.error("Mappls Tracker Error:", err);
+        console.error("Tracker Map Error:", err);
         setMapLoadError(true);
       }
     };
 
-    if (!document.getElementById("mappls-tracker-script")) {
-      const script = document.createElement('script');
-      script.id = "mappls-tracker-script";
-      script.src = `https://apis.mappls.com/advancedmaps/api/${MAPPLS_KEY}/map_sdk?layer=vector&v=3.0`;
-      script.async = true;
-      script.defer = true;
-      
-      const pluginScript = document.createElement('script');
-      pluginScript.src = `https://apis.mappls.com/advancedmaps/api/${MAPPLS_KEY}/map_sdk_plugins?v=3.0`;
-      pluginScript.async = true;
-      pluginScript.defer = true;
+    // हर 0.5 सेकंड में चेक करें कि MapmyIndia का बेस कोड आ गया या नहीं
+    checkInterval = setInterval(() => {
+      if ((window as any).mappls && mapContainerRef.current) {
+        initMap();
+        clearInterval(checkInterval);
+      }
+    }, 500);
 
-      document.head.appendChild(script);
-      script.onload = () => document.head.appendChild(pluginScript);
-      pluginScript.onload = loadMap;
-    } else {
-      setTimeout(loadMap, 1000);
-    }
+    // 10 सेकंड बाद भी लोड न हो, तो एरर दिखा दें
+    const timeout = setTimeout(() => {
+      if (!mapplsMapRef.current) {
+        clearInterval(checkInterval);
+        setMapLoadError(true);
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(checkInterval);
+      clearTimeout(timeout);
+    };
   }, [liveOrder]);
 
   if (!liveOrder) return null;
@@ -98,7 +109,7 @@ export default function LiveOrderTracker({
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />
             <span className="text-gray-100 font-extrabold uppercase tracking-wide">
-              {isHindi ? `लाइव आर्डर ट्रैकिंग (#${formatBillNumber(liveOrder.billNumber)})` : `Live Tracker (#${formatBillNumber(liveOrder.billNumber)})`}
+              {isHindi ? `लाइव आर्डर (#${formatBillNumber(liveOrder.billNumber)})` : `Live Tracker (#${formatBillNumber(liveOrder.billNumber)})`}
             </span>
           </div>
           <span className="bg-orange-500/10 text-orange-400 px-2.5 py-1 rounded-lg text-[9px] font-black font-mono">
@@ -109,27 +120,31 @@ export default function LiveOrderTracker({
         {/* 🗺️ MAPPLS LIVE TRACKING MAP (केवल डिलीवरी के लिए) */}
         {liveOrder.fulfillmentType === 'delivery' && (
           <div className="w-full h-40 bg-neutral-800 rounded-2xl overflow-hidden relative border-2 border-neutral-700 shadow-inner">
-            {!mapplsMapRef.current && !mapLoadError && (
+            
+            {/* लोडिंग स्टेट */}
+            {!isMapReady && !mapLoadError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-500 bg-neutral-900 z-10">
                 <Loader2 className="animate-spin mb-2" size={24} />
-                <span className="text-[10px] font-bold uppercase">{isHindi ? "मैप कनेक्ट हो रहा है..." : "Connecting to Live Map..."}</span>
+                <span className="text-[10px] font-bold uppercase">{isHindi ? "लाइव मैप कनेक्ट हो रहा है..." : "Connecting to Live Map..."}</span>
               </div>
             )}
+            
+            {/* एरर स्टेट */}
             {mapLoadError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-red-500 bg-neutral-900 z-10">
                 <span className="text-[10px] font-bold uppercase">⚠️ {isHindi ? "मैप लोड नहीं हो सका" : "Map failed to load"}</span>
               </div>
             )}
             
-            {/* असली मैप यहाँ दिखेगा */}
+            {/* असली मैप (Mappls Container) */}
             <div ref={mapContainerRef} className="w-full h-full absolute inset-0 z-0"></div>
 
-            {/* स्कूटर एनीमेशन ओवरले */}
+            {/* स्कूटर एनीमेशन ओवरले (हवा में चलता हुआ स्कूटर) */}
             <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-center px-4">
               <motion.div 
                 className="absolute z-20"
                 animate={{ 
-                  left: liveOrder.status === 'pending' ? '4%' : liveOrder.status === 'preparing' ? '12%' : liveOrder.status === 'out_for_delivery' ? '46%' : '88%',
+                  left: liveOrder.status === 'pending' ? '10%' : liveOrder.status === 'preparing' ? '20%' : liveOrder.status === 'out_for_delivery' ? '60%' : '88%',
                   scale: liveOrder.status === 'preparing' ? [1, 1.15, 1] : 1
                 }}
                 transition={{ 
@@ -137,7 +152,7 @@ export default function LiveOrderTracker({
                   scale: { repeat: Infinity, duration: 1.5 }
                 }}
               >
-                <div className="bg-white p-1 rounded-full shadow-lg border-2 border-orange-500 flex items-center justify-center -translate-y-4">
+                <div className="bg-white p-1.5 rounded-full shadow-lg border-2 border-orange-500 flex items-center justify-center -translate-y-4">
                   <span className="text-xl">🛵</span>
                 </div>
               </motion.div>
@@ -181,7 +196,7 @@ export default function LiveOrderTracker({
           <p className="text-xs font-black text-yellow-400">
             {liveOrder.status === 'pending' && (isHindi ? "⏳ आपके आर्डर की पुष्टि की जा रही है..." : "⏳ Confirming your order at counter...")}
             {liveOrder.status === 'preparing' && (isHindi ? "👨‍🍳 शेफ रसोईघर में आपका भोजन तैयार कर रहे हैं..." : "👨‍🍳 Chef is preparing your delicious meal...")}
-            {liveOrder.status === 'out_for_delivery' && (isHindi ? "🛵 डिलीवरी राइडर आर्डर लेकर निकल चुके हैं!" : "🛵 Rider is on the way to deliver your food!")}
+            {liveOrder.status === 'out_for_delivery' && (isHindi ? "🛵 डिलीवरी बॉय रास्ते में है..." : "🛵 Rider is on the way to deliver your food!")}
             {liveOrder.status === 'delivered' && (isHindi ? "✅ आर्डर सफलतापूर्वक पूरा हो गया है!" : "✅ Order successfully completed!")}
             {liveOrder.status === 'rejected' && (isHindi ? "❌ आर्डर रद्द कर दिया गया है।" : "❌ Order was rejected.")}
           </p>
@@ -194,12 +209,12 @@ export default function LiveOrderTracker({
           </p>
         </div>
 
-        {/* --- नया सुधारात्मक क्षेत्र: डिलीवरी पिन (OTP) ग्राहक की स्क्रीन पर चमकेगा --- */}
+        {/* --- डिलीवरी पिन (OTP) --- */}
         {liveOrder.status !== 'delivered' && liveOrder.status !== 'completed' && liveOrder.status !== 'rejected' && liveOrder.deliveryPin && liveOrder.fulfillmentType === 'delivery' && (
-          <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-2xl text-center space-y-1.5 shadow-inner">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-2xl text-center space-y-1.5 shadow-inner mt-2">
             <p className="text-[9px] uppercase tracking-wider text-yellow-500 font-black flex items-center justify-center gap-1 leading-none">
               <Lock size={10} />
-              <span>{isHindi ? "🔑 डिलीवरी पुष्टि पिन (RIDER OTP):" : "🔑 Delivery Security PIN / OTP:"}</span>
+              <span>{isHindi ? "🔑 डिलीवरी पुष्टि पिन (OTP):" : "🔑 Delivery Security OTP:"}</span>
             </p>
             <p className="text-2xl font-black text-white tracking-widest font-mono leading-none py-0.5">
               {liveOrder.deliveryPin}
@@ -210,7 +225,7 @@ export default function LiveOrderTracker({
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-2">
           <a 
             href={`tel:+${whatsappNumber}`}
             onClick={() => triggerHaptic(20)}
@@ -225,7 +240,7 @@ export default function LiveOrderTracker({
               triggerHaptic(); 
               setLiveOrder(null); 
             }}
-            className="bg-neutral-800 text-gray-400 px-4 py-3 rounded-xl hover:text-white"
+            className="bg-neutral-800 text-gray-400 px-4 py-3 rounded-xl hover:text-white uppercase text-[10px]"
           >
             {isHindi ? "छिपाएं" : "Dismiss"}
           </button>
