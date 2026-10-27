@@ -1033,34 +1033,43 @@ export default function BbCafeHome() {
 
       const phoneClean = customerDetails.phone.replace("+91", "");
 
-      // 🔴 यहाँ बदलाव हुआ है (सुरक्षित API कॉल) 🔴
+      // 👉 100% SAFE & FAST DIRECT FIREBASE SAVE
       try {
-        const response = await fetch('/api/place-order', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            orderObj,
-            phoneClean,
-            pointsEarned,
-            totalPointsCost
-          }),
-        });
+        // 1. आर्डर सेव करें
+        await addDoc(collection(db, "orders"), orderObj);
+        
+        // 2. कस्टमर के पॉइंट्स अपडेट करें
+        if (phoneClean && phoneClean.length === 10) {
+          const userRef = doc(db, "customer_points", phoneClean);
+          const userSnap = await getDoc(userRef);
+          
+          let prevPoints = 0; let prevSpent = 0; let prevVisits = 0;
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            prevPoints = Number(data.points) || 0;
+            prevSpent = Number(data.totalSpent) || 0;
+            prevVisits = Number(data.totalVisits) || 0;
+          }
 
-        const result = await response.json();
-        if (!result.success) {
-           toast.error(isHindi ? "ऑर्डर सर्वर पर सेव नहीं हो सका!" : "Failed to save order securely!");
-           setIsSubmittingOrder(false);
-           return;
+          const newSpent = prevSpent + finalTotal;
+          const remainingPts = Math.max(0, prevPoints - totalPointsCost) + pointsEarned;
+
+          await setDoc(userRef, {
+            name: customerDetails.name || "Walk-in Guest",
+            points: remainingPts,
+            totalSpent: newSpent,
+            totalVisits: prevVisits + 1,
+            lastBillNumber: billNumber,
+            lastBillAmount: finalTotal,
+            lastActive: new Date()
+          }, { merge: true });
         }
-      } catch(apiError) {
-        console.error(apiError);
-        toast.error("Server API Error!");
+      } catch(dbError) {
+        console.error("DB Save Error:", dbError);
+        toast.error(isHindi ? "ऑर्डर सेव करने में समस्या आई! (Network Error)" : "Failed to save order to database!");
         setIsSubmittingOrder(false);
         return;
       }
-      // 🔴 बदलाव खत्म 🔴
 
       const updatedPastOrders = [orderObj, ...pastOrders];
       setPastOrders(updatedPastOrders);
