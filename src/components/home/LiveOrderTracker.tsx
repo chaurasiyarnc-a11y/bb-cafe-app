@@ -98,6 +98,29 @@ export default function LiveOrderTracker({
              dashArray: '6, 8'
           }).addTo(map);
 
+          // 👉 असली मैप पर स्कूटर की लोकेशन (Progress के हिसाब से)
+          let progress = 0.1;
+          if (liveOrder.status === 'preparing') progress = 0.25;
+          if (liveOrder.status === 'out_for_delivery') progress = 0.70;
+          if (liveOrder.status === 'delivered') progress = 1.0;
+
+          const currentLat = CAFE_LAT + (custLat - CAFE_LAT) * progress;
+          const currentLng = CAFE_LNG + (custLng - CAFE_LNG) * progress;
+
+          // स्कूटर का मुँह (Direction) सही करें: अगर पूर्व (East) जा रहा है तो घुमा दें (ताकि उल्टा न चले)
+          const isMovingEast = custLng > CAFE_LNG;
+          const flipStyle = isMovingEast ? 'transform: scaleX(-1);' : '';
+          const bounceClass = liveOrder.status === 'preparing' ? 'animate-bounce' : '';
+
+          const scooterIcon = L.divIcon({
+            className: `bg-transparent flex items-center justify-center ${bounceClass}`,
+            html: `<div style="font-size: 28px; ${flipStyle} filter: drop-shadow(0 3px 3px rgba(0,0,0,0.4)); display: inline-block;">🛵</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          });
+
+          L.marker([currentLat, currentLng], { icon: scooterIcon, zIndexOffset: 1000 }).addTo(map);
+
           // मैप को ऐसे ज़ूम करें कि कैफे और घर दोनों एक साथ स्क्रीन पर दिखें
           const bounds = L.latLngBounds([[CAFE_LAT, CAFE_LNG], [custLat, custLng]]);
           map.fitBounds(bounds, { padding: [30, 30] });
@@ -126,14 +149,6 @@ export default function LiveOrderTracker({
   }, [liveOrder]);
 
   if (!liveOrder) return null;
-
-  // प्रोग्रेस के हिसाब से स्कूटर की पोजीशन सेट करें
-  const getScooterPosition = () => {
-    if (liveOrder.status === 'pending') return '15%';
-    if (liveOrder.status === 'preparing') return '25%';
-    if (liveOrder.status === 'out_for_delivery') return '60%';
-    return '85%';
-  };
 
   return (
     <AnimatePresence>
@@ -167,26 +182,7 @@ export default function LiveOrderTracker({
             )}
             
             {/* असली मैप */}
-            <div ref={mapContainerRef} className="w-full h-full absolute inset-0 z-0"></div>
-
-            {/* स्कूटर एनीमेशन ओवरले (हवा में चलता हुआ स्कूटर) */}
-            <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-center px-6">
-              <motion.div 
-                className="absolute z-20"
-                animate={{ 
-                  left: getScooterPosition(),
-                  scale: liveOrder.status === 'preparing' ? [1, 1.15, 1] : 1
-                }}
-                transition={{ 
-                  left: { type: "spring", stiffness: 45, damping: 15 },
-                  scale: { repeat: Infinity, duration: 1.5 }
-                }}
-              >
-                <div className="bg-white p-1.5 rounded-full shadow-[0_5px_15px_rgba(234,88,12,0.5)] border-2 border-orange-500 flex items-center justify-center -translate-y-4">
-                  <span className="text-lg">🛵</span>
-                </div>
-              </motion.div>
-            </div>
+            <div ref={mapContainerRef} className="w-full h-full absolute inset-0 z-0 pointer-events-none"></div>
           </div>
         )}
 
@@ -216,7 +212,10 @@ export default function LiveOrderTracker({
                 scale: { repeat: Infinity, duration: 1.5 }
               }}
             >
-              <span className="text-2xl drop-shadow-md inline-block -translate-y-3.5">
+              <span 
+                className="text-2xl drop-shadow-md inline-block -translate-y-3.5"
+                style={{ transform: liveOrder.fulfillmentType === 'delivery' ? 'scaleX(-1)' : 'none' }}
+              >
                 {liveOrder.fulfillmentType === 'delivery' ? '🛵' : '🍳'}
               </span>
             </motion.div>
