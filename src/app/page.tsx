@@ -209,14 +209,14 @@ export default function BbCafeHome() {
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
-  // UPI Payment states
+ // UPI Payment states
   const [paymentScreenshot, setPaymentScreenshot] = useState<string | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isUpiPopupOpen, setIsUpiPopupOpen] = useState(false);
 
   // UI States
   const [showGreeting, setShowGreeting] = useState(true);
-
+  const [isTrackerExpanded, setIsTrackerExpanded] = useState(true); // 👉 NEW: ट्रैकर को छोटा/बड़ा करने के लिए
   // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
 
   const triggerHaptic = (ms = 35) => {
