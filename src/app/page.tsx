@@ -2224,19 +2224,46 @@ export default function BbCafeHome() {
         </div>
       </div>
 
+      {/* MINI FLOATING TRACKER BUTTON (जब ग्राहक मैप को छिपा दे) */}
+      <AnimatePresence>
+        {liveOrder && !isTrackerExpanded && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            onClick={() => { triggerHaptic(); setIsTrackerExpanded(true); }}
+            className="fixed bottom-[110px] right-4 z-[90] bg-neutral-900 border-2 border-orange-500 text-white p-2.5 rounded-full shadow-[0_0_20px_rgba(249,115,22,0.4)] flex items-center gap-2"
+          >
+            <div className="relative flex items-center justify-center">
+              <span className="absolute w-full h-full bg-orange-500/50 rounded-full animate-ping"></span>
+              <span className="text-xl relative z-10 drop-shadow-md">🛵</span>
+            </div>
+            <span className="text-[10px] font-black uppercase text-orange-400 pr-2 tracking-wider">
+              {isHindi ? "ट्रैक करें" : "Tracker"}
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* LIVE ORDER REAL-TIME TRACKING FLOATING PANEL */}
       <AnimatePresence>
-        {liveOrder && (
+        {liveOrder && isTrackerExpanded && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto shadow-2xl"
+            className="fixed bottom-24 inset-x-4 z-[100] max-w-sm mx-auto shadow-2xl pointer-events-auto"
           >
             <LiveOrderTracker 
               isHindi={isHindi}
               liveOrder={liveOrder}
-              setLiveOrder={setLiveOrder}
+              setLiveOrder={(val) => {
+                if (val === null) {
+                  setIsTrackerExpanded(false); // 👉 "Dismiss" दबाने पर अब यह सिर्फ छोटा (Minimize) होगा!
+                } else {
+                  setLiveOrder(val);
+                }
+              }}
               formatBillNumber={formatBillNumber}
               whatsappNumber={whatsappNumber}
               triggerHaptic={triggerHaptic}
