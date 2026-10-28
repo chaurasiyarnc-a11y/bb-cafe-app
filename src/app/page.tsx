@@ -1465,6 +1465,7 @@ export default function BbCafeHome() {
           }
         } catch (e) {}
         setLiveOrder(null);
+        setIsTrackerExpanded(true); // 👉 अगले आर्डर के लिए वापस बड़ा कर दें
       }, 15000);
       return () => clearTimeout(timer);
     }
