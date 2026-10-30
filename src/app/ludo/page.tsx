@@ -1,13 +1,12 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Phone, ArrowRight, Loader2, Swords, Users, Share2, Copy } from 'lucide-react';
+import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Phone, ArrowRight, Loader2, Swords, Users, Share2, LogIn, Lock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 
-// 4 स्लॉट: 3 दोस्त (Red, Blue, Green) vs Cafe Boss (Yellow - Top Right)
 type SeatId = 'p1' | 'p2' | 'p3' | 'cafe';
 
 interface PlayerSlot {
@@ -16,17 +15,19 @@ interface PlayerSlot {
   phone: string;
   colorName: string;
   hex: string;
+  baseLabel: string;
+  joined: boolean;
   isBot?: boolean;
 }
 
 interface Token {
   id: number;
   ownerSeat: SeatId;
-  slotIndex: number; // 0, 1
+  slotIndex: number;
   step: number; // -1 = Base, 0 to 50 = Track, 51 to 55 = Runway, 56 = Home
 }
 
-// 15x15 ग्रिड कोऑर्डिनेट्स [row, col]
+// 15x15 ग्रिड के 52 मुख्य ट्रैक कोऑर्डिनेट्स [row, col] (Standard Clockwise Track)
 const BOARD_PATH: [number, number][] = [
   // Red Track Starts (Row 13 Col 6 going up & clockwise)
   [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
@@ -44,28 +45,31 @@ const BOARD_PATH: [number, number][] = [
   [14, 6]  // Red entrance
 ];
 
+// हर बेस का अपना एग्जिट पॉइंट (Start Offsets on 52-cell track)
 const START_OFFSETS: Record<SeatId, number> = {
-  p1: 0,   // Red (Bottom-Left)
-  p2: 39,  // Blue (Bottom-Right/Exit)
-  p3: 13,  // Green (Top-Left)
-  cafe: 26 // Yellow (Top-Right Boss)
+  p1: 0,   // Red (Bottom-Left exit at [13, 6])
+  p3: 13,  // Green (Top-Left exit at [6, 1])
+  cafe: 26,// Yellow (Top-Right exit at [1, 8])
+  p2: 39   // Blue (Bottom-Right exit at [8, 13])
 };
 
+// हर बेस के अपने खाने के सामने वाले रनवे (Home Runways)
 const RUNWAYS: Record<SeatId, [number, number][]> = {
-  p1: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]], // Red Runway
-  p2: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]], // Blue share
-  p3: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],     // Green Runway
-  cafe: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]]    // Yellow Runway
+  p1: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]],    // Red Runway (Bottom to Center)
+  p3: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],        // Green Runway (Left to Center)
+  cafe: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]],      // Yellow Runway (Top to Center)
+  p2: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]]     // Blue Runway (Right to Center)
 };
 
+// 4 बेस के अंदर 2 गोल पॉकेट्स [row, col]
 const BASE_POCKETS: Record<SeatId, [number, number][]> = {
-  p1: [[11.5, 1.8], [11.5, 3.8]], // Red Base
-  p2: [[11.5, 10.8], [11.5, 12.8]], // Blue Base
-  p3: [[2.5, 1.8], [2.5, 3.8]],    // Green Base
-  cafe: [[2.5, 10.8], [2.5, 12.8]]  // Yellow Base (Cafe)
+  p3: [[2.5, 1.8], [2.5, 3.8]],    // Top-Left Green Base
+  cafe: [[2.5, 10.8], [2.5, 12.8]],// Top-Right Yellow Base (Cafe)
+  p1: [[11.5, 1.8], [11.5, 3.8]],  // Bottom-Left Red Base
+  p2: [[11.5, 10.8], [11.5, 12.8]] // Bottom-Right Blue Base
 };
 
-// 🔊 SINGLETON AUDIO ENGINE
+// 🔊 SINGLETON AUDIO ENGINE (तेज़ रिंग और कभी न रुकने वाली आवाज़)
 let globalAudioCtx: AudioContext | null = null;
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -79,29 +83,30 @@ function getAudioContext(): AudioContext | null {
   return globalAudioCtx;
 }
 
-export default function LudoCoopVsCafe() {
-  // गेम मोड: 'local' (Pass & Play on 1 Phone) या 'online' (Live Room across Phones)
+export default function AuthenticLudoVersusCafe() {
   const [gameMode, setGameMode] = useState<'local' | 'online' | null>(null);
-  const [friendCount, setFriendCount] = useState<1 | 2 | 3>(1); // कितने दोस्त साथ हैं
+  const [onlineAction, setOnlineAction] = useState<'create' | 'join' | null>(null);
+  const [friendCount, setFriendCount] = useState<1 | 2 | 3>(1);
 
   // रूम स्टेट्स
   const [roomId, setRoomId] = useState('');
-  const [joinCodeInput, setJoinCodeInput] = useState('');
-  const [isHost, setIsHost] = useState(false);
+  const [inputRoomCode, setInputRoomCode] = useState('');
   const [mySeat, setMySeat] = useState<SeatId>('p1');
-
-  // प्लेयर्स लिस्ट
-  const [players, setPlayers] = useState<Record<SeatId, PlayerSlot>>({
-    p1: { seat: 'p1', name: '', phone: '', colorName: 'Red', hex: '#ed1c24' },
-    p2: { seat: 'p2', name: 'Friend 2', phone: '', colorName: 'Blue', hex: '#00aeef' },
-    p3: { seat: 'p3', name: 'Friend 3', phone: '', colorName: 'Green', hex: '#00a651' },
-    cafe: { seat: 'cafe', name: 'Bum Bum Cafe ☕', phone: '', colorName: 'Yellow', hex: '#ffc20e', isBot: true },
-  });
-
   const [isSetupDone, setIsSetupDone] = useState(false);
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
 
-  // कोर गेमप्ले स्टेट्स
+  // प्लेयर विवरण
+  const [myPhone, setMyPhone] = useState('');
+  const [myName, setMyName] = useState('');
+
+  const [players, setPlayers] = useState<Record<SeatId, PlayerSlot>>({
+    p1: { seat: 'p1', name: '', phone: '', colorName: 'Red', hex: '#ed1c24', baseLabel: 'Bottom-Left', joined: false },
+    p2: { seat: 'p2', name: 'Friend 2', phone: '', colorName: 'Blue', hex: '#00aeef', baseLabel: 'Bottom-Right', joined: false },
+    p3: { seat: 'p3', name: 'Friend 3', phone: '', colorName: 'Green', hex: '#00a651', baseLabel: 'Top-Left', joined: false },
+    cafe: { seat: 'cafe', name: 'Bum Bum Cafe ☕', phone: '', colorName: 'Yellow', hex: '#ffc20e', baseLabel: 'Top-Right (Boss)', joined: true, isBot: true },
+  });
+
+  // गेमप्ले स्टेट्स
   const [turn, setTurn] = useState<SeatId>('p1');
   const [dice, setDice] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -109,13 +114,12 @@ export default function LudoCoopVsCafe() {
   const [isAnimatingMove, setIsAnimatingMove] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // 75% चांस कैफे बॉट जीतने का
+  // 75% कैफे बॉट की जीत
   const [targetWinner, setTargetWinner] = useState<'friends' | 'cafe'>(() => Math.random() < 0.75 ? 'cafe' : 'friends');
   const [winner, setWinner] = useState<'friends' | 'cafe' | null>(null);
   const [winningPlayerName, setWinningPlayerName] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
 
-  // टोकन्स
   const [tokens, setTokens] = useState<Token[]>([
     { id: 1, ownerSeat: 'p1', slotIndex: 0, step: -1 },
     { id: 2, ownerSeat: 'p1', slotIndex: 1, step: -1 },
@@ -142,52 +146,51 @@ export default function LudoCoopVsCafe() {
   const diceRef = useRef<number | null>(dice);
   diceRef.current = dice;
 
-  // URL से सीधा रूम कोड पढ़ना (WhatsApp Invite Link)
+  // URL से WhatsApp इनवाइट रूम कोड पढ़ना
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const roomParam = params.get('room');
       if (roomParam) {
         setGameMode('online');
-        setRoomId(roomParam.toUpperCase());
-        setJoinCodeInput(roomParam.toUpperCase());
-        setIsHost(false);
+        setOnlineAction('join');
+        setInputRoomCode(roomParam.trim().toUpperCase());
+        setRoomId(roomParam.trim().toUpperCase());
       }
     }
   }, []);
 
-  // 📡 रीयल-टाइम ऑनलाइन रूम सिंक (Firebase Firestore)
+  // रीयल-टाइम रूम लिसनर (Firestore onSnapshot)
   useEffect(() => {
     if (gameMode !== 'online' || !roomId || !isSetupDone) return;
 
-    const roomRef = doc(db, 'ludo_rooms', roomId);
-    const unsub = onSnapshot(roomRef, (snap) => {
+    const unsub = onSnapshot(doc(db, 'ludo_rooms', roomId), (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        if (data.tokens) setTokens(data.tokens);
-        if (data.turn) setTurn(data.turn);
-        if (data.dice !== undefined) setDice(data.dice);
-        if (data.hasRolled !== undefined) setHasRolled(data.hasRolled);
-        if (data.winner) setWinner(data.winner);
-        if (data.winningPlayerName) setWinningPlayerName(data.winningPlayerName);
-        if (data.voucherCode) setVoucherCode(data.voucherCode);
-        if (data.players) setPlayers(data.players);
+        const d = snap.data();
+        if (d.tokens) setTokens(d.tokens);
+        if (d.turn) setTurn(d.turn);
+        if (d.dice !== undefined) setDice(d.dice);
+        if (d.hasRolled !== undefined) setHasRolled(d.hasRolled);
+        if (d.winner) setWinner(d.winner);
+        if (d.winningPlayerName) setWinningPlayerName(d.winningPlayerName);
+        if (d.voucherCode) setVoucherCode(d.voucherCode);
+        if (d.players) setPlayers(d.players);
+        if (d.friendCount) setFriendCount(d.friendCount);
       }
     });
 
     return () => unsub();
   }, [gameMode, roomId, isSetupDone]);
 
-  // रूम डेटा अपडेट हेल्पर
   const syncOnlineRoom = async (updates: any) => {
     if (gameMode === 'online' && roomId) {
       try {
-        await setDoc(doc(db, 'ludo_rooms', roomId), updates, { merge: true });
+        await updateDoc(doc(db, 'ludo_rooms', roomId), updates);
       } catch {}
     }
   };
 
-  // 🔊 ऑडियो इंजन
+  // 🔊 LOUD RING & DICE ROLLING SOUNDS
   const playSfx = (type: 'roll' | 'step' | 'cut' | 'win') => {
     if (!soundEnabled) return;
     const ctx = getAudioContext();
@@ -195,6 +198,7 @@ export default function LudoCoopVsCafe() {
     const now = ctx.currentTime;
 
     if (type === 'roll') {
+      // 🎲 पासे की खड़खड़ाहट
       for (let i = 0; i < 7; i++) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -207,19 +211,20 @@ export default function LudoCoopVsCafe() {
         osc.start(now + i * 0.035);
         osc.stop(now + i * 0.035 + 0.032);
       }
-
+      // 🔔 लाउड रिंगिंग बेल टोन
       const ringOsc = ctx.createOscillator();
       const ringGain = ctx.createGain();
       ringOsc.type = 'sine';
       ringOsc.frequency.setValueAtTime(1250, now);
       ringOsc.frequency.exponentialRampToValueAtTime(980, now + 0.35);
-      ringGain.gain.setValueAtTime(0.45, now);
+      ringGain.gain.setValueAtTime(0.48, now);
       ringGain.gain.exponentialRampToValueAtTime(0.005, now + 0.35);
       ringOsc.connect(ringGain);
       ringGain.connect(ctx.destination);
       ringOsc.start(now);
       ringOsc.stop(now + 0.35);
     } else if (type === 'step') {
+      // 🪵 लकड़ी की ठोस 'टक' आवाज़
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
@@ -232,6 +237,7 @@ export default function LudoCoopVsCafe() {
       osc.start(now);
       osc.stop(now + 0.09);
     } else if (type === 'cut') {
+      // ⚔️ जोरदार स्लैश
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sawtooth';
@@ -244,6 +250,7 @@ export default function LudoCoopVsCafe() {
       osc.start(now);
       osc.stop(now + 0.35);
     } else if (type === 'win') {
+      // 🎺 जीत का बिगुल
       [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -259,78 +266,124 @@ export default function LudoCoopVsCafe() {
     }
   };
 
-  // 🔍 फ़ोन नंबर लुकअप
-  const handlePhoneLookup = async (phoneStr: string, seat: SeatId) => {
+  const handlePhoneLookup = async (phoneStr: string) => {
     const clean = phoneStr.replace(/\D/g, '').slice(0, 10);
-    setPlayers(prev => ({ ...prev, [seat]: { ...prev[seat], phone: clean } }));
+    setMyPhone(clean);
 
     if (clean.length === 10) {
       setIsCheckingPhone(true);
       try {
         const snap = await getDoc(doc(db, 'customer_points', clean));
         if (snap.exists() && snap.data().name) {
-          const fName = snap.data().name;
-          setPlayers(prev => ({ ...prev, [seat]: { ...prev[seat], name: fName } }));
-          toast.success(`पहचाना गया: ${fName} 👋`);
+          setMyName(snap.data().name);
+          toast.success(`नमस्ते ${snap.data().name}! 👋`);
         }
       } catch {}
       setIsCheckingPhone(false);
     }
   };
 
-  // 🚀 गेम / रूम सेटअप शुरू करना
-  const handleStartSetup = async (e: React.FormEvent) => {
+  const handleCreateOnlineRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!players.p1.phone || players.p1.phone.length !== 10) return toast.error("Player 1 का 10-अंकों का फ़ोन नंबर डालें!");
-    if (!players.p1.name.trim()) return toast.error("Player 1 का नाम डालें!");
+    if (myPhone.length !== 10 || !myName.trim()) return toast.error("फ़ोन नंबर और नाम दर्ज करें!");
 
     getAudioContext();
+    const newRoomCode = `ROOM-${Math.floor(1000 + Math.random() * 9000)}`;
+    setRoomId(newRoomCode);
+    setMySeat('p1');
 
-    if (gameMode === 'online') {
-      let activeRoom = roomId;
-      if (isHost || !activeRoom) {
-        activeRoom = `ROOM-${Math.floor(1000 + Math.random() * 9000)}`;
-        setRoomId(activeRoom);
-        setIsHost(true);
-        setMySeat('p1');
-      }
+    const updatedPlayers = {
+      ...players,
+      p1: { ...players.p1, name: myName.trim(), phone: myPhone, joined: true },
+    };
+    setPlayers(updatedPlayers);
 
-      const initialRoomData = {
-        roomId: activeRoom,
-        createdAt: new Date(),
-        targetWinner,
-        turn: 'p1',
-        dice: null,
-        hasRolled: false,
-        winner: null,
-        players,
-        friendCount,
-        tokens
-      };
-
-      await setDoc(doc(db, 'ludo_rooms', activeRoom), initialRoomData, { merge: true });
-      toast.success(`रूम बना: ${activeRoom}! दोस्तों को इनवाइट करें`);
-    }
+    await setDoc(doc(db, 'ludo_rooms', newRoomCode), {
+      roomId: newRoomCode,
+      createdAt: new Date(),
+      targetWinner,
+      turn: 'p1',
+      dice: null,
+      hasRolled: false,
+      winner: null,
+      players: updatedPlayers,
+      friendCount,
+      tokens
+    });
 
     setIsSetupDone(true);
+    toast.success(`रूम तैयार: ${newRoomCode}! WhatsApp पर इनवाइट भेजें! 🎉`);
   };
 
-  // इनवाइट लिंक WhatsApp पर शेयर करना
+  const handleJoinOnlineRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetRoom = (inputRoomCode || roomId).trim().toUpperCase();
+    if (!targetRoom) return toast.error("रूम कोड डालें!");
+    if (myPhone.length !== 10 || !myName.trim()) return toast.error("फ़ोन नंबर और नाम दर्ज करें!");
+
+    getAudioContext();
+    setIsCheckingPhone(true);
+
+    try {
+      const roomRef = doc(db, 'ludo_rooms', targetRoom);
+      const snap = await getDoc(roomRef);
+
+      if (!snap.exists()) {
+        setIsCheckingPhone(false);
+        return toast.error("❌ यह रूम कोड मौजूद नहीं है!");
+      }
+
+      const rData = snap.data();
+      const currentPlayers = rData.players;
+
+      // सीट आवंटन: P2 (Blue) या P3 (Green)
+      let assignedSeat: SeatId | null = null;
+      if (!currentPlayers.p2.joined) assignedSeat = 'p2';
+      else if (!currentPlayers.p3.joined) assignedSeat = 'p3';
+
+      if (!assignedSeat) {
+        setIsCheckingPhone(false);
+        return toast.error("⚠️ यह रूम पहले से फुल है!");
+      }
+
+      currentPlayers[assignedSeat] = {
+        ...currentPlayers[assignedSeat],
+        name: myName.trim(),
+        phone: myPhone,
+        joined: true
+      };
+
+      await updateDoc(roomRef, {
+        players: currentPlayers,
+        friendCount: Math.max(rData.friendCount || 1, assignedSeat === 'p2' ? 2 : 3)
+      });
+
+      setRoomId(targetRoom);
+      setMySeat(assignedSeat);
+      setPlayers(currentPlayers);
+      setIsSetupDone(true);
+      toast.success(`जुड़े! आपका बेस ${currentPlayers[assignedSeat].colorName} (${currentPlayers[assignedSeat].baseLabel}) है 🎮`);
+    } catch {
+      toast.error("रूम से जुड़ने में त्रुटि आई!");
+    } finally {
+      setIsCheckingPhone(false);
+    }
+  };
+
   const handleShareWhatsAppInvite = () => {
     if (!roomId) return;
     const shareUrl = `${window.location.origin}/ludo?room=${roomId}`;
-    const text = `🍕 *BUM BUM CAFE LUDO RAID CHALLENGE!*\n\nअरे भाई, साथ मिलकर Bum Bum Cafe को लूडो में हराना है और *1x Veg Manchurian Half FREE* जीतना है! 🥟\n\n👉 नीचे दिए लिंक से तुरंत गेम रूम में जुड़ें:\n${shareUrl}\n\nरूम कोड: *${roomId}*`;
+    const text = `🍕 *BUM BUM CAFE LUDO RAID!*\n\nसाथ मिलकर Bum Bum Cafe को लूडो में हराते हैं और *1x Veg Manchurian Half FREE* जीतते हैं! 🥟\n\n👉 रूम से जुड़ने के लिए लिंक दबाएं:\n${shareUrl}\n\nरूम कोड: *${roomId}*`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
-  // 🎲 AI BIASED DICE ROLLER (75% Cafe Winner)
+  // 🎲 75% बायस्ड डाइस लॉजिक
   const getBiasedDiceRoll = (currentSeat: SeatId): number => {
     const raw = Math.floor(Math.random() * 6) + 1;
     const curTokens = tokensRef.current;
     const cafeTokens = curTokens.filter(t => t.ownerSeat === 'cafe');
     const friendTokens = curTokens.filter(t => t.ownerSeat !== 'cafe');
 
-    // अगर कैफ़े किसी भी दोस्त की गोटी काट सकता है तो पहले उसे काटो!
     if (currentSeat === 'cafe') {
       for (let r = 1; r <= 6; r++) {
         const canKill = cafeTokens.some(t => {
@@ -347,16 +400,14 @@ export default function LudoCoopVsCafe() {
       }
     }
 
-    // अगर कैफ़े को जीतना तय है (75% केस):
     if (targetWinner === 'cafe') {
       if (currentSeat === 'cafe') {
         const inBase = cafeTokens.some(t => t.step === -1);
         if (inBase && Math.random() < 0.6) return 6;
         if (Math.random() < 0.5) return Math.random() < 0.5 ? 5 : 6;
       } else {
-        // दोस्त अगर जीतने के करीब हैं तो उन्हें गलत अंक दो
         const nearWinning = friendTokens.some(t => t.step >= 53);
-        if (nearWinning && Math.random() < 0.75) {
+        if (nearWinning && Math.random() < 0.8) {
           return Math.floor(Math.random() * 4) + 1;
         }
       }
@@ -365,13 +416,13 @@ export default function LudoCoopVsCafe() {
     return raw;
   };
 
-  // पासा रोल करना
+  // 🔒 कड़ा पहरा: जिसकी बारी है सिर्फ वही पासा फेंक सकता है
   const handleRollDice = (isBot = false) => {
     if (rollingRef.current || winnerRef.current || hasRolledRef.current || isAnimatingMoveRef.current) return;
     
-    // ऑनलाइन मोड में सिर्फ उसी की बारी चलेगी जिसका सीट है
+    // अगर ऑनलाइन है और आपकी बारी नहीं है तो ब्लॉक करें
     if (gameMode === 'online' && turnRef.current !== mySeat && !isBot) {
-      return toast.error("यह आपकी चाल नहीं है!");
+      return toast.error(`अभी आपकी बारी नहीं है! ${players[turnRef.current].name} की चाल का इंतज़ार करें। ⏳`);
     }
     if (turnRef.current === 'cafe' && !isBot) return;
 
@@ -394,7 +445,6 @@ export default function LudoCoopVsCafe() {
     }, 40);
   };
 
-  // कैफ़े ऑटो-बॉट इफेक्ट
   useEffect(() => {
     if (isSetupDone && turn === 'cafe' && !rolling && !hasRolled && !winner && !isAnimatingMove) {
       const botTimer = setTimeout(() => {
@@ -418,7 +468,6 @@ export default function LudoCoopVsCafe() {
     } else if (currentSeat === 'cafe') {
       setTimeout(() => {
         const curTokens = tokensRef.current;
-        // 1. अगर किसी भी दोस्त की गोटी कट रही है तो उसे सबसे पहले काटो (Targeted Hunter)
         const killMove = movable.find(t => {
           const targetStep = t.step === -1 ? 0 : t.step + rollVal;
           const targetGlobal = (START_OFFSETS.cafe + targetStep) % 52;
@@ -437,7 +486,7 @@ export default function LudoCoopVsCafe() {
     }
   };
 
-  // गोटी चलना
+  // 🚶‍♂️ 300ms धीमा एक-एक कदम चलना
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
     if (!hasRolledRef.current || rollValue === null || isAnimatingMoveRef.current) {
       return toast.error("पहले पासा फेंकें! 🎲");
@@ -462,7 +511,7 @@ export default function LudoCoopVsCafe() {
         currentStep += 1;
         playSfx('step');
         setTokens(prev => prev.map(t => t.id === token.id ? { ...t, step: currentStep } : t));
-        await new Promise(r => setTimeout(r, 280));
+        await new Promise(r => setTimeout(r, 300)); // इत्मीनान से 300ms चाल
       }
     }
 
@@ -477,12 +526,10 @@ export default function LudoCoopVsCafe() {
     const myGlobal = getGlobal(turnRef.current, finalStep);
     let captured = false;
 
-    // ⚔️ गोटी काटना
     if (myGlobal !== -1) {
       const safe = [0, 8, 13, 21, 26, 34, 39, 47];
       if (!safe.includes(myGlobal)) {
         updated = updated.map(t => {
-          // अगर कैफे चल रहा है तो दोस्तों को काटेगा; अगर दोस्त चल रहे हैं तो सिर्फ कैफे को काटेंगे (दोस्त आपस में नहीं कटेंगे!)
           const isEnemy = turnRef.current === 'cafe' ? t.ownerSeat !== 'cafe' : t.ownerSeat === 'cafe';
 
           if (isEnemy && t.step >= 0 && t.step < 51 && getGlobal(t.ownerSeat, t.step) === myGlobal) {
@@ -499,8 +546,7 @@ export default function LudoCoopVsCafe() {
 
     setIsAnimatingMove(false);
 
-    // 🏆 जीत का फैसला
-    // अगर किसी भी दोस्त की 2 गोटियां अंदर पहुंच गईं तो सारी टीम (Friends) जीत जाएगी!
+    // 🏆 जीत की जांच
     const activeFinished = updated.filter(t => t.ownerSeat === turnRef.current && t.step === 56).length;
     if (activeFinished === 2) {
       const isCafe = turnRef.current === 'cafe';
@@ -514,9 +560,8 @@ export default function LudoCoopVsCafe() {
         const code = `BOM-RAID-${Math.floor(1000 + Math.random() * 9000)}`;
         setVoucherCode(code);
         confetti({ particleCount: 260, spread: 100 });
-        toast.success(`🎉 गजब! ${champName} ने Bum Bum Cafe को हरा दिया! सबको Manchurian FREE 🥟`);
+        toast.success(`🎉 गजब! ${champName} और दोस्तों ने कैफे को हरा दिया! सबको Manchurian FREE 🥟`);
 
-        // सारे दोस्तों के नंबर पर वाउचर सेव
         [players.p1, players.p2, players.p3].forEach(p => {
           if (p.phone && p.phone.length === 10) {
             setDoc(doc(db, "customer_points", p.phone), {
@@ -551,7 +596,6 @@ export default function LudoCoopVsCafe() {
     }
   };
 
-  // टर्न बदलना (दोस्तों की संख्या के अनुसार)
   const switchTurn = (extra = false) => {
     setHasRolled(false);
     setDice(null);
@@ -601,6 +645,8 @@ export default function LudoCoopVsCafe() {
     return [7, 7];
   };
 
+  const isMyTurnNow = gameMode === 'local' ? (turn !== 'cafe') : (mySeat === turn);
+
   return (
     <div className="min-h-screen bg-[#07080c] text-white flex flex-col justify-between items-center p-2 sm:p-4 select-none font-sans">
       <Toaster position="top-center" />
@@ -614,18 +660,16 @@ export default function LudoCoopVsCafe() {
               animate={{ scale: 1, opacity: 1 }}
               className="bg-neutral-900 border-2 border-amber-500/50 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl relative overflow-hidden"
             >
-              {/* स्पेशल इनाम बैनर */}
               <div className="bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-amber-500/20 border border-amber-500/40 rounded-2xl p-3 text-center space-y-1">
                 <span className="text-[10px] font-black uppercase text-amber-400 flex items-center justify-center gap-1">
-                  <Gift size={13} /> Co-op Cafe Raid Challenge
+                  <Gift size={13} /> Co-op Cafe Challenge
                 </span>
                 <p className="text-sm font-black text-white">
-                  दोस्त मिलकर हराओ कैफे को: <br />
+                  हराओ कैफे को और पाओ: <br />
                   <span className="text-amber-400 text-base">1x Veg Manchurian (Half) FREE! 🥟</span>
                 </p>
               </div>
 
-              {/* 1. गेम मोड चुनाव */}
               {!gameMode ? (
                 <div className="space-y-3 pt-2">
                   <p className="text-xs font-black uppercase text-neutral-400 text-center">खेलने का तरीका चुनें:</p>
@@ -639,8 +683,8 @@ export default function LudoCoopVsCafe() {
                         <Users size={20} />
                       </div>
                       <div className="text-left">
-                        <p className="text-xs font-black uppercase text-white group-hover:text-amber-400">Option A: 1 Phone पर खेलें</p>
-                        <p className="text-[10px] text-neutral-400">टेबल पर 1 ही फ़ोन में बारी-बारी खेलें</p>
+                        <p className="text-xs font-black uppercase text-white group-hover:text-amber-400">Option A: 1 ही फ़ोन पर खेलें</p>
+                        <p className="text-[10px] text-neutral-400">टेबल पर बारी-बारी पासा फेंकें</p>
                       </div>
                     </div>
                     <ArrowRight size={16} className="text-neutral-500 group-hover:text-white" />
@@ -655,54 +699,89 @@ export default function LudoCoopVsCafe() {
                         <Share2 size={20} />
                       </div>
                       <div className="text-left">
-                        <p className="text-xs font-black uppercase text-white group-hover:text-amber-400">Option B: अलग-अलग फ़ोन से जुड़ें</p>
-                        <p className="text-[10px] text-neutral-400">WhatsApp लिंक से दोस्त अपने फ़ोन से खेलेंगे</p>
+                        <p className="text-xs font-black uppercase text-white group-hover:text-amber-400">Option B: ऑनलाइन दोस्त जोड़ें</p>
+                        <p className="text-[10px] text-neutral-400">WhatsApp लिंक या कोड से अलग-अलग फ़ोन पर</p>
                       </div>
                     </div>
                     <ArrowRight size={16} className="text-neutral-500 group-hover:text-white" />
                   </button>
                 </div>
+              ) : gameMode === 'online' && !onlineAction ? (
+                <div className="space-y-3 pt-2">
+                  <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                    <span className="text-xs font-black uppercase text-blue-400">🌐 Online Multiplayer</span>
+                    <button onClick={() => setGameMode(null)} className="text-[10px] text-neutral-400 underline">बदलें</button>
+                  </div>
+
+                  <button
+                    onClick={() => setOnlineAction('create')}
+                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-rose-500 text-black font-black uppercase text-xs rounded-xl shadow-lg flex items-center justify-center gap-2"
+                  >
+                    + नया रूम बनाएं (Host Room)
+                  </button>
+
+                  <div className="text-center text-[10px] text-neutral-500 uppercase font-black">--- या ---</div>
+
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="रूम कोड डालें (e.g. ROOM-4821)"
+                      value={inputRoomCode}
+                      onChange={e => setInputRoomCode(e.target.value.toUpperCase())}
+                      className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-center text-white outline-none focus:border-blue-400"
+                    />
+                    <button
+                      onClick={() => {
+                        if (!inputRoomCode.trim()) return toast.error("रूम कोड लिखें!");
+                        setOnlineAction('join');
+                      }}
+                      className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white font-black uppercase text-xs rounded-xl border border-white/10 flex items-center justify-center gap-1.5"
+                    >
+                      <LogIn size={14} /> रूम में जुड़ें (Join Room)
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <form onSubmit={handleStartSetup} className="space-y-3 pt-1">
+                <form onSubmit={gameMode === 'online' && onlineAction === 'join' ? handleJoinOnlineRoom : handleCreateOnlineRoom} className="space-y-3 pt-1">
                   <div className="flex justify-between items-center pb-2 border-b border-white/10">
                     <span className="text-xs font-black uppercase text-amber-400">
-                      {gameMode === 'local' ? '📱 1 Phone Table Mode' : '🌐 Online Room Mode'}
+                      {gameMode === 'local' ? '📱 Table Pass-and-Play' : onlineAction === 'create' ? '👑 Host New Room' : `🤝 Join Room`}
                     </span>
-                    <button type="button" onClick={() => setGameMode(null)} className="text-[10px] text-neutral-400 underline">
+                    <button type="button" onClick={() => { setOnlineAction(null); setGameMode(null); }} className="text-[10px] text-neutral-400 underline">
                       बदलें
                     </button>
                   </div>
 
-                  {/* कितने दोस्त खेल रहे हैं */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-neutral-400">कितने दोस्त कैफ़े से लड़ेंगे?</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[1, 2, 3].map(cnt => (
-                        <button
-                          key={cnt}
-                          type="button"
-                          onClick={() => setFriendCount(cnt as any)}
-                          className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${
-                            friendCount === cnt ? 'bg-amber-400 text-black border-amber-400 shadow' : 'bg-white/5 text-neutral-400 border-white/10'
-                          }`}
-                        >
-                          {cnt === 1 ? '1 Friend' : `${cnt} Friends`}
-                        </button>
-                      ))}
+                  {onlineAction === 'create' && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-neutral-400">कितने दोस्त साथ खेलेंगे?</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[1, 2, 3].map(cnt => (
+                          <button
+                            key={cnt}
+                            type="button"
+                            onClick={() => setFriendCount(cnt as any)}
+                            className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${
+                              friendCount === cnt ? 'bg-amber-400 text-black border-amber-400 shadow' : 'bg-white/5 text-neutral-400 border-white/10'
+                            }`}
+                          >
+                            {cnt === 1 ? '1 Friend' : `${cnt} Friends`}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Player 1 Details */}
                   <div className="space-y-1 pt-1">
-                    <label className="text-[10px] font-black uppercase text-neutral-400">Player 1 Phone (आपका नंबर) *</label>
+                    <label className="text-[10px] font-black uppercase text-neutral-400">Your Mobile Number (फ़ोन नंबर) *</label>
                     <div className="relative">
                       <input
                         type="tel"
                         maxLength={10}
                         required
                         placeholder="10 अंकों का नंबर"
-                        value={players.p1.phone}
-                        onChange={e => handlePhoneLookup(e.target.value, 'p1')}
+                        value={myPhone}
+                        onChange={e => handlePhoneLookup(e.target.value)}
                         className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-white outline-none focus:border-amber-400"
                       />
                       {isCheckingPhone && <Loader2 size={14} className="animate-spin text-amber-400 absolute right-3 top-3" />}
@@ -710,50 +789,23 @@ export default function LudoCoopVsCafe() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-neutral-400">Player 1 Name (आपका नाम) *</label>
+                    <label className="text-[10px] font-black uppercase text-neutral-400">Your Name (आपका नाम) *</label>
                     <input
                       type="text"
                       required
-                      placeholder="उदा. राम भाई"
-                      value={players.p1.name}
-                      onChange={e => setPlayers(prev => ({ ...prev, p1: { ...prev.p1, name: e.target.value } }))}
+                      placeholder="उदा. राहुल"
+                      value={myName}
+                      onChange={e => setMyName(e.target.value)}
                       className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3.5 py-2.5 text-xs font-bold text-white outline-none focus:border-rose-400"
                     />
                   </div>
 
-                  {/* Friend 2 / Friend 3 in Local Mode */}
-                  {gameMode === 'local' && friendCount >= 2 && (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-blue-400">Friend 2 Name (दूसरा दोस्त)</label>
-                      <input
-                        type="text"
-                        placeholder="उदा. राहुल"
-                        value={players.p2.name}
-                        onChange={e => setPlayers(prev => ({ ...prev, p2: { ...prev.p2, name: e.target.value } }))}
-                        className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400"
-                      />
-                    </div>
-                  )}
-
-                  {gameMode === 'local' && friendCount === 3 && (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-green-400">Friend 3 Name (तीसरा दोस्त)</label>
-                      <input
-                        type="text"
-                        placeholder="उदा. अमित"
-                        value={players.p3.name}
-                        onChange={e => setPlayers(prev => ({ ...prev, p3: { ...prev.p3, name: e.target.value } }))}
-                        className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:border-green-400"
-                      />
-                    </div>
-                  )}
-
                   <button
                     type="submit"
-                    disabled={players.p1.phone.length !== 10 || !players.p1.name.trim()}
+                    disabled={myPhone.length !== 10 || !myName.trim()}
                     className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 disabled:opacity-40 text-black font-black uppercase text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 tracking-wider mt-2"
                   >
-                    <Swords size={16} /> मैच शुरू करें (Raid Boss)
+                    <Swords size={16} /> {onlineAction === 'join' ? 'कमरे में प्रवेश करें (Join)' : 'मैच शुरू करें (Start)'}
                   </button>
                 </form>
               )}
@@ -769,7 +821,7 @@ export default function LudoCoopVsCafe() {
         </button>
         <div className="text-center">
           <h1 className="text-base sm:text-lg font-black tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-400 to-rose-500">
-            FRIENDS VS CAFE RAID
+            CLASSIC LUDO RAID
           </h1>
           <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
             {gameMode === 'online' && roomId ? `Room: ${roomId}` : 'Win 1x Veg Manchurian Half 🥟'}
@@ -777,7 +829,7 @@ export default function LudoCoopVsCafe() {
         </div>
         <div className="flex gap-2">
           {gameMode === 'online' && roomId && (
-            <button onClick={handleShareWhatsAppInvite} className="p-2.5 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30">
+            <button onClick={handleShareWhatsAppInvite} title="WhatsApp Invite" className="p-2.5 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30">
               <Share2 size={16} />
             </button>
           )}
@@ -790,30 +842,34 @@ export default function LudoCoopVsCafe() {
         </div>
       </header>
 
-      {/* RAID PLAYERS HUD CARDS */}
+      {/* 4 BASES HUD CARDS (हर बेस का अपना कार्ड) */}
       <div className="w-full max-w-md grid grid-cols-4 gap-1.5 my-2 shrink-0">
-        {/* PLAYER 1 */}
-        <div className={`p-2 rounded-xl border text-center transition-all ${turn === 'p1' ? 'bg-[#ed1c24] text-white border-white shadow-lg ring-2 ring-white/50 scale-102' : 'bg-white/5 border-white/10 opacity-60'}`}>
-          <p className="text-[10px] font-black uppercase truncate">{players.p1.name || 'P1'}</p>
-          <p className="text-[9px] font-mono">{tokens.filter(t => t.ownerSeat === 'p1' && t.step === 56).length}/2 In</p>
+        {/* P3 (GREEN - TOP LEFT) */}
+        <div className={`p-2 rounded-xl border text-center transition-all ${turn === 'p3' ? 'bg-[#00a651] text-white border-white shadow-lg ring-2 ring-white/50 scale-102' : 'bg-white/5 border-white/10 opacity-60'}`}>
+          <p className="text-[10px] font-black uppercase truncate">{friendCount >= 3 ? (players.p3.joined ? players.p3.name : 'Waiting...') : 'Empty'}</p>
+          <p className="text-[8px] font-mono text-green-300">Top-Left</p>
+          <p className="text-[9px] font-mono mt-0.5">{friendCount >= 3 ? `${tokens.filter(t => t.ownerSeat === 'p3' && t.step === 56).length}/2` : '--'}</p>
         </div>
 
-        {/* PLAYER 2 */}
-        <div className={`p-2 rounded-xl border text-center transition-all ${friendCount < 2 ? 'opacity-20' : turn === 'p2' ? 'bg-[#00aeef] text-white border-white shadow-lg ring-2 ring-white/50 scale-102' : 'bg-white/5 border-white/10 opacity-60'}`}>
-          <p className="text-[10px] font-black uppercase truncate">{friendCount >= 2 ? players.p2.name : 'Empty'}</p>
-          <p className="text-[9px] font-mono">{friendCount >= 2 ? `${tokens.filter(t => t.ownerSeat === 'p2' && t.step === 56).length}/2` : '--'}</p>
-        </div>
-
-        {/* PLAYER 3 */}
-        <div className={`p-2 rounded-xl border text-center transition-all ${friendCount < 3 ? 'opacity-20' : turn === 'p3' ? 'bg-[#00a651] text-white border-white shadow-lg ring-2 ring-white/50 scale-102' : 'bg-white/5 border-white/10 opacity-60'}`}>
-          <p className="text-[10px] font-black uppercase truncate">{friendCount >= 3 ? players.p3.name : 'Empty'}</p>
-          <p className="text-[9px] font-mono">{friendCount >= 3 ? `${tokens.filter(t => t.ownerSeat === 'p3' && t.step === 56).length}/2` : '--'}</p>
-        </div>
-
-        {/* CAFE BOSS (YELLOW) */}
+        {/* CAFE BOSS (YELLOW - TOP RIGHT) */}
         <div className={`p-2 rounded-xl border text-center transition-all ${turn === 'cafe' ? 'bg-[#ffc20e] text-black border-white shadow-lg ring-2 ring-white/50 scale-102' : 'bg-white/5 border-white/10 opacity-60'}`}>
           <p className="text-[10px] font-black uppercase truncate">Cafe Boss ☕</p>
-          <p className="text-[9px] font-mono">{tokens.filter(t => t.ownerSeat === 'cafe' && t.step === 56).length}/2 In</p>
+          <p className="text-[8px] font-mono text-amber-800">Top-Right</p>
+          <p className="text-[9px] font-mono mt-0.5">{tokens.filter(t => t.ownerSeat === 'cafe' && t.step === 56).length}/2 In</p>
+        </div>
+
+        {/* P1 (RED - BOTTOM LEFT) */}
+        <div className={`p-2 rounded-xl border text-center transition-all ${turn === 'p1' ? 'bg-[#ed1c24] text-white border-white shadow-lg ring-2 ring-white/50 scale-102' : 'bg-white/5 border-white/10 opacity-60'}`}>
+          <p className="text-[10px] font-black uppercase truncate">{players.p1.name || 'P1'}</p>
+          <p className="text-[8px] font-mono text-red-300">Btm-Left</p>
+          <p className="text-[9px] font-mono mt-0.5">{tokens.filter(t => t.ownerSeat === 'p1' && t.step === 56).length}/2 In</p>
+        </div>
+
+        {/* P2 (BLUE - BOTTOM RIGHT) */}
+        <div className={`p-2 rounded-xl border text-center transition-all ${friendCount < 2 ? 'opacity-20' : turn === 'p2' ? 'bg-[#00aeef] text-white border-white shadow-lg ring-2 ring-white/50 scale-102' : 'bg-white/5 border-white/10 opacity-60'}`}>
+          <p className="text-[10px] font-black uppercase truncate">{friendCount >= 2 ? (players.p2.joined ? players.p2.name : 'Waiting...') : 'Empty'}</p>
+          <p className="text-[8px] font-mono text-cyan-300">Btm-Right</p>
+          <p className="text-[9px] font-mono mt-0.5">{friendCount >= 2 ? `${tokens.filter(t => t.ownerSeat === 'p2' && t.step === 56).length}/2` : '--'}</p>
         </div>
       </div>
 
@@ -829,16 +885,15 @@ export default function LudoCoopVsCafe() {
                   </div>
                   <h2 className="text-2xl font-black uppercase text-amber-400">FRIENDS WON! 🎉</h2>
                   <p className="text-xs text-neutral-300 font-bold">
-                    बधाई हो! <span className="text-white underline">{winningPlayerName}</span> और उनकी टीम ने Bum Bum Cafe को हरा दिया:
+                    बधाई हो! <span className="text-white underline">{winningPlayerName}</span> और पूरी टीम ने Bum Bum Cafe को हरा दिया:
                   </p>
                   
                   <div className="bg-amber-500/10 border-2 border-amber-400 p-3 rounded-2xl">
                     <p className="text-base font-black text-amber-300">1x Veg Manchurian (Half) FREE 🥟</p>
-                    <p className="text-xs font-mono text-neutral-400 mt-1">Voucher Code: <span className="text-white font-bold">{voucherCode}</span></p>
+                    <p className="text-xs font-mono text-neutral-400 mt-1">Voucher: <span className="text-white font-bold">{voucherCode}</span></p>
                   </div>
-
                   <p className="text-[10px] text-green-400 font-bold bg-green-500/10 py-1.5 px-2 rounded-lg border border-green-500/30">
-                    ✅ टेबल के सभी दोस्तों के नंबर पर वाउचर सेव हो गया!
+                    ✅ सभी दोस्तों के नंबर पर वाउचर सेव हो गया!
                   </p>
 
                   <button onClick={handleRestart} className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-black font-black uppercase text-xs rounded-xl shadow-lg transition-all">
@@ -864,10 +919,10 @@ export default function LudoCoopVsCafe() {
         )}
       </AnimatePresence>
 
-      {/* 🎯 15×15 MATHEMATICAL SVG LUDO BOARD */}
+      {/* 🎯 15×15 EXACT MATHEMATICAL SVG LUDO BOARD */}
       <div className="w-full max-w-[420px] aspect-square bg-white border-[6px] border-[#000] shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto">
         <svg viewBox="0 0 15 15" className="w-full h-full block">
-          {/* 1. ग्रिड सेल्स (1.0 × 1.0 के 100% बराबर चौकोर खाने) */}
+          {/* ग्रिड सेल्स (1.0 × 1.0 के 100% बराबर चौकोर खाने) */}
           {Array.from({ length: 15 }).map((_, r) =>
             Array.from({ length: 15 }).map((_, c) => {
               if (r < 6 && c < 6) return null;
@@ -913,7 +968,7 @@ export default function LudoCoopVsCafe() {
             })
           )}
 
-          {/* 2. बेस (Bases) */}
+          {/* 4 कोनों के पक्के बेस (Exact 6×6 Units) */}
           {/* Top-Left Green Base (P3) */}
           <rect x="0" y="0" width="6" height="6" fill="#00a651" stroke="#000" strokeWidth="0.04" />
           <rect x="1" y="1" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
@@ -921,9 +976,9 @@ export default function LudoCoopVsCafe() {
           <circle cx="4" cy="2" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
           <circle cx="2" cy="4" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
           <circle cx="4" cy="4" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
-          <text x="3" y="3.15" fontSize="0.45" fontWeight="900" textAnchor="middle" fill="#065f46">{friendCount >= 3 ? players.p3.name.slice(0, 6) : 'P3'}</text>
+          <text x="3" y="3.15" fontSize="0.45" fontWeight="900" textAnchor="middle" fill="#065f46">{friendCount >= 3 ? players.p3.name.slice(0, 6) : 'GREEN'}</text>
 
-          {/* Top-Right Yellow Base (Cafe Boss ☕) */}
+          {/* Top-Right Yellow Base (Bum Bum Cafe Boss ☕) */}
           <rect x="9" y="0" width="6" height="6" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
           <rect x="10" y="1" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
           <circle cx="11" cy="2" r="0.65" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
@@ -939,7 +994,7 @@ export default function LudoCoopVsCafe() {
           <circle cx="4" cy="11" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
           <circle cx="2" cy="13" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
           <circle cx="4" cy="13" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
-          <text x="3" y="12.15" fontSize="0.45" fontWeight="900" textAnchor="middle" fill="#7f1d1d">{players.p1.name ? players.p1.name.slice(0, 6) : 'P1'}</text>
+          <text x="3" y="12.15" fontSize="0.45" fontWeight="900" textAnchor="middle" fill="#7f1d1d">{players.p1.name ? players.p1.name.slice(0, 6) : 'RED'}</text>
 
           {/* Bottom-Right Blue Base (P2) */}
           <rect x="9" y="9" width="6" height="6" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
@@ -948,16 +1003,16 @@ export default function LudoCoopVsCafe() {
           <circle cx="13" cy="11" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
           <circle cx="11" cy="13" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
           <circle cx="13" cy="13" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
-          <text x="12" y="12.15" fontSize="0.45" fontWeight="900" textAnchor="middle" fill="#0369a1">{friendCount >= 2 ? players.p2.name.slice(0, 6) : 'P2'}</text>
+          <text x="12" y="12.15" fontSize="0.45" fontWeight="900" textAnchor="middle" fill="#0369a1">{friendCount >= 2 ? (players.p2.joined ? players.p2.name.slice(0, 6) : 'BLUE') : 'BLUE'}</text>
 
-          {/* 3. बीच के 4 तिकोने (Home Center) */}
+          {/* सेंटर ट्रायएंगल्स */}
           <polygon points="6,6 9,6 7.5,7.5" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
           <polygon points="9,6 9,9 7.5,7.5" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
           <polygon points="6,9 9,9 7.5,7.5" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
           <polygon points="6,6 6,9 7.5,7.5" fill="#00a651" stroke="#000" strokeWidth="0.04" />
           <rect x="6" y="6" width="3" height="3" fill="none" stroke="#000" strokeWidth="0.05" />
 
-          {/* 4. तीर व सितारे */}
+          {/* तीर व सितारे */}
           <text x="0.5" y="7.7" fontSize="0.65" textAnchor="middle" fill="#00a651" fontWeight="bold">➡</text>
           <text x="7.5" y="0.75" fontSize="0.65" textAnchor="middle" fill="#ffc20e" fontWeight="bold">⬇</text>
           <text x="14.5" y="7.7" fontSize="0.65" textAnchor="middle" fill="#00aeef" fontWeight="bold">⬅</text>
@@ -971,7 +1026,6 @@ export default function LudoCoopVsCafe() {
 
         {/* ♟️ गोटियां */}
         {tokens.map(token => {
-          // अगर वो सीट खेल ही नहीं रही तो गोटी न दिखाएं
           if (token.ownerSeat === 'p2' && friendCount < 2) return null;
           if (token.ownerSeat === 'p3' && friendCount < 3) return null;
 
@@ -996,7 +1050,10 @@ export default function LudoCoopVsCafe() {
               }}
               onClick={() => {
                 if (isAnimatingMove) return;
-                if (canMove && (gameMode === 'local' || mySeat === turn)) {
+                if (!isMyTurnNow) {
+                  return toast.error("यह आपकी चाल नहीं है!");
+                }
+                if (canMove) {
                   handleMoveToken(token);
                 } else if (!hasRolled) {
                   toast.error("पहले पासा फेंकें! 🎲");
@@ -1005,13 +1062,13 @@ export default function LudoCoopVsCafe() {
               className="absolute z-30 flex items-center justify-center p-[2px] cursor-pointer"
             >
               <motion.div
-                animate={canMove && (gameMode === 'local' || mySeat === turn) ? { scale: [1, 1.25, 1], y: [0, -3, 0] } : { scale: 1 }}
+                animate={canMove && isMyTurnNow ? { scale: [1, 1.25, 1], y: [0, -3, 0] } : { scale: 1 }}
                 transition={canMove ? { repeat: Infinity, duration: 0.6 } : {}}
                 className={`w-[85%] h-[85%] rounded-full border-2 border-white shadow-[0_4px_8px_rgba(0,0,0,0.6)] flex items-center justify-center relative ${
                   token.ownerSeat === 'p1' ? 'bg-[#ed1c24]' :
                   token.ownerSeat === 'p2' ? 'bg-[#00aeef]' :
                   token.ownerSeat === 'p3' ? 'bg-[#00a651]' : 'bg-[#ffc20e]'
-                } ${canMove ? 'ring-2 ring-white shadow-[0_0_12px_#fff]' : ''}`}
+                } ${canMove && isMyTurnNow ? 'ring-2 ring-white shadow-[0_0_12px_#fff]' : ''}`}
               >
                 <div className="w-[45%] h-[45%] rounded-full bg-white/40 shadow-inner" />
               </motion.div>
@@ -1020,34 +1077,38 @@ export default function LudoCoopVsCafe() {
         })}
       </div>
 
-      {/* FOOTER CONTROLS & LOUD DICE BUTTON */}
+      {/* FOOTER CONTROLS & LOCKED DICE */}
       <footer className="w-full max-w-md bg-neutral-900/90 border border-white/10 rounded-3xl p-3 flex justify-between items-center shadow-2xl shrink-0 mt-2">
-        <div>
+        <div className="space-y-0.5">
           <span className="text-[10px] text-neutral-400 font-bold uppercase block">किसकी चाल:</span>
-          <p className={`text-base font-black uppercase flex items-center gap-1.5`} style={{ color: players[turn].hex }}>
+          <p className="text-base font-black uppercase flex items-center gap-1.5" style={{ color: players[turn].hex }}>
             <span className="w-3 h-3 rounded-full" style={{ backgroundColor: players[turn].hex }} />
             {players[turn].name} {turn === 'cafe' ? '(Boss)' : ''}
           </p>
-          <span className="text-[10px] text-neutral-500 font-bold">
+          <span className="text-[10px] text-neutral-400 font-bold">
             {isAnimatingMove ? 'गोटी चल रही है...' : (turn === 'cafe' 
-              ? 'कैफ़े Boss सोच रहा है...' 
-              : (hasRolled ? '👉 अपनी गोटी पर टैप करें' : '👉 पहले पासा फेंकें'))}
+              ? '🤖 कैफ़े Boss सोच रहा है...' 
+              : isMyTurnNow 
+                ? (hasRolled ? '👉 अपनी गोटी पर टैप करें' : '👉 पासा फेंकने के लिए बटन दबाएं') 
+                : `⏳ ${players[turn].name} की चाल का इंतज़ार करें...`)}
           </span>
         </div>
 
-        {/* 🎲 3D DICE BUTTON WITH LOUD RING */}
+        {/* 🎲 पासा बटन (जब अपनी बारी न हो तो कड़ा ताला 🔒) */}
         <motion.button
-          whileTap={{ scale: 0.9 }}
+          whileTap={isMyTurnNow ? { scale: 0.9 } : {}}
           onClick={() => handleRollDice(false)}
-          disabled={rolling || hasRolled || isAnimatingMove || !isSetupDone || (gameMode === 'online' && mySeat !== turn && turn !== 'cafe')}
+          disabled={!isMyTurnNow || rolling || hasRolled || isAnimatingMove || !isSetupDone}
           className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center font-mono font-black text-3xl shadow-xl transition-all ${
-            hasRolled || turn === 'cafe' || (gameMode === 'online' && mySeat !== turn)
-              ? 'bg-neutral-800 border-neutral-700 text-neutral-500 cursor-not-allowed'
+            !isMyTurnNow || hasRolled || turn === 'cafe' || isAnimatingMove
+              ? 'bg-neutral-800 border-neutral-700 text-neutral-500 cursor-not-allowed opacity-60'
               : 'border-white text-white shadow-[0_0_20px_rgba(255,255,255,0.4)] animate-pulse cursor-pointer'
           }`}
-          style={{ backgroundColor: hasRolled || turn === 'cafe' ? undefined : players[turn].hex }}
+          style={{ backgroundColor: !isMyTurnNow || hasRolled || turn === 'cafe' ? undefined : players[turn].hex }}
         >
-          {rolling ? (
+          {!isMyTurnNow ? (
+            <Lock size={22} className="text-neutral-500" />
+          ) : rolling ? (
             <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.25 }}>
               🎲
             </motion.span>
