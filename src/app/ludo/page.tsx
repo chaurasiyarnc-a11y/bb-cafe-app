@@ -1,7 +1,7 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Sparkles, Bot, User, CheckCircle2, Gift } from 'lucide-react';
+import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
@@ -16,7 +16,7 @@ interface Token {
   step: number; // -1 = Base, 0 to 50 = Track, 51 to 55 = Runway, 56 = Home
 }
 
-// 15x15 ट्रैक कोऑर्डिनेट्स
+// 15x15 ट्रैक कोऑर्डिनेट्स [row, col] - सख्त Tuple टाइपिंग
 const BOARD_PATH: [number, number][] = [
   [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
   [5, 6], [4, 6], [3, 6], [2, 6], [1, 6], [0, 6],
@@ -32,14 +32,14 @@ const BOARD_PATH: [number, number][] = [
   [7, 0], [6, 0]
 ];
 
-const START_OFFSETS = { player: 0, cafe: 26 };
+const START_OFFSETS: Record<Player, number> = { player: 0, cafe: 26 };
 
-const RUNWAYS = {
+const RUNWAYS: Record<Player, [number, number][]> = {
   player: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],
   cafe: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]]
 };
 
-const BASE_POCKETS = {
+const BASE_POCKETS: Record<Player, [number, number][]> = {
   player: [[2, 2], [2, 3], [3, 2], [3, 3]],
   cafe: [[11, 11], [11, 12], [12, 11], [12, 12]]
 };
@@ -49,7 +49,7 @@ const STAR_COORDS: [number, number][] = [
 ];
 
 // 🎁 रिवॉर्ड्स का बिज़नेस लॉजिक (25% कस्टमर विनिंग में से डिस्ट्रीब्यूशन)
-const getRandomReward = () => {
+const getRandomReward = (): string => {
   const rand = Math.random() * 100;
   if (rand < 4) return "1x Pizza (Small Size) 🍕";
   if (rand < 8) return "1x Grilled Sandwich 🥪";
@@ -74,7 +74,7 @@ export default function LudoVersusCafe() {
   const [claimedPhone, setClaimedPhone] = useState('');
   const [savingReward, setSavingReward] = useState(false);
 
-  // 2-2 गोटियां (ताकि कैफे में 3-5 मिनट में गेम खत्म हो जाए और कस्टमर बोर न हो)
+  // 2-2 गोटियां (त्वरित गेमप्ले के लिए)
   const [tokens, setTokens] = useState<Token[]>([
     { id: 1, owner: 'player', slotIndex: 0, step: -1 },
     { id: 2, owner: 'player', slotIndex: 1, step: -1 },
@@ -85,7 +85,8 @@ export default function LudoVersusCafe() {
   const playSfx = (type: 'roll' | 'step' | 'cut' | 'win') => {
     if (!soundEnabled || typeof window === 'undefined') return;
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -110,26 +111,25 @@ export default function LudoVersusCafe() {
         gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.25);
         osc.start(); osc.stop(ctx.currentTime + 0.25);
       }
-    } catch (e) {}
+    } catch {
+      // Ignore audio errors
+    }
   };
 
-  // 🎲 स्मार्ट पासा (Algorithm जो 75% बार Cafe को जिताता है)
+  // 🎲 75% बिज़नेस AI डाइस लॉजिक
   const getBiasedDiceRoll = (playerTurn: Player): number => {
     const raw = Math.floor(Math.random() * 6) + 1;
     
-    // अगर कैफे को जिताना तय है
     if (targetWinner === 'cafe') {
       if (playerTurn === 'cafe') {
-        // कैफे को अक्सर 6 या अच्छे नंबर मिलेंगे
         const cafeTokens = tokens.filter(t => t.owner === 'cafe');
         const inBase = cafeTokens.some(t => t.step === -1);
-        if (inBase && Math.random() < 0.6) return 6; // 60% चांस बेस से 6 मिलने का
+        if (inBase && Math.random() < 0.6) return 6; // 60% चांस बेस से बाहर आने का
         if (Math.random() < 0.5) return Math.random() < 0.5 ? 5 : 6;
       } else {
-        // कस्टमर को 6 कम मिलेंगे
         const playerTokens = tokens.filter(t => t.owner === 'player');
         const inBase = playerTokens.every(t => t.step === -1);
-        if (inBase && Math.random() < 0.7) return Math.floor(Math.random() * 5) + 1; // 6 आने में देरी
+        if (inBase && Math.random() < 0.7) return Math.floor(Math.random() * 5) + 1;
       }
     }
 
@@ -139,7 +139,7 @@ export default function LudoVersusCafe() {
   // डाइस रोल करना
   const handleRollDice = (isBot = false) => {
     if (rolling || hasRolled || winner) return;
-    if (turn === 'cafe' && !isBot) return; // बोट की चाल में यूजर क्लिक नहीं कर सकता
+    if (turn === 'cafe' && !isBot) return;
 
     setRolling(true);
     playSfx('roll');
@@ -159,7 +159,6 @@ export default function LudoVersusCafe() {
     }, 45);
   };
 
-  // रोल के बाद चेक करना
   const postRollEvaluation = (rollVal: number, currentTurn: Player) => {
     const myTokens = tokens.filter(t => t.owner === currentTurn);
     const movable = myTokens.filter(t => {
@@ -171,9 +170,8 @@ export default function LudoVersusCafe() {
     if (movable.length === 0) {
       setTimeout(() => switchTurn(false), 900);
     } else if (currentTurn === 'cafe') {
-      // 🤖 बोट का ऑटो मूव
       setTimeout(() => {
-        // स्मार्ट चॉइस: अगर किसी को काट सकता है तो पहले उसे चलो
+        // AI: गोटी काटने को प्राथमिकता देना
         const killMove = movable.find(t => {
           const targetStep = t.step === -1 ? 0 : t.step + rollVal;
           const targetGlobal = (START_OFFSETS.cafe + targetStep) % 52;
@@ -187,7 +185,6 @@ export default function LudoVersusCafe() {
     }
   };
 
-  // गोटी चलना
   const handleMoveToken = (token: Token, rollValue: number = dice) => {
     if (!hasRolled || token.owner !== turn || winner) return;
 
@@ -229,7 +226,7 @@ export default function LudoVersusCafe() {
     setTokens(updated);
     setHasRolled(false);
 
-    // जीत का फैसला (दोनों गोटियां अंदर)
+    // जीत की जांच
     const homeCount = updated.filter(t => t.owner === turn && t.step === 56).length;
     if (homeCount === 2) {
       setWinner(turn);
@@ -258,7 +255,7 @@ export default function LudoVersusCafe() {
   const switchTurn = (extra = false) => {
     setHasRolled(false);
     if (!extra) {
-      const next = turn === 'player' ? 'cafe' : 'player';
+      const next: Player = turn === 'player' ? 'cafe' : 'player';
       setTurn(next);
       if (next === 'cafe') {
         setTimeout(() => handleRollDice(true), 900);
@@ -284,21 +281,27 @@ export default function LudoVersusCafe() {
       }, { merge: true });
 
       toast.success("🎉 इनाम आपके नंबर पर लॉक हो गया! काउंटर पर नंबर बताएं।");
-    } catch (e) {
+    } catch {
       toast.error("इनाम सेव करने में त्रुटि आई!");
     } finally {
       setSavingReward(false);
     }
   };
 
+  // 100% सुरक्षित टुपल कोऑर्डिनेट फ़ंक्शन (TypeScript Safe)
   const getTokenCoords = (t: Token): [number, number] => {
-    if (t.step === -1) return BASE_POCKETS[t.owner][t.slotIndex];
+    if (t.step === -1) {
+      const pocket = BASE_POCKETS[t.owner]?.[t.slotIndex];
+      return pocket ? [pocket[0], pocket[1]] : [0, 0];
+    }
     if (t.step >= 0 && t.step < 51) {
       const idx = (START_OFFSETS[t.owner] + t.step) % 52;
-      return BOARD_PATH[idx];
+      const pt = BOARD_PATH[idx];
+      return pt ? [pt[0], pt[1]] : [0, 0];
     }
     if (t.step >= 51 && t.step < 56) {
-      return RUNWAYS[t.owner][t.step - 51];
+      const rw = RUNWAYS[t.owner]?.[t.step - 51];
+      return rw ? [rw[0], rw[1]] : [7, 7];
     }
     return [7, 7];
   };
@@ -330,7 +333,7 @@ export default function LudoVersusCafe() {
 
       {/* 2 PLAYERS HUD CARD */}
       <div className="w-full max-w-md grid grid-cols-2 gap-3 my-2 shrink-0">
-        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'player' ? 'bg-rose-500 text-white border-white shadow-[0_0_20px_rgba(244,63,94,0.4)] scale-102 ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
+        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'player' ? 'bg-rose-500 text-white border-white shadow-[0_0_20px_rgba(244,63,94,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
           <div className="flex items-center gap-2">
             <User size={18} />
             <div>
@@ -341,7 +344,7 @@ export default function LudoVersusCafe() {
           <span className="w-3 h-3 rounded-full bg-rose-400 border border-white" />
         </div>
 
-        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'cafe' ? 'bg-amber-500 text-black border-white shadow-[0_0_20px_rgba(245,158,11,0.4)] scale-102 ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
+        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'cafe' ? 'bg-amber-500 text-black border-white shadow-[0_0_20px_rgba(245,158,11,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
           <div className="flex items-center gap-2">
             <Bot size={18} />
             <div>
@@ -455,7 +458,7 @@ export default function LudoVersusCafe() {
           </div>
         </div>
 
-        {/* INACTIVE CORNERS (MUTED) */}
+        {/* INACTIVE CORNERS */}
         <div className="absolute top-1 right-1 w-[40%] h-[40%] bg-neutral-100 rounded-2xl p-2.5 flex items-center justify-center opacity-40 border border-neutral-300">
           <span className="text-[10px] font-bold text-neutral-400 uppercase">Cafe Zone</span>
         </div>
