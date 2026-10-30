@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Flame, Phone, ArrowRight, Loader2, Swords } from 'lucide-react';
+import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Phone, ArrowRight, Loader2, Swords } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
@@ -45,13 +45,26 @@ const RUNWAYS: Record<Player, [number, number][]> = {
   cafe: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]]       // Yellow Runway (Top to Center)
 };
 
-// बेस के गोलों के बिल्कुल केंद्र कोऑर्डिनेट्स [row, col]
 const BASE_POCKETS: Record<Player, [number, number][]> = {
   player: [[11.5, 1.8], [11.5, 3.8]], // Red Base Inside
   cafe: [[2.5, 10.8], [2.5, 12.8]]    // Yellow Base Inside
 };
 
-export default function PerfectClassicLudo() {
+// 🔊 SINGLETON AUDIO ENGINE (ताकि साउंड कभी बंद न हो)
+let globalAudioCtx: AudioContext | null = null;
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  if (!globalAudioCtx) {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (AudioCtx) globalAudioCtx = new AudioCtx();
+  }
+  if (globalAudioCtx && globalAudioCtx.state === 'suspended') {
+    globalAudioCtx.resume();
+  }
+  return globalAudioCtx;
+}
+
+export default function AuthenticLudoVersusCafe() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [isCustomerVerified, setIsCustomerVerified] = useState(false);
@@ -65,10 +78,12 @@ export default function PerfectClassicLudo() {
   const [isAnimatingMove, setIsAnimatingMove] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   
+  // 75% बार कैफे ही जीतेगा, 25% ग्राहक
   const [targetWinner, setTargetWinner] = useState<Player>(() => Math.random() < 0.75 ? 'cafe' : 'player');
   const [winner, setWinner] = useState<Player | null>(null);
   const [voucherCode, setVoucherCode] = useState('');
 
+  // 2-2 गोटियां
   const [tokens, setTokens] = useState<Token[]>([
     { id: 1, owner: 'player', slotIndex: 0, step: -1 },
     { id: 2, owner: 'player', slotIndex: 1, step: -1 },
@@ -91,63 +106,86 @@ export default function PerfectClassicLudo() {
   const diceRef = useRef<number | null>(dice);
   diceRef.current = dice;
 
-  // 🔊 सिंथेसाइज्ड साउंड्स
+  // 🔊 LOUD RING & DICE ROLLING SOUNDS
   const playSfx = (type: 'roll' | 'step' | 'cut' | 'win') => {
-    if (!soundEnabled || typeof window === 'undefined') return;
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioCtx();
+    if (!soundEnabled) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
 
-      if (type === 'roll') {
-        for (let i = 0; i < 6; i++) {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(220 + Math.random() * 260, ctx.currentTime + i * 0.04);
-          gain.gain.setValueAtTime(0.18, ctx.currentTime + i * 0.04);
-          gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + i * 0.04 + 0.035);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(ctx.currentTime + i * 0.04);
-          osc.stop(ctx.currentTime + i * 0.04 + 0.035);
-        }
-      } else if (type === 'step') {
+    const now = ctx.currentTime;
+
+    if (type === 'roll') {
+      // 🎲 LOUD DICE RATTLING + METALLIC RINGING CHIME
+      // 1. Dice rattle beats
+      for (let i = 0; i < 7; i++) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(500, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(130, ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.35, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+        osc.type = i % 2 === 0 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(260 + Math.random() * 320, now + i * 0.035);
+        gain.gain.setValueAtTime(0.35, now + i * 0.035);
+        gain.gain.linearRampToValueAtTime(0.01, now + i * 0.035 + 0.032);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(); osc.stop(ctx.currentTime + 0.1);
-      } else if (type === 'cut') {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(360, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(70, ctx.currentTime + 0.32);
-        gain.gain.setValueAtTime(0.4, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.32);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(); osc.stop(ctx.currentTime + 0.32);
-      } else if (type === 'win') {
-        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.14);
-          gain.gain.setValueAtTime(0.35, ctx.currentTime + idx * 0.14);
-          gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + idx * 0.14 + 0.28);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(ctx.currentTime + idx * 0.14);
-          osc.stop(ctx.currentTime + idx * 0.14 + 0.28);
-        });
+        osc.start(now + i * 0.035);
+        osc.stop(now + i * 0.035 + 0.032);
       }
-    } catch {}
+
+      // 2. Loud Ringing Bell Tone (खड़कने के साथ गूंजने वाली रिंग)
+      const ringOsc = ctx.createOscillator();
+      const ringGain = ctx.createGain();
+      ringOsc.type = 'sine';
+      ringOsc.frequency.setValueAtTime(1250, now);
+      ringOsc.frequency.exponentialRampToValueAtTime(980, now + 0.35);
+      ringGain.gain.setValueAtTime(0.45, now);
+      ringGain.gain.exponentialRampToValueAtTime(0.005, now + 0.35);
+      ringOsc.connect(ringGain);
+      ringGain.connect(ctx.destination);
+      ringOsc.start(now);
+      ringOsc.stop(now + 0.35);
+
+    } else if (type === 'step') {
+      // 🪵 Deep Solid Wood Tap Sound
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(560, now);
+      osc.frequency.exponentialRampToValueAtTime(140, now + 0.09);
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.09);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.09);
+
+    } else if (type === 'cut') {
+      // ⚔️ Loud Capture Strike
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(420, now);
+      osc.frequency.linearRampToValueAtTime(80, now + 0.35);
+      gain.gain.setValueAtTime(0.6, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.35);
+
+    } else if (type === 'win') {
+      // 🎺 Grand Victory Fanfare
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.13);
+        gain.gain.setValueAtTime(0.45, now + idx * 0.13);
+        gain.gain.linearRampToValueAtTime(0.01, now + idx * 0.13 + 0.28);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.13);
+        osc.stop(now + idx * 0.13 + 0.28);
+      });
+    }
   };
 
   const handlePhoneLookup = async (inputPhone: string) => {
@@ -185,6 +223,9 @@ export default function PerfectClassicLudo() {
     if (customerPhone.length !== 10) return toast.error('10 अंकों का मोबाइल नंबर डालें!');
     if (!customerName.trim()) return toast.error('कृपया अपना नाम दर्ज करें!');
 
+    // ऑडियो अनलॉक
+    getAudioContext();
+
     try {
       await setDoc(doc(db, 'customer_points', customerPhone), {
         phone: customerPhone,
@@ -206,6 +247,7 @@ export default function PerfectClassicLudo() {
     const activeTokens = playerTurn === 'player' ? playerTokens : cafeTokens;
     const enemyTokens = playerTurn === 'player' ? cafeTokens : playerTokens;
 
+    // काटने का मौका
     for (let r = 1; r <= 6; r++) {
       const canKill = activeTokens.some(t => {
         if (t.step === -1) return false;
@@ -230,7 +272,7 @@ export default function PerfectClassicLudo() {
           if (inBase && Math.random() < 0.6) return 6;
         } else {
           const needed = playerTokens.map(t => 56 - t.step).filter(d => d > 0 && d <= 6);
-          if (needed.length > 0 && Math.random() < 0.8) {
+          if (needed.length > 0 && Math.random() < 0.85) {
             const wrong = [1, 2, 3, 4, 5, 6].filter(n => !needed.includes(n));
             if (wrong.length > 0) return wrong[Math.floor(Math.random() * wrong.length)];
           }
@@ -239,7 +281,7 @@ export default function PerfectClassicLudo() {
         if (isPlayerNearWinning) {
           const inBase = cafeTokens.some(t => t.step === -1);
           if (inBase) return 6;
-          return Math.random() < 0.6 ? 6 : 5;
+          return Math.random() < 0.65 ? 6 : 5;
         }
       }
     }
@@ -252,7 +294,7 @@ export default function PerfectClassicLudo() {
     if (turnRef.current === 'cafe' && !isBot) return;
 
     setRolling(true);
-    playSfx('roll');
+    playSfx('roll'); // 🎲 Loud Ringing Dice Roll
 
     let counter = 0;
     const timer = setInterval(() => {
@@ -310,7 +352,6 @@ export default function PerfectClassicLudo() {
     }
   };
 
-  // 🐢 धीमा चलना (Slow 300ms Step-by-Step)
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
     if (!hasRolledRef.current || rollValue === null || isAnimatingMoveRef.current) {
       return toast.error("पहले पासा फेंकें! 🎲");
@@ -367,6 +408,7 @@ export default function PerfectClassicLudo() {
 
     setIsAnimatingMove(false);
 
+    // 🏆 खेल खत्म होने पर ही विनर तय होगा (कोई लीकेज नहीं)
     const homeCount = updated.filter(t => t.owner === turnRef.current && t.step === 56).length;
     if (homeCount === 2) {
       const winningSide = turnRef.current;
@@ -444,13 +486,11 @@ export default function PerfectClassicLudo() {
     return [7, 7];
   };
 
-  const isNearWin = tokens.some(t => t.owner === 'player' && t.step >= 52);
-
   return (
     <div className="min-h-screen bg-[#07080c] text-white flex flex-col justify-between items-center p-2 sm:p-4 select-none font-sans">
       <Toaster position="top-center" />
 
-      {/* 🥟 स्पेशल लॉगिन बॉक्स */}
+      {/* 🥟 लॉगिन बॉक्स */}
       <AnimatePresence>
         {!isCustomerVerified && (
           <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
@@ -537,9 +577,9 @@ export default function PerfectClassicLudo() {
         </div>
       </header>
 
-      {/* HUD CARDS */}
+      {/* HUD CARDS (बिना किसी प्रीमेच्योर विनर लीक के) */}
       <div className="w-full max-w-md grid grid-cols-2 gap-3 my-2 shrink-0">
-        {/* CAFE (YELLOW - TOP RIGHT PLAYER) */}
+        {/* CAFE (TOP) */}
         <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'cafe' ? 'bg-[#ffc20e] text-black border-white shadow-[0_0_20px_rgba(255,194,14,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
           <div className="flex items-center gap-2">
             <Bot size={18} />
@@ -551,13 +591,8 @@ export default function PerfectClassicLudo() {
           <span className="w-3 h-3 rounded-full bg-yellow-400 border border-black" />
         </div>
 
-        {/* CUSTOMER (RED - BOTTOM LEFT PLAYER) */}
-        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all relative overflow-hidden ${turn === 'player' ? 'bg-[#ed1c24] text-white border-white shadow-[0_0_20px_rgba(237,28,36,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
-          {isNearWin && (
-            <span className="absolute top-1 right-2 text-[8px] bg-yellow-400 text-black px-1 rounded font-black uppercase flex items-center gap-0.5 animate-bounce">
-              <Flame size={9} fill="currentColor" /> Winning!
-            </span>
-          )}
+        {/* CUSTOMER (BOTTOM) */}
+        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'player' ? 'bg-[#ed1c24] text-white border-white shadow-[0_0_20px_rgba(237,28,36,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
           <div className="flex items-center gap-2">
             <User size={18} />
             <div>
@@ -616,7 +651,7 @@ export default function PerfectClassicLudo() {
         )}
       </AnimatePresence>
 
-      {/* 🎯 शुद्ध गणितीय 15×15 SVG बोर्ड (सारे खाने 100% एक बराबर साइज के) */}
+      {/* 🎯 15×15 EXACT SVG BOARD */}
       <div className="w-full max-w-[420px] aspect-square bg-white border-[6px] border-[#000] shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto">
         <svg viewBox="0 0 15 15" className="w-full h-full block">
           {/* 1. बैकग्राउंड ग्रिड सेल्स (1.0 × 1.0 के 100% बराबर चौकोर खाने) */}
@@ -665,7 +700,7 @@ export default function PerfectClassicLudo() {
             })
           )}
 
-          {/* 2. चारों कोनों के घर (Exact 6×6 Units) */}
+          {/* 2. बेस (Bases) */}
           {/* Top-Left Green Base */}
           <rect x="0" y="0" width="6" height="6" fill="#00a651" stroke="#000" strokeWidth="0.04" />
           <rect x="1" y="1" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
@@ -700,7 +735,7 @@ export default function PerfectClassicLudo() {
           <circle cx="11" cy="13" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
           <circle cx="13" cy="13" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
 
-          {/* 3. बीच के 4 तिकोने (Home Center - Exact 3×3 Box) */}
+          {/* 3. बीच के 4 तिकोने (Home Center) */}
           <polygon points="6,6 9,6 7.5,7.5" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
           <polygon points="9,6 9,9 7.5,7.5" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
           <polygon points="6,9 9,9 7.5,7.5" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
@@ -765,7 +800,7 @@ export default function PerfectClassicLudo() {
         })}
       </div>
 
-      {/* FOOTER CONTROLS & DICE BUTTON */}
+      {/* FOOTER CONTROLS & LOUD DICE BUTTON */}
       <footer className="w-full max-w-md bg-neutral-900/90 border border-white/10 rounded-3xl p-3 flex justify-between items-center shadow-2xl shrink-0 mt-2">
         <div>
           <span className="text-[10px] text-neutral-400 font-bold uppercase block">किसकी चाल:</span>
@@ -780,7 +815,7 @@ export default function PerfectClassicLudo() {
           </span>
         </div>
 
-        {/* 🎲 3D DICE BUTTON */}
+        {/* 🎲 3D DICE BUTTON WITH LOUD RING */}
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => handleRollDice(false)}
@@ -788,7 +823,7 @@ export default function PerfectClassicLudo() {
           className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center font-mono font-black text-3xl shadow-xl transition-all ${
             hasRolled || turn !== 'player' || isAnimatingMove
               ? 'bg-neutral-800 border-neutral-700 text-neutral-500 cursor-not-allowed'
-              : 'bg-[#ed1c24] border-white text-white shadow-[0_0_20px_rgba(237,28,36,0.4)] animate-pulse cursor-pointer'
+              : 'bg-[#ed1c24] border-white text-white shadow-[0_0_20px_rgba(237,28,36,0.5)] animate-pulse cursor-pointer'
           }`}
         >
           {rolling ? (
