@@ -1,115 +1,87 @@
 'use client';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Sparkles, User, CheckCircle2 } from 'lucide-react';
+import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Sparkles, Bot, User, CheckCircle2, Gift } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
-type PlayerColor = 'red' | 'green' | 'yellow' | 'blue';
+type Player = 'player' | 'cafe'; // player = Red, cafe = Yellow
 
 interface Token {
   id: number;
-  color: PlayerColor;
-  slotIndex: number; // 0, 1, 2, 3
-  step: number; // -1 = Base, 0 to 50 = Main Track, 51 to 55 = Home Runway, 56 = Home (Finished)
+  owner: Player;
+  slotIndex: number;
+  step: number; // -1 = Base, 0 to 50 = Track, 51 to 55 = Runway, 56 = Home
 }
 
-// 15x15 Ludo Board का सटीक 52 मेन-ट्रैक कोऑर्डिनेट्स [row, col] (0-indexed)
+// 15x15 ट्रैक कोऑर्डिनेट्स
 const BOARD_PATH: [number, number][] = [
-  // Red side start & up
   [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
   [5, 6], [4, 6], [3, 6], [2, 6], [1, 6], [0, 6],
-  [0, 7], // Top junction
-  // Green side down
+  [0, 7],
   [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8],
   [6, 9], [6, 10], [6, 11], [6, 12], [6, 13], [6, 14],
-  [7, 14], // Right junction
-  // Yellow side left
+  [7, 14],
   [8, 14], [8, 13], [8, 12], [8, 11], [8, 10], [8, 9],
   [9, 8], [10, 8], [11, 8], [12, 8], [13, 8], [14, 8],
-  [14, 7], // Bottom junction
-  // Blue side up
+  [14, 7],
   [14, 6], [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
   [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
-  [7, 0], // Left junction
-  [6, 0]  // Red entrance
+  [7, 0], [6, 0]
 ];
 
-const START_OFFSETS: Record<PlayerColor, number> = {
-  red: 0,
-  green: 13,
-  yellow: 26,
-  blue: 39
+const START_OFFSETS = { player: 0, cafe: 26 };
+
+const RUNWAYS = {
+  player: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],
+  cafe: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]]
 };
 
-// 4 रंगों के Home Runways (जीत की ओर जाने वाले 5 खाने)
-const HOME_RUNWAYS: Record<PlayerColor, [number, number][]> = {
-  red: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],
-  green: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]],
-  yellow: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]],
-  blue: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]]
+const BASE_POCKETS = {
+  player: [[2, 2], [2, 3], [3, 2], [3, 3]],
+  cafe: [[11, 11], [11, 12], [12, 11], [12, 12]]
 };
 
-// 4 घरों (Bases) के अंदर 4 गोल खानों की सटीक जगह
-const BASE_POCKETS: Record<PlayerColor, [number, number][]> = {
-  red: [[2, 2], [2, 3], [3, 2], [3, 3]],
-  green: [[2, 11], [2, 12], [3, 11], [3, 12]],
-  yellow: [[11, 11], [11, 12], [12, 11], [12, 12]],
-  blue: [[11, 2], [11, 3], [12, 2], [12, 3]]
-};
-
-// सुरक्षित खाने (Stars)
 const STAR_COORDS: [number, number][] = [
   [6, 1], [2, 6], [1, 8], [6, 12], [8, 13], [12, 8], [13, 6], [8, 2]
 ];
 
-const COLOR_THEMES: Record<PlayerColor, { name: string; bg: string; border: string; hex: string; text: string }> = {
-  red: { name: 'Red', bg: 'bg-rose-500', border: 'border-rose-600', hex: '#e11d48', text: 'text-rose-500' },
-  green: { name: 'Green', bg: 'bg-emerald-500', border: 'border-emerald-600', hex: '#10b981', text: 'text-emerald-500' },
-  yellow: { name: 'Yellow', bg: 'bg-amber-400', border: 'border-amber-500', hex: '#fbbf24', text: 'text-amber-400' },
-  blue: { name: 'Blue', bg: 'bg-sky-500', border: 'border-sky-600', hex: '#0284c7', text: 'text-sky-500' }
+// 🎁 रिवॉर्ड्स का बिज़नेस लॉजिक (25% कस्टमर विनिंग में से डिस्ट्रीब्यूशन)
+const getRandomReward = () => {
+  const rand = Math.random() * 100;
+  if (rand < 4) return "1x Pizza (Small Size) 🍕";
+  if (rand < 8) return "1x Grilled Sandwich 🥪";
+  if (rand < 12) return "1x Manchurian Dry 🥟";
+  if (rand < 16) return "1x Manchurian Fried Rice 🍚";
+  if (rand < 36) return "₹20 Flat Off Token 💵";
+  return "₹10 Flat Off Token 🎟️";
 };
 
-const PLAYERS: PlayerColor[] = ['red', 'green', 'yellow', 'blue'];
-
-export default function PerfectLudo() {
-  const [activeIdx, setActiveIdx] = useState(0);
+export default function LudoVersusCafe() {
+  const [turn, setTurn] = useState<Player>('player');
   const [dice, setDice] = useState<number>(6);
   const [rolling, setRolling] = useState(false);
   const [hasRolled, setHasRolled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [winner, setWinner] = useState<PlayerColor | null>(null);
-
-  // क्लेम रिवॉर्ड स्टेट्स
-  const [claimedPhone, setClaimedPhone] = useState('');
+  
+  // गेम का नतीजा पहले से तय (75% Cafe Winner, 25% Player Winner)
+  const [targetWinner] = useState<Player>(() => Math.random() < 0.75 ? 'cafe' : 'player');
+  const [winner, setWinner] = useState<Player | null>(null);
+  const [rewardWon, setRewardWon] = useState<string>('');
   const [voucherCode, setVoucherCode] = useState('');
+  const [claimedPhone, setClaimedPhone] = useState('');
   const [savingReward, setSavingReward] = useState(false);
 
-  // 16 टोकन (हर रंग के 4)
+  // 2-2 गोटियां (ताकि कैफे में 3-5 मिनट में गेम खत्म हो जाए और कस्टमर बोर न हो)
   const [tokens, setTokens] = useState<Token[]>([
-    { id: 1, color: 'red', slotIndex: 0, step: -1 },
-    { id: 2, color: 'red', slotIndex: 1, step: -1 },
-    { id: 3, color: 'red', slotIndex: 2, step: -1 },
-    { id: 4, color: 'red', slotIndex: 3, step: -1 },
-    { id: 5, color: 'green', slotIndex: 0, step: -1 },
-    { id: 6, color: 'green', slotIndex: 1, step: -1 },
-    { id: 7, color: 'green', slotIndex: 2, step: -1 },
-    { id: 8, color: 'green', slotIndex: 3, step: -1 },
-    { id: 9, color: 'yellow', slotIndex: 0, step: -1 },
-    { id: 10, color: 'yellow', slotIndex: 1, step: -1 },
-    { id: 11, color: 'yellow', slotIndex: 2, step: -1 },
-    { id: 12, color: 'yellow', slotIndex: 3, step: -1 },
-    { id: 13, color: 'blue', slotIndex: 0, step: -1 },
-    { id: 14, color: 'blue', slotIndex: 1, step: -1 },
-    { id: 15, color: 'blue', slotIndex: 2, step: -1 },
-    { id: 16, color: 'blue', slotIndex: 3, step: -1 }
+    { id: 1, owner: 'player', slotIndex: 0, step: -1 },
+    { id: 2, owner: 'player', slotIndex: 1, step: -1 },
+    { id: 3, owner: 'cafe', slotIndex: 0, step: -1 },
+    { id: 4, owner: 'cafe', slotIndex: 1, step: -1 },
   ]);
 
-  const currentColor = PLAYERS[activeIdx];
-
-  // साउंड इफ़ेक्ट्स जनरेटर (Web Audio API - बिना किसी बाहरी mp3 के)
   const playSfx = (type: 'roll' | 'step' | 'cut' | 'win') => {
     if (!soundEnabled || typeof window === 'undefined') return;
     try {
@@ -121,19 +93,19 @@ export default function PerfectLudo() {
 
       if (type === 'roll') {
         osc.frequency.setValueAtTime(300, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(700, ctx.currentTime + 0.15);
+        osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.12);
         gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-        osc.start(); osc.stop(ctx.currentTime + 0.15);
+        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+        osc.start(); osc.stop(ctx.currentTime + 0.12);
       } else if (type === 'step') {
-        osc.frequency.setValueAtTime(520, ctx.currentTime);
+        osc.frequency.setValueAtTime(540, ctx.currentTime);
         gain.gain.setValueAtTime(0.15, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.08);
         osc.start(); osc.stop(ctx.currentTime + 0.08);
       } else if (type === 'cut') {
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(250, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(120, ctx.currentTime + 0.25);
+        osc.frequency.setValueAtTime(260, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.25);
         gain.gain.setValueAtTime(0.3, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.25);
         osc.start(); osc.stop(ctx.currentTime + 0.25);
@@ -141,9 +113,33 @@ export default function PerfectLudo() {
     } catch (e) {}
   };
 
-  // डाइस रोल लॉजिक
-  const handleRollDice = () => {
+  // 🎲 स्मार्ट पासा (Algorithm जो 75% बार Cafe को जिताता है)
+  const getBiasedDiceRoll = (playerTurn: Player): number => {
+    const raw = Math.floor(Math.random() * 6) + 1;
+    
+    // अगर कैफे को जिताना तय है
+    if (targetWinner === 'cafe') {
+      if (playerTurn === 'cafe') {
+        // कैफे को अक्सर 6 या अच्छे नंबर मिलेंगे
+        const cafeTokens = tokens.filter(t => t.owner === 'cafe');
+        const inBase = cafeTokens.some(t => t.step === -1);
+        if (inBase && Math.random() < 0.6) return 6; // 60% चांस बेस से 6 मिलने का
+        if (Math.random() < 0.5) return Math.random() < 0.5 ? 5 : 6;
+      } else {
+        // कस्टमर को 6 कम मिलेंगे
+        const playerTokens = tokens.filter(t => t.owner === 'player');
+        const inBase = playerTokens.every(t => t.step === -1);
+        if (inBase && Math.random() < 0.7) return Math.floor(Math.random() * 5) + 1; // 6 आने में देरी
+      }
+    }
+
+    return raw;
+  };
+
+  // डाइस रोल करना
+  const handleRollDice = (isBot = false) => {
     if (rolling || hasRolled || winner) return;
+    if (turn === 'cafe' && !isBot) return; // बोट की चाल में यूजर क्लिक नहीं कर सकता
 
     setRolling(true);
     playSfx('roll');
@@ -152,76 +148,78 @@ export default function PerfectLudo() {
     const timer = setInterval(() => {
       setDice(Math.floor(Math.random() * 6) + 1);
       counter++;
-      if (counter > 10) {
+      if (counter > 8) {
         clearInterval(timer);
-        const finalVal = Math.floor(Math.random() * 6) + 1;
+        const finalVal = getBiasedDiceRoll(turn);
         setDice(finalVal);
         setRolling(false);
         setHasRolled(true);
-        evaluateMoves(finalVal);
+        postRollEvaluation(finalVal, turn);
       }
     }, 45);
   };
 
-  // ऑटो चेक: क्या खिलाड़ी चल सकता है?
-  const evaluateMoves = (roll: number) => {
-    const myTokens = tokens.filter(t => t.color === currentColor);
+  // रोल के बाद चेक करना
+  const postRollEvaluation = (rollVal: number, currentTurn: Player) => {
+    const myTokens = tokens.filter(t => t.owner === currentTurn);
     const movable = myTokens.filter(t => {
-      if (t.step === -1 && roll === 6) return true;
-      if (t.step >= 0 && t.step + roll <= 56) return true;
+      if (t.step === -1 && rollVal === 6) return true;
+      if (t.step >= 0 && t.step + rollVal <= 56) return true;
       return false;
     });
 
     if (movable.length === 0) {
-      toast('कोई चाल संभव नहीं! ⏭️', { duration: 1200 });
-      setTimeout(() => nextPlayer(false), 1000);
-    } else if (movable.length === 1 && movable[0].step === -1 && roll === 6) {
-      // अगर सिर्फ एक गोटी बेस में है और 6 आया, तो तुरंत बाहर निकालें
-      setTimeout(() => handleMoveToken(movable[0], roll), 400);
+      setTimeout(() => switchTurn(false), 900);
+    } else if (currentTurn === 'cafe') {
+      // 🤖 बोट का ऑटो मूव
+      setTimeout(() => {
+        // स्मार्ट चॉइस: अगर किसी को काट सकता है तो पहले उसे चलो
+        const killMove = movable.find(t => {
+          const targetStep = t.step === -1 ? 0 : t.step + rollVal;
+          const targetGlobal = (START_OFFSETS.cafe + targetStep) % 52;
+          return tokens.some(other => other.owner === 'player' && other.step >= 0 && other.step < 51 && (START_OFFSETS.player + other.step) % 52 === targetGlobal);
+        });
+
+        handleMoveToken(killMove || movable[0], rollVal);
+      }, 700);
+    } else if (movable.length === 1 && movable[0].step === -1 && rollVal === 6) {
+      setTimeout(() => handleMoveToken(movable[0], rollVal), 400);
     }
   };
 
-  // गोटी मूव करने का कोर लॉजिक
+  // गोटी चलना
   const handleMoveToken = (token: Token, rollValue: number = dice) => {
-    if (!hasRolled || token.color !== currentColor || winner) return;
+    if (!hasRolled || token.owner !== turn || winner) return;
 
     let targetStep = token.step;
-
     if (token.step === -1) {
       if (rollValue === 6) targetStep = 0;
       else return toast.error("बाहर निकलने के लिए 6 चाहिए!");
     } else {
-      if (token.step + rollValue > 56) {
-        return toast.error("होम पहुंचने के लिए सही अंक चाहिए!");
-      }
+      if (token.step + rollValue > 56) return toast.error("घर पहुंचने के लिए सही अंक चाहिए!");
       targetStep = token.step + rollValue;
     }
 
     playSfx('step');
 
-    // ग्लोबल पोजीशन की गणना
-    const getBoardPos = (c: PlayerColor, s: number) => {
+    const getGlobal = (p: Player, s: number) => {
       if (s < 0 || s >= 51) return -1;
-      return (START_OFFSETS[c] + s) % 52;
+      return (START_OFFSETS[p] + s) % 52;
     };
 
     let updated = tokens.map(t => t.id === token.id ? { ...t, step: targetStep } : t);
-
-    // ⚔️ गोटी काटना
-    const currentGlobal = getBoardPos(currentColor, targetStep);
+    const myGlobal = getGlobal(turn, targetStep);
     let captured = false;
 
-    if (currentGlobal !== -1) {
-      const safeIndices = [0, 8, 13, 21, 26, 34, 39, 47];
-      if (!safeIndices.includes(currentGlobal)) {
+    if (myGlobal !== -1) {
+      const safe = [0, 8, 13, 21, 26, 34, 39, 47];
+      if (!safe.includes(myGlobal)) {
         updated = updated.map(t => {
-          if (t.color !== currentColor && t.step >= 0 && t.step < 51) {
-            if (getBoardPos(t.color, t.step) === currentGlobal) {
-              captured = true;
-              playSfx('cut');
-              toast.success(`💥 ${currentColor.toUpperCase()} ने ${t.color.toUpperCase()} को काटा!`);
-              return { ...t, step: -1 };
-            }
+          if (t.owner !== turn && t.step >= 0 && t.step < 51 && getGlobal(t.owner, t.step) === myGlobal) {
+            captured = true;
+            playSfx('cut');
+            toast.success(`💥 ${turn === 'player' ? 'आपने' : 'Bum Bum Cafe ने'} गोटी काटी!`);
+            return { ...t, step: -1 };
           }
           return t;
         });
@@ -231,32 +229,44 @@ export default function PerfectLudo() {
     setTokens(updated);
     setHasRolled(false);
 
-    // जीत की जांच
-    const homeCount = updated.filter(t => t.color === currentColor && t.step === 56).length;
-    if (homeCount === 4) {
-      setWinner(currentColor);
-      const code = `BOM-LUDO-${Math.floor(1000 + Math.random() * 9000)}`;
-      setVoucherCode(code);
-      confetti({ particleCount: 200, spread: 90, origin: { y: 0.5 } });
-      toast.success(`👑 बधाई! ${currentColor.toUpperCase()} जीत गया!`);
+    // जीत का फैसला (दोनों गोटियां अंदर)
+    const homeCount = updated.filter(t => t.owner === turn && t.step === 56).length;
+    if (homeCount === 2) {
+      setWinner(turn);
+      if (turn === 'player') {
+        const reward = getRandomReward();
+        const code = `BOM-${Math.floor(1000 + Math.random() * 9000)}`;
+        setRewardWon(reward);
+        setVoucherCode(code);
+        confetti({ particleCount: 200, spread: 90 });
+        toast.success(`🎉 बधाई हो! आप जीत गए: ${reward}`);
+      } else {
+        toast.error("😢 Bum Bum Cafe जीत गया! Better luck next time!");
+      }
       return;
     }
 
-    // 6 आने पर या गोटी काटने पर दोबारा चाल
     if (rollValue === 6 || captured) {
-      toast(rollValue === 6 ? '6 आया! फिर से चलें 🎯' : 'गोटी काटी! बोनस चाल ⚔️', { duration: 1500 });
+      if (turn === 'cafe') {
+        setTimeout(() => handleRollDice(true), 800);
+      }
     } else {
-      nextPlayer(false);
+      switchTurn(false);
     }
   };
 
-  const nextPlayer = (extra = false) => {
+  const switchTurn = (extra = false) => {
     setHasRolled(false);
     if (!extra) {
-      setActiveIdx(prev => (prev + 1) % 4);
+      const next = turn === 'player' ? 'cafe' : 'player';
+      setTurn(next);
+      if (next === 'cafe') {
+        setTimeout(() => handleRollDice(true), 900);
+      }
     }
   };
 
+  // इनाम सेव करना
   const handleClaimReward = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = claimedPhone.replace(/\D/g, '').slice(-10);
@@ -266,11 +276,11 @@ export default function PerfectLudo() {
     try {
       await setDoc(doc(db, "customer_points", clean), {
         phone: clean,
-        lastPrizeWon: "1x Free Cold Coffee / 20% OFF (Ludo Winner)",
+        lastPrizeWon: rewardWon,
         voucherCode: voucherCode,
         voucherClaimed: false,
         lastPlayedAt: new Date(),
-        importSource: 'LudoGame'
+        importSource: 'Ludo1v1'
       }, { merge: true });
 
       toast.success("🎉 इनाम आपके नंबर पर लॉक हो गया! काउंटर पर नंबर बताएं।");
@@ -281,139 +291,140 @@ export default function PerfectLudo() {
     }
   };
 
-  // ग्रिड कोऑर्डिनेट हेल्पर
   const getTokenCoords = (t: Token): [number, number] => {
-    if (t.step === -1) {
-      return BASE_POCKETS[t.color][t.slotIndex];
-    }
+    if (t.step === -1) return BASE_POCKETS[t.owner][t.slotIndex];
     if (t.step >= 0 && t.step < 51) {
-      const idx = (START_OFFSETS[t.color] + t.step) % 52;
+      const idx = (START_OFFSETS[t.owner] + t.step) % 52;
       return BOARD_PATH[idx];
     }
     if (t.step >= 51 && t.step < 56) {
-      return HOME_RUNWAYS[t.color][t.step - 51];
+      return RUNWAYS[t.owner][t.step - 51];
     }
-    return [7, 7]; // Center Home
+    return [7, 7];
   };
 
   return (
-    <div className="min-h-screen bg-[#0d0e12] text-white flex flex-col justify-between items-center p-3 select-none font-sans">
+    <div className="min-h-screen bg-[#0c0d12] text-white flex flex-col justify-between items-center p-3 select-none font-sans">
       <Toaster position="top-center" />
 
       {/* HEADER */}
-      <header className="w-full max-w-xl flex justify-between items-center py-2 px-3 border-b border-white/10 shrink-0">
+      <header className="w-full max-w-lg flex justify-between items-center py-2 px-3 border-b border-white/10 shrink-0">
         <button onClick={() => window.history.back()} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
           <ArrowLeft size={18} />
         </button>
         <div className="text-center">
-          <h1 className="text-lg font-black tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500">
-            BUM BUM CAFE LUDO
+          <h1 className="text-base sm:text-lg font-black tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-amber-400 to-yellow-500">
+            BUM BUM CAFE 1v1 LUDO
           </h1>
-          <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Classic Cafe Arena</p>
+          <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Customer vs Cafe Bot</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300">
             {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
-          <button onClick={() => { setTokens(tokens.map(t => ({ ...t, step: -1 }))); setWinner(null); setHasRolled(false); }} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300">
+          <button onClick={() => { setTokens(tokens.map(t => ({ ...t, step: -1 }))); setWinner(null); setHasRolled(false); setTurn('player'); }} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300">
             <RefreshCw size={18} />
           </button>
         </div>
       </header>
 
-      {/* 4 PLAYERS TOP HUD */}
-      <div className="w-full max-w-md grid grid-cols-4 gap-2 my-2 shrink-0">
-        {PLAYERS.map((col, idx) => {
-          const isActive = idx === activeIdx;
-          const theme = COLOR_THEMES[col];
-          const finished = tokens.filter(t => t.color === col && t.step === 56).length;
-
-          return (
-            <div
-              key={col}
-              className={`p-2 rounded-2xl border text-center transition-all ${
-                isActive
-                  ? `${theme.bg} text-white border-white shadow-lg scale-105 ring-2 ring-white/50`
-                  : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'
-              }`}
-            >
-              <p className="text-[10px] font-black uppercase tracking-wider">{theme.name}</p>
-              <p className="text-xs font-mono font-bold mt-0.5">{finished}/4 In</p>
+      {/* 2 PLAYERS HUD CARD */}
+      <div className="w-full max-w-md grid grid-cols-2 gap-3 my-2 shrink-0">
+        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'player' ? 'bg-rose-500 text-white border-white shadow-[0_0_20px_rgba(244,63,94,0.4)] scale-102 ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
+          <div className="flex items-center gap-2">
+            <User size={18} />
+            <div>
+              <p className="text-xs font-black uppercase">You (ग्राहक)</p>
+              <p className="text-[10px] font-mono">{tokens.filter(t => t.owner === 'player' && t.step === 56).length}/2 In</p>
             </div>
-          );
-        })}
+          </div>
+          <span className="w-3 h-3 rounded-full bg-rose-400 border border-white" />
+        </div>
+
+        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'cafe' ? 'bg-amber-500 text-black border-white shadow-[0_0_20px_rgba(245,158,11,0.4)] scale-102 ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
+          <div className="flex items-center gap-2">
+            <Bot size={18} />
+            <div>
+              <p className="text-xs font-black uppercase">Bum Bum Cafe ☕</p>
+              <p className="text-[10px] font-mono">{tokens.filter(t => t.owner === 'cafe' && t.step === 56).length}/2 In</p>
+            </div>
+          </div>
+          <span className="w-3 h-3 rounded-full bg-amber-400 border border-black" />
+        </div>
       </div>
 
-      {/* WINNER MODAL */}
+      {/* WINNER POPUP */}
       <AnimatePresence>
         {winner && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-neutral-900 border-2 border-amber-400 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
-              <div className="w-16 h-16 bg-amber-400/20 text-amber-400 rounded-full mx-auto flex items-center justify-center">
-                <Trophy size={36} />
-              </div>
-              <h2 className="text-2xl font-black uppercase text-amber-400">{COLOR_THEMES[winner].name} WINS!</h2>
-              <p className="text-xs text-neutral-300 font-bold">🎉 बधाई हो! आपको कैफ़े से मुफ़्त इनाम मिलता है।</p>
-              
-              <div className="bg-white/5 border border-amber-400/30 p-3 rounded-2xl">
-                <p className="text-[10px] font-black uppercase text-neutral-400">Voucher Code:</p>
-                <p className="text-xl font-mono font-black text-amber-400 tracking-wider mt-1">{voucherCode}</p>
-              </div>
+              {winner === 'player' ? (
+                <>
+                  <div className="w-16 h-16 bg-amber-400/20 text-amber-400 rounded-full mx-auto flex items-center justify-center">
+                    <Gift size={36} />
+                  </div>
+                  <h2 className="text-2xl font-black uppercase text-amber-400">YOU WON! 🎉</h2>
+                  <p className="text-xs text-neutral-300 font-bold">बधाई हो! आपने लूडो में जीता है:</p>
+                  
+                  <div className="bg-amber-500/10 border-2 border-amber-400 p-3 rounded-2xl">
+                    <p className="text-base font-black text-amber-300">{rewardWon}</p>
+                    <p className="text-xs font-mono text-neutral-400 mt-1">Voucher: <span className="text-white font-bold">{voucherCode}</span></p>
+                  </div>
 
-              <form onSubmit={handleClaimReward} className="space-y-3 pt-2">
-                <input 
-                  type="tel" 
-                  maxLength={10} 
-                  required 
-                  placeholder="अपना 10-अंकों का फ़ोन नंबर डालें" 
-                  value={claimedPhone} 
-                  onChange={e => setClaimedPhone(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3 py-2.5 text-center text-sm font-mono font-bold text-white outline-none focus:border-amber-400"
-                />
-                <button type="submit" disabled={savingReward} className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-black font-black uppercase text-xs rounded-xl shadow-lg transition-all">
-                  {savingReward ? 'सेव हो रहा है...' : 'इनाम लॉक करें (Claim Reward)'}
-                </button>
-              </form>
+                  <form onSubmit={handleClaimReward} className="space-y-3 pt-2">
+                    <input 
+                      type="tel" 
+                      maxLength={10} 
+                      required 
+                      placeholder="अपना 10-अंकों का फ़ोन नंबर डालें" 
+                      value={claimedPhone} 
+                      onChange={e => setClaimedPhone(e.target.value.replace(/\D/g, ''))}
+                      className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3 py-2.5 text-center text-sm font-mono font-bold text-white outline-none focus:border-amber-400"
+                    />
+                    <button type="submit" disabled={savingReward} className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-black font-black uppercase text-xs rounded-xl shadow-lg transition-all">
+                      {savingReward ? 'सेव हो रहा है...' : 'काउंटर के लिए लॉक करें (Claim)'}
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 bg-rose-500/20 text-rose-500 rounded-full mx-auto flex items-center justify-center">
+                    <Bot size={36} />
+                  </div>
+                  <h2 className="text-xl font-black uppercase text-rose-400">CAFE WON! ☕</h2>
+                  <p className="text-xs text-neutral-300 font-bold">इस बार Bum Bum Cafe जीत गया! अगली बार फिर कोशिश करें।</p>
+                  <button onClick={() => { setTokens(tokens.map(t => ({ ...t, step: -1 }))); setWinner(null); setTurn('player'); }} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-black uppercase text-xs rounded-xl transition-all">
+                    Play Again (दोबारा खेलें)
+                  </button>
+                </>
+              )}
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* 🎯 15×15 PERFECT SVG / CSS GRID LUDO BOARD */}
-      <div className="w-full max-w-[420px] aspect-square bg-[#fff] border-[6px] border-[#20222a] rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto p-1">
+      {/* 🎯 15×15 ASYMMETRICAL 1v1 BOARD */}
+      <div className="w-full max-w-[420px] aspect-square bg-[#fff] border-[6px] border-[#222] rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto p-1">
         
-        {/* CSS GRID CELLS (15x15 = 225 Cells) */}
+        {/* ग्रिड सेल्स */}
         <div className="w-full h-full grid grid-cols-15 grid-rows-15">
           {Array.from({ length: 15 }).map((_, r) =>
             Array.from({ length: 15 }).map((_, c) => {
-              // 4 कोनों के बड़े रंगीन घर (Bases)
-              if (r < 6 && c < 6) return null; // Red Base Area
-              if (r < 6 && c > 8) return null; // Green Base Area
-              if (r > 8 && c > 8) return null; // Yellow Base Area
-              if (r > 8 && c < 6) return null; // Blue Base Area
+              if (r < 6 && c < 6) return null; // Red Base
+              if (r < 6 && c > 8) return null; // Green (Empty/Gray)
+              if (r > 8 && c > 8) return null; // Yellow Base (Cafe)
+              if (r > 8 && c < 6) return null; // Blue (Empty/Gray)
+              if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return null; // Center
 
-              // सेंटर होम ज़ोन
-              if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return null;
-
-              // रंगीन Home Runways
               const isRedRunway = r === 7 && c >= 1 && c <= 5;
-              const isGreenRunway = c === 7 && r >= 1 && r <= 5;
               const isYellowRunway = r === 7 && c >= 9 && c <= 13;
-              const isBlueRunway = c === 7 && r >= 9 && r <= 13;
-
-              // शुरुआती खाने (Start Boxes)
               const isRedStart = r === 6 && c === 1;
-              const isGreenStart = r === 1 && c === 8;
               const isYellowStart = r === 8 && c === 13;
-              const isBlueStart = r === 13 && c === 6;
-
               const isStar = STAR_COORDS.some(([sr, sc]) => sr === r && sc === c);
 
               let bg = 'bg-white';
               if (isRedRunway || isRedStart) bg = 'bg-rose-500';
-              if (isGreenRunway || isGreenStart) bg = 'bg-emerald-500';
               if (isYellowRunway || isYellowStart) bg = 'bg-amber-400';
-              if (isBlueRunway || isBlueStart) bg = 'bg-sky-500';
 
               return (
                 <div
@@ -421,63 +432,52 @@ export default function PerfectLudo() {
                   style={{ gridRowStart: r + 1, gridColumnStart: c + 1 }}
                   className={`border-[0.5px] border-neutral-300 relative flex items-center justify-center ${bg}`}
                 >
-                  {isStar && (
-                    <span className={`text-[11px] font-black ${bg === 'bg-white' ? 'text-neutral-400' : 'text-white'}`}>
-                      ★
-                    </span>
-                  )}
+                  {isStar && <span className={`text-[11px] font-black ${bg === 'bg-white' ? 'text-neutral-400' : 'text-white'}`}>★</span>}
                 </div>
               );
             })
           )}
         </div>
 
-        {/* 4 SOLID BASES WITH WHITE POCKET PLATES */}
-        {/* RED BASE */}
+        {/* 🔴 RED BASE (PLAYER) */}
         <div className="absolute top-1 left-1 w-[40%] h-[40%] bg-rose-500 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
           <div className="w-full h-full bg-white rounded-xl shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
-            {[0, 1, 2, 3].map(i => <div key={i} className="rounded-full bg-rose-100 border border-rose-300 flex items-center justify-center" />)}
+            {[0, 1].map(i => <div key={i} className="rounded-full bg-rose-100 border border-rose-300 flex items-center justify-center" />)}
+            <div className="col-span-2 text-center text-[10px] font-black text-rose-600 uppercase">You (Player)</div>
           </div>
         </div>
 
-        {/* GREEN BASE */}
-        <div className="absolute top-1 right-1 w-[40%] h-[40%] bg-emerald-500 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
-          <div className="w-full h-full bg-white rounded-xl shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
-            {[0, 1, 2, 3].map(i => <div key={i} className="rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center" />)}
-          </div>
-        </div>
-
-        {/* YELLOW BASE */}
+        {/* 🟡 YELLOW BASE (CAFE BOT) */}
         <div className="absolute bottom-1 right-1 w-[40%] h-[40%] bg-amber-400 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
           <div className="w-full h-full bg-white rounded-xl shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
-            {[0, 1, 2, 3].map(i => <div key={i} className="rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center" />)}
+            {[0, 1].map(i => <div key={i} className="rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center" />)}
+            <div className="col-span-2 text-center text-[10px] font-black text-amber-700 uppercase">Bum Bum Cafe</div>
           </div>
         </div>
 
-        {/* BLUE BASE */}
-        <div className="absolute bottom-1 left-1 w-[40%] h-[40%] bg-sky-500 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
-          <div className="w-full h-full bg-white rounded-xl shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
-            {[0, 1, 2, 3].map(i => <div key={i} className="rounded-full bg-sky-100 border border-sky-300 flex items-center justify-center" />)}
-          </div>
+        {/* INACTIVE CORNERS (MUTED) */}
+        <div className="absolute top-1 right-1 w-[40%] h-[40%] bg-neutral-100 rounded-2xl p-2.5 flex items-center justify-center opacity-40 border border-neutral-300">
+          <span className="text-[10px] font-bold text-neutral-400 uppercase">Cafe Zone</span>
+        </div>
+        <div className="absolute bottom-1 left-1 w-[40%] h-[40%] bg-neutral-100 rounded-2xl p-2.5 flex items-center justify-center opacity-40 border border-neutral-300">
+          <span className="text-[10px] font-bold text-neutral-400 uppercase">Cafe Zone</span>
         </div>
 
-        {/* 🏆 CENTER TRIANGLES (HOME) */}
+        {/* 🏆 CENTER TRIANGLES */}
         <div className="absolute top-[40%] left-[40%] w-[20%] h-[20%] overflow-hidden">
           <svg viewBox="0 0 100 100" className="w-full h-full">
-            <polygon points="0,0 50,50 0,100" fill="#e11d48" />
-            <polygon points="0,0 50,50 100,0" fill="#10b981" />
-            <polygon points="100,0 50,50 100,100" fill="#fbbf24" />
-            <polygon points="0,100 50,50 100,100" fill="#0284c7" />
+            <polygon points="0,0 50,50 0,100" fill="#f43f5e" />
+            <polygon points="100,0 50,50 100,100" fill="#f59e0b" />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Trophy size={18} className="text-white drop-shadow-md" />
           </div>
         </div>
 
-        {/* ♟️ 16 DYNAMIC 3D TOKENS (PIECES) */}
+        {/* ♟️ 4 DYNAMIC TOKENS */}
         {tokens.map(token => {
           const [r, c] = getTokenCoords(token);
-          const isMyTurn = token.color === currentColor;
+          const isMyTurn = token.owner === turn;
           const canMove = hasRolled && isMyTurn && ((token.step === -1 && dice === 6) || (token.step >= 0 && token.step + dice <= 56));
 
           return (
@@ -495,16 +495,12 @@ export default function PerfectLudo() {
               className="absolute z-30 flex items-center justify-center p-0.5 cursor-pointer"
             >
               <motion.div
-                animate={canMove ? { scale: [1, 1.25, 1], y: [0, -4, 0] } : { scale: 1 }}
+                animate={canMove && turn === 'player' ? { scale: [1, 1.25, 1], y: [0, -4, 0] } : { scale: 1 }}
                 transition={canMove ? { repeat: Infinity, duration: 0.6 } : {}}
                 className={`w-full h-full rounded-full border-2 border-white shadow-[0_4px_8px_rgba(0,0,0,0.5)] flex items-center justify-center relative ${
-                  token.color === 'red' ? 'bg-gradient-to-tr from-rose-700 to-rose-400' :
-                  token.color === 'green' ? 'bg-gradient-to-tr from-emerald-700 to-emerald-400' :
-                  token.color === 'yellow' ? 'bg-gradient-to-tr from-amber-600 to-amber-300' :
-                  'bg-gradient-to-tr from-sky-700 to-sky-400'
-                } ${canMove ? 'ring-2 ring-white shadow-[0_0_12px_#fff]' : ''}`}
+                  token.owner === 'player' ? 'bg-gradient-to-tr from-rose-700 to-rose-400' : 'bg-gradient-to-tr from-amber-600 to-amber-300'
+                } ${canMove && turn === 'player' ? 'ring-2 ring-white shadow-[0_0_12px_#fff]' : ''}`}
               >
-                {/* 3D Inner Cap */}
                 <div className="w-[50%] h-[50%] rounded-full bg-white/40 shadow-inner" />
               </motion.div>
             </motion.div>
@@ -512,28 +508,27 @@ export default function PerfectLudo() {
         })}
       </div>
 
-      {/* FOOTER CONTROLS & 3D DICE */}
+      {/* FOOTER CONTROLS & DICE */}
       <footer className="w-full max-w-md bg-neutral-900/90 border border-white/10 rounded-3xl p-3 flex justify-between items-center shadow-2xl shrink-0 mt-2">
-        <div className="space-y-0.5">
-          <span className="text-[10px] text-neutral-400 font-bold uppercase block">Current Turn:</span>
-          <p className={`text-base font-black uppercase flex items-center gap-1.5 ${COLOR_THEMES[currentColor].text}`}>
-            <span className={`w-3 h-3 rounded-full ${COLOR_THEMES[currentColor].bg}`} />
-            {COLOR_THEMES[currentColor].name} Player
+        <div>
+          <span className="text-[10px] text-neutral-400 font-bold uppercase block">किसकी चाल:</span>
+          <p className={`text-base font-black uppercase flex items-center gap-1.5 ${turn === 'player' ? 'text-rose-500' : 'text-amber-400'}`}>
+            <span className={`w-3 h-3 rounded-full ${turn === 'player' ? 'bg-rose-500' : 'bg-amber-400'}`} />
+            {turn === 'player' ? 'आपकी चाल (Your Turn)' : 'Bum Bum Cafe (Thinking...)'}
           </p>
-          <span className="text-[10px] text-neutral-500 font-bold block">
-            {hasRolled ? '👉 अपनी गोटी पर टैप करें' : 'पासा फेंकने के लिए बटन दबाएं'}
+          <span className="text-[10px] text-neutral-500 font-bold">
+            {turn === 'player' ? (hasRolled ? '👉 अपनी गोटी पर टैप करें' : 'पासा फेंकें') : 'कंप्यूटर खेल रहा है...'}
           </span>
         </div>
 
-        {/* INTERACTIVE 3D DICE */}
         <motion.button
           whileTap={{ scale: 0.9 }}
-          onClick={handleRollDice}
-          disabled={rolling || hasRolled || !!winner}
+          onClick={() => handleRollDice(false)}
+          disabled={rolling || hasRolled || turn !== 'player' || !!winner}
           className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center font-mono font-black text-3xl shadow-xl transition-all ${
-            hasRolled
+            hasRolled || turn !== 'player'
               ? 'bg-neutral-800 border-neutral-700 text-neutral-500 cursor-not-allowed'
-              : `${COLOR_THEMES[currentColor].bg} border-white text-white shadow-[0_0_20px_rgba(255,255,255,0.3)] animate-pulse`
+              : 'bg-rose-500 border-white text-white shadow-[0_0_20px_rgba(244,63,94,0.4)] animate-pulse'
           }`}
         >
           {rolling ? (
