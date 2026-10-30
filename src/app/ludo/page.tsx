@@ -1,13 +1,13 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Flame, Sparkles, Phone, ArrowRight, Loader2 } from 'lucide-react';
+import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Flame, Sparkles, Phone, ArrowRight, Loader2, Swords } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-type Player = 'player' | 'cafe';
+type Player = 'player' | 'cafe'; // player = Red (Bottom-Left), cafe = Yellow (Top-Right)
 
 interface Token {
   id: number;
@@ -16,60 +16,54 @@ interface Token {
   step: number; // -1 = Base, 0 to 50 = Track, 51 to 55 = Runway, 56 = Home
 }
 
-// 15x15 ट्रैक कोऑर्डिनेट्स [row, col]
+// 15x15 ग्रिड के सटीक 52 मुख्य ट्रैक कोऑर्डिनेट्स [row, col]
 const BOARD_PATH: [number, number][] = [
+  // Red Track (Left Arm - Going Up)
   [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
   [5, 6], [4, 6], [3, 6], [2, 6], [1, 6], [0, 6],
-  [0, 7],
+  [0, 7], // Top Corner
+  // Green/Top Track (Going Down)
   [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8],
   [6, 9], [6, 10], [6, 11], [6, 12], [6, 13], [6, 14],
-  [7, 14],
+  [7, 14], // Right Corner
+  // Yellow/Right Track (Going Left)
   [8, 14], [8, 13], [8, 12], [8, 11], [8, 10], [8, 9],
   [9, 8], [10, 8], [11, 8], [12, 8], [13, 8], [14, 8],
-  [14, 7],
+  [14, 7], // Bottom Corner
+  // Blue/Bottom Track (Going Up)
   [14, 6], [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
   [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
-  [7, 0], [6, 0]
+  [7, 0], // Left Corner
+  [6, 0]  // Red Turn
 ];
 
-// Cafe (Top-Right): Offset 13, Player (Bottom-Left): Offset 39
+// Start Offsets: Player = 39 (Bottom-Left exit [13, 6]), Cafe = 13 (Top-Right exit [1, 8])
 const START_OFFSETS: Record<Player, number> = { player: 39, cafe: 13 };
 
+// Home Runways (जीत की ओर जाने वाले 5 खाने)
 const RUNWAYS: Record<Player, [number, number][]> = {
   player: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]],
   cafe: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]]
 };
 
-// 15x15 ग्रिड में बेस पॉकेट्स के सटीक कोऑर्डिनेट्स
+// बेस के अंदर 2 गोटियों के पिक्सल-परफेक्ट कोऑर्डिनेट्स [row, col]
 const BASE_POCKETS: Record<Player, [number, number][]> = {
   player: [[11, 2], [11, 3]], // Customer (Bottom-Left)
   cafe: [[3, 11], [3, 12]]     // Bum Bum Cafe (Top-Right)
 };
 
+// सुरक्षित खाने (Stars)
 const STAR_COORDS: [number, number][] = [
   [6, 1], [2, 6], [1, 8], [6, 12], [8, 13], [12, 8], [13, 6], [8, 2]
 ];
 
-// इनाम का बिज़नेस लॉजिक
-const getRandomReward = (): string => {
-  const rand = Math.random() * 100;
-  if (rand < 4) return "1x Pizza (Small Size) 🍕";
-  if (rand < 8) return "1x Grilled Sandwich 🥪";
-  if (rand < 12) return "1x Manchurian Dry 🥟";
-  if (rand < 16) return "1x Manchurian Fried Rice 🍚";
-  if (rand < 36) return "₹20 Flat Off Token 💵";
-  return "₹10 Flat Off Token 🎟️";
-};
-
 export default function LudoVersusCafe() {
-  // कस्टमर ऑथ स्टेट्स
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [isCustomerVerified, setIsCustomerVerified] = useState(false);
   const [isCheckingCustomer, setIsCheckingCustomer] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
 
-  // गेम स्टेट्स
   const [turn, setTurn] = useState<Player>('player');
   const [dice, setDice] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -77,12 +71,12 @@ export default function LudoVersusCafe() {
   const [isAnimatingMove, setIsAnimatingMove] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   
-  // 75% बार कैफे को जिताने का गुप्त निर्णय
+  // 75% बार कैफे जीतेगा, 25% बार कस्टमर
   const [targetWinner, setTargetWinner] = useState<Player>(() => Math.random() < 0.75 ? 'cafe' : 'player');
   const [winner, setWinner] = useState<Player | null>(null);
-  const [rewardWon, setRewardWon] = useState<string>('');
   const [voucherCode, setVoucherCode] = useState('');
 
+  // 2-2 गोटियां
   const [tokens, setTokens] = useState<Token[]>([
     { id: 1, owner: 'player', slotIndex: 0, step: -1 },
     { id: 2, owner: 'player', slotIndex: 1, step: -1 },
@@ -105,7 +99,7 @@ export default function LudoVersusCafe() {
   const diceRef = useRef<number | null>(dice);
   diceRef.current = dice;
 
-  // 🔍 फ़ोन नंबर डालते ही डेटाबेस से नाम लाने का लॉजिक
+  // 🔍 फ़ोन नंबर डालते ही नाम खोजना
   const handlePhoneLookup = async (inputPhone: string) => {
     const clean = inputPhone.replace(/\D/g, '').slice(0, 10);
     setCustomerPhone(clean);
@@ -123,7 +117,7 @@ export default function LudoVersusCafe() {
         } else {
           setIsNewUser(true);
           setCustomerName('');
-          toast('नया खिलाड़ी! कृपया अपना नाम दर्ज करें ✍️', { icon: '👤' });
+          toast('नया खिलाड़ी! अपना नाम लिखें ✍️', { icon: '👤' });
         }
       } catch {
         setIsNewUser(true);
@@ -142,7 +136,6 @@ export default function LudoVersusCafe() {
     if (!customerName.trim()) return toast.error('कृपया अपना नाम दर्ज करें!');
 
     try {
-      // अगर नया ग्राहक है तो नाम सेव करें
       await setDoc(doc(db, 'customer_points', customerPhone), {
         phone: customerPhone,
         name: customerName.trim(),
@@ -151,7 +144,7 @@ export default function LudoVersusCafe() {
     } catch {}
 
     setIsCustomerVerified(true);
-    toast.success(`खेल शुरू! शुभकामनाएँ ${customerName}! 🎲`);
+    toast.success(`चैलेंज शुरू! हराओ Bum Bum Cafe को! ⚔️`);
   };
 
   const playSfx = (type: 'roll' | 'step' | 'cut') => {
@@ -177,66 +170,65 @@ export default function LudoVersusCafe() {
         osc.start(); osc.stop(ctx.currentTime + 0.08);
       } else if (type === 'cut') {
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(260, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.25);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.25);
-        osc.start(); osc.stop(ctx.currentTime + 0.25);
+        osc.frequency.setValueAtTime(280, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(90, ctx.currentTime + 0.28);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.28);
+        osc.start(); osc.stop(ctx.currentTime + 0.28);
       }
     } catch {}
   };
 
-  // 🔥 NEAR-MISS AI पासा लॉजिक
+  // 🔥 रोमांचक लड़ाकू पासा (Aggressive Clash Algorithm)
   const getBiasedDiceRoll = (playerTurn: Player): number => {
     const raw = Math.floor(Math.random() * 6) + 1;
     const currentTokens = tokensRef.current;
     const playerTokens = currentTokens.filter(t => t.owner === 'player');
     const cafeTokens = currentTokens.filter(t => t.owner === 'cafe');
 
+    // 1. क्या कोई खिलाड़ी दूसरे को काट सकता है? (Attack First!)
+    const activeTokens = playerTurn === 'player' ? playerTokens : cafeTokens;
+    const enemyTokens = playerTurn === 'player' ? cafeTokens : playerTokens;
+
+    for (let r = 1; r <= 6; r++) {
+      const canKill = activeTokens.some(t => {
+        if (t.step === -1) return false;
+        const targetStep = t.step + r;
+        if (targetStep > 50) return false;
+        const targetGlobal = (START_OFFSETS[playerTurn] + targetStep) % 52;
+        const safe = [0, 8, 13, 21, 26, 34, 39, 47];
+        if (safe.includes(targetGlobal)) return false;
+
+        return enemyTokens.some(e => e.step >= 0 && e.step < 51 && (START_OFFSETS[e.owner] + e.step) % 52 === targetGlobal);
+      });
+
+      // 40% चांस कि मुकाबला रोमांचक करने के लिए वही अंक निकले जिससे गोटी कटेगी!
+      if (canKill && Math.random() < 0.45) {
+        return r;
+      }
+    }
+
     const isPlayerNearWinning = playerTokens.some(t => t.step >= 53) || playerTokens.filter(t => t.step === 56).length === 1;
 
+    // 75% बार कैफ़े की जीत तय करने का ड्रामा
     if (targetWinner === 'cafe') {
       if (playerTurn === 'player') {
         if (!isPlayerNearWinning) {
           const inBase = playerTokens.some(t => t.step === -1);
-          if (inBase && Math.random() < 0.65) return 6;
-          if (Math.random() < 0.45) return 5;
+          if (inBase && Math.random() < 0.6) return 6;
         } else {
-          const targetDistances = playerTokens.map(t => 56 - t.step).filter(d => d > 0 && d <= 6);
-          if (targetDistances.length > 0 && Math.random() < 0.8) {
-            const blockedRolls = [1, 2, 3, 4, 5, 6].filter(n => !targetDistances.includes(n));
-            if (blockedRolls.length > 0) {
-              return blockedRolls[Math.floor(Math.random() * blockedRolls.length)];
-            }
+          // जीत के मुंह पर गलत नंबर आना
+          const needed = playerTokens.map(t => 56 - t.step).filter(d => d > 0 && d <= 6);
+          if (needed.length > 0 && Math.random() < 0.8) {
+            const wrong = [1, 2, 3, 4, 5, 6].filter(n => !needed.includes(n));
+            if (wrong.length > 0) return wrong[Math.floor(Math.random() * wrong.length)];
           }
         }
       } else {
         if (isPlayerNearWinning) {
           const inBase = cafeTokens.some(t => t.step === -1);
           if (inBase) return 6;
-
-          for (let r = 1; r <= 6; r++) {
-            const canKill = cafeTokens.some(t => {
-              if (t.step === -1) return false;
-              const nextStep = t.step + r;
-              if (nextStep > 50) return false;
-              const nextGlobal = (START_OFFSETS.cafe + nextStep) % 52;
-              const safe = [0, 8, 13, 21, 26, 34, 39, 47];
-              if (safe.includes(nextGlobal)) return false;
-
-              return playerTokens.some(p => p.step >= 0 && p.step < 51 && (START_OFFSETS.player + p.step) % 52 === nextGlobal);
-            });
-            if (canKill) return r;
-          }
-
-          for (const t of cafeTokens) {
-            const need = 56 - t.step;
-            if (need >= 1 && need <= 6) return need;
-          }
-
           return Math.random() < 0.6 ? 6 : 5;
-        } else {
-          if (Math.random() < 0.4) return Math.floor(Math.random() * 3) + 1;
         }
       }
     }
@@ -284,13 +276,12 @@ export default function LudoVersusCafe() {
     });
 
     if (movable.length === 0) {
-      if (currentTurn === 'player') {
-        toast('अरेरे! चाल नहीं बन पाई! ⏭️', { duration: 1200 });
-      }
+      if (currentTurn === 'player') toast('चाल नहीं बन पाई! ⏭️', { duration: 1200 });
       setTimeout(() => switchTurn(false), 900);
     } else if (currentTurn === 'cafe') {
       setTimeout(() => {
         const currentTokens = tokensRef.current;
+        // AI की पहली प्राथमिकता: ग्राहक की गोटी काटना
         const killMove = movable.find(t => {
           const targetStep = t.step === -1 ? 0 : t.step + rollVal;
           const targetGlobal = (START_OFFSETS.cafe + targetStep) % 52;
@@ -309,19 +300,16 @@ export default function LudoVersusCafe() {
     }
   };
 
+  // 🔥 स्टेप-बाय-स्टेप चलना और गोटी काटना
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
     if (!hasRolledRef.current || rollValue === null || isAnimatingMoveRef.current) {
-      return toast.error("कृपया पहले पासा (Dice) फेंकें! 🎲");
+      return toast.error("पहले पासा फेंकें! 🎲");
     }
 
     if (token.owner !== turnRef.current || winnerRef.current) return;
 
-    if (token.step === -1 && rollValue !== 6) {
-      return toast.error("बाहर निकलने के लिए 6 चाहिए!");
-    }
-    if (token.step >= 0 && token.step + rollValue > 56) {
-      return toast.error("घर पहुंचने के लिए सही अंक चाहिए!");
-    }
+    if (token.step === -1 && rollValue !== 6) return toast.error("बाहर निकलने के लिए 6 चाहिए!");
+    if (token.step >= 0 && token.step + rollValue > 56) return toast.error("होम पहुंचने के लिए सही अंक चाहिए!");
 
     setIsAnimatingMove(true);
     setHasRolled(false);
@@ -336,7 +324,7 @@ export default function LudoVersusCafe() {
         currentStep += 1;
         playSfx('step');
         setTokens(prev => prev.map(t => t.id === token.id ? { ...t, step: currentStep } : t));
-        await new Promise(r => setTimeout(r, 170));
+        await new Promise(r => setTimeout(r, 160));
       }
     }
 
@@ -351,6 +339,7 @@ export default function LudoVersusCafe() {
     const myGlobal = getGlobal(turnRef.current, finalStep);
     let captured = false;
 
+    // ⚔️ काटना (Kill Strike)
     if (myGlobal !== -1) {
       const safe = [0, 8, 13, 21, 26, 34, 39, 47];
       if (!safe.includes(myGlobal)) {
@@ -358,7 +347,7 @@ export default function LudoVersusCafe() {
           if (t.owner !== turnRef.current && t.step >= 0 && t.step < 51 && getGlobal(t.owner, t.step) === myGlobal) {
             captured = true;
             playSfx('cut');
-            toast.success(`💥 ${turnRef.current === 'player' ? 'आपने' : 'Bum Bum Cafe ने'} गोटी काटी!`);
+            toast.success(`⚔️ ${turnRef.current === 'player' ? 'आपने' : 'Bum Bum Cafe ने'} गोटी काटी!`);
             return { ...t, step: -1 };
           }
           return t;
@@ -369,30 +358,29 @@ export default function LudoVersusCafe() {
 
     setIsAnimatingMove(false);
 
+    // 🏆 जीत की जांच
     const homeCount = updated.filter(t => t.owner === turnRef.current && t.step === 56).length;
     if (homeCount === 2) {
       const winningSide = turnRef.current;
       setWinner(winningSide);
       if (winningSide === 'player') {
-        const reward = getRandomReward();
-        const code = `BOM-${Math.floor(1000 + Math.random() * 9000)}`;
-        setRewardWon(reward);
+        const code = `BOM-MANCHURIAN-${Math.floor(1000 + Math.random() * 9000)}`;
         setVoucherCode(code);
         confetti({ particleCount: 200, spread: 90 });
-        toast.success(`🎉 गजब! आप जीत गए: ${reward}`);
+        toast.success(`🎉 गजब! आपको मिला 1x Veg Manchurian (Half) FREE! 🥟`);
 
-        // ऑटोमैटिक Firebase में विनर सेव करें
+        // Firebase में इनाम लॉक करना
         setDoc(doc(db, "customer_points", customerPhone), {
           phone: customerPhone,
           name: customerName,
-          lastPrizeWon: reward,
+          lastPrizeWon: "1x Veg Manchurian (Half) FREE 🥟",
           voucherCode: code,
           voucherClaimed: false,
           lastPlayedAt: new Date(),
-          importSource: 'Ludo1v1'
+          importSource: 'LudoManchurian'
         }, { merge: true }).catch(() => {});
       } else {
-        toast.error("😱 ओह्ह! बस 1 कदम से रह गए! कैफ़े आखिरी सेकंड में जीत गया!");
+        toast.error("😱 ओह्ह! कैफ़े ने मैच छीन लिया! Manchurian हाथ से निकल गया!");
       }
       return;
     }
@@ -430,6 +418,7 @@ export default function LudoVersusCafe() {
     setTargetWinner(Math.random() < 0.75 ? 'cafe' : 'player');
   };
 
+  // 15x15 ग्रिड में सटीक प्रतिशत कोऑर्डिनेट्स
   const getTokenCoords = (t: Token): [number, number] => {
     if (t.step === -1) {
       const pocket = BASE_POCKETS[t.owner]?.[t.slotIndex];
@@ -450,27 +439,30 @@ export default function LudoVersusCafe() {
   const isNearWin = tokens.some(t => t.owner === 'player' && t.step >= 52);
 
   return (
-    <div className="min-h-screen bg-[#090a0f] text-white flex flex-col justify-between items-center p-2 sm:p-4 select-none font-sans">
+    <div className="min-h-screen bg-[#07080c] text-white flex flex-col justify-between items-center p-2 sm:p-4 select-none font-sans">
       <Toaster position="top-center" />
 
-      {/* 👤 कस्टमर पहचान पॉपअप (गेम शुरू होने से पहले) */}
+      {/* 🥟 स्पेशल लॉगिन बॉक्स (इनाम के साथ) */}
       <AnimatePresence>
         {!isCustomerVerified && (
           <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-neutral-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full space-y-5 shadow-2xl"
+              className="bg-neutral-900 border-2 border-amber-500/50 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl relative overflow-hidden"
             >
-              <div className="text-center space-y-1">
-                <div className="w-14 h-14 bg-amber-500/10 text-amber-500 rounded-2xl mx-auto flex items-center justify-center mb-2 border border-amber-500/20">
-                  <Phone size={26} />
-                </div>
-                <h2 className="text-xl font-black uppercase text-white tracking-wide">Enter Mobile Number</h2>
-                <p className="text-xs text-neutral-400 font-bold">लूडो खेलें और स्वादिष्ट खाना जीतें 🍕</p>
+              {/* स्पेशल इनाम बैनर */}
+              <div className="bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-amber-500/20 border border-amber-500/40 rounded-2xl p-3 text-center space-y-1">
+                <span className="text-[10px] font-black uppercase text-amber-400 flex items-center justify-center gap-1">
+                  <Gift size={13} /> Special Cafe Challenge
+                </span>
+                <p className="text-sm font-black text-white">
+                  हराओ कैफे को और पाओ: <br />
+                  <span className="text-amber-400 text-base">1x Veg Manchurian (Half) FREE! 🥟</span>
+                </p>
               </div>
 
-              <form onSubmit={handleStartGame} className="space-y-3.5">
+              <form onSubmit={handleStartGame} className="space-y-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-neutral-400">Mobile Number (फ़ोन नंबर) *</label>
                   <div className="relative">
@@ -482,7 +474,7 @@ export default function LudoVersusCafe() {
                       placeholder="10 अंकों का नंबर"
                       value={customerPhone}
                       onChange={e => handlePhoneLookup(e.target.value)}
-                      className="w-full bg-black/50 border border-neutral-700 rounded-xl px-3.5 py-3 text-sm font-mono font-bold text-white outline-none focus:border-amber-400"
+                      className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3.5 py-3 text-sm font-mono font-bold text-white outline-none focus:border-amber-400"
                     />
                     {isCheckingCustomer && (
                       <Loader2 size={16} className="animate-spin text-amber-400 absolute right-3 top-3.5" />
@@ -499,7 +491,7 @@ export default function LudoVersusCafe() {
                       placeholder="e.g. Rahul Sharma"
                       value={customerName}
                       onChange={e => setCustomerName(e.target.value)}
-                      className="w-full bg-black/50 border border-neutral-700 rounded-xl px-3.5 py-3 text-sm font-bold text-white outline-none focus:border-rose-400"
+                      className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3.5 py-3 text-sm font-bold text-white outline-none focus:border-rose-400"
                     />
                   </motion.div>
                 )}
@@ -509,7 +501,7 @@ export default function LudoVersusCafe() {
                   disabled={customerPhone.length !== 10 || !customerName.trim()}
                   className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 disabled:opacity-40 text-black font-black uppercase text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 tracking-wider"
                 >
-                  Start Game (खेल शुरू करें) <ArrowRight size={16} />
+                  <Swords size={16} /> मैच शुरू करें (Play 1v1)
                 </button>
               </form>
             </motion.div>
@@ -524,9 +516,9 @@ export default function LudoVersusCafe() {
         </button>
         <div className="text-center">
           <h1 className="text-base sm:text-lg font-black tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-400 to-rose-500">
-            BUM BUM CAFE 1v1 LUDO
+            BUM BUM CAFE 1v1
           </h1>
-          <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Play & Win Delicious Food</p>
+          <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Win 1x Veg Manchurian Half 🥟</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300">
@@ -538,7 +530,7 @@ export default function LudoVersusCafe() {
         </div>
       </header>
 
-      {/* 2 PLAYERS HUD CARD (ग्राहक का असली नाम) */}
+      {/* HUD CARDS */}
       <div className="w-full max-w-md grid grid-cols-2 gap-3 my-2 shrink-0">
         {/* CAFE (TOP) */}
         <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'cafe' ? 'bg-amber-500 text-black border-white shadow-[0_0_20px_rgba(245,158,11,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
@@ -555,8 +547,8 @@ export default function LudoVersusCafe() {
         {/* CUSTOMER (BOTTOM) */}
         <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all relative overflow-hidden ${turn === 'player' ? 'bg-rose-500 text-white border-white shadow-[0_0_20px_rgba(244,63,94,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
           {isNearWin && (
-            <span className="absolute top-1 right-2 text-[9px] bg-yellow-400 text-black px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-0.5 animate-bounce">
-              <Flame size={10} fill="currentColor" /> Winning!
+            <span className="absolute top-1 right-2 text-[8px] bg-yellow-400 text-black px-1 rounded font-black uppercase flex items-center gap-0.5 animate-bounce">
+              <Flame size={9} fill="currentColor" /> Winning!
             </span>
           )}
           <div className="flex items-center gap-2">
@@ -580,15 +572,15 @@ export default function LudoVersusCafe() {
                   <div className="w-16 h-16 bg-amber-400/20 text-amber-400 rounded-full mx-auto flex items-center justify-center">
                     <Gift size={36} />
                   </div>
-                  <h2 className="text-2xl font-black uppercase text-amber-400">JACKPOT! YOU WON! 🎉</h2>
+                  <h2 className="text-2xl font-black uppercase text-amber-400">YOU WON! 🎉</h2>
                   <p className="text-xs text-neutral-300 font-bold">बधाई हो <span className="text-white underline">{customerName}</span>! आपने जीता है:</p>
                   
                   <div className="bg-amber-500/10 border-2 border-amber-400 p-3 rounded-2xl">
-                    <p className="text-base font-black text-amber-300">{rewardWon}</p>
+                    <p className="text-base font-black text-amber-300">1x Veg Manchurian (Half) FREE 🥟</p>
                     <p className="text-xs font-mono text-neutral-400 mt-1">Voucher Code: <span className="text-white font-bold">{voucherCode}</span></p>
                   </div>
                   <p className="text-[10px] text-green-400 font-bold bg-green-500/10 py-1.5 px-2 rounded-lg border border-green-500/30">
-                    ✅ आपके फ़ोन {customerPhone} पर सुरक्षित हो गया!
+                    ✅ आपके फ़ोन {customerPhone} पर सेव हो गया! काउंटर पर दिखाएं।
                   </p>
 
                   <button onClick={handleRestart} className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-black font-black uppercase text-xs rounded-xl shadow-lg transition-all">
@@ -602,10 +594,10 @@ export default function LudoVersusCafe() {
                   </div>
                   <h2 className="text-xl font-black uppercase text-rose-400">SO CLOSE! 😱</h2>
                   <p className="text-xs text-neutral-300 font-bold">
-                    आप बस 1 चाल से रह गए! Bum Bum Cafe ने बाज़ी पलट दी।
+                    आप बस 1 चाल से रह गए! Bum Bum Cafe ने मैच निकाल लिया।
                   </p>
                   <p className="text-[11px] text-amber-400 font-bold bg-white/5 p-2 rounded-xl border border-white/10">
-                    💡 अगली बार सही पासा बैठा तो इनाम पक्का आपका होगा!
+                    💡 अगली बार पासा सही पड़ा तो मंचूरियन पक्का आपका होगा!
                   </p>
                   <button onClick={handleRestart} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-black uppercase text-xs rounded-xl transition-all shadow-lg">
                     एक बार और खेलें (Try Again) 🎲
@@ -617,20 +609,21 @@ export default function LudoVersusCafe() {
         )}
       </AnimatePresence>
 
-      {/* 🎯 15×15 CLEAN PIXEL-PERFECT LUDO BOARD */}
-      <div className="w-full max-w-[420px] aspect-square bg-white border-[6px] border-[#1b1c24] rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto p-1">
+      {/* 🎯 15×15 MATHEMATICALLY LOCKED LUDO BOARD */}
+      <div className="w-full max-w-[420px] aspect-square bg-white border-[6px] border-[#181a22] rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto">
         
         {/* ग्रिड सेल्स (15x15) */}
         <div className="w-full h-full grid grid-cols-15 grid-rows-15">
           {Array.from({ length: 15 }).map((_, r) =>
             Array.from({ length: 15 }).map((_, c) => {
-              if (r < 6 && c < 6) return null; // Inactive Base Top-Left
-              if (r < 6 && c > 8) return null; // Cafe Base Top-Right 🟡
-              if (r > 8 && c > 8) return null; // Inactive Base Bottom-Right
-              if (r > 8 && c < 6) return null; // Customer Base Bottom-Left 🔴
-              if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return null; // Center Triangle
+              // 4 Base Areas (Empty out for plates)
+              if (r < 6 && c < 6) return null;
+              if (r < 6 && c > 8) return null;
+              if (r > 8 && c > 8) return null;
+              if (r > 8 && c < 6) return null;
+              if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return null;
 
-              // Runway & Starts
+              // Runways & Starts
               const isRedRunway = c === 7 && r >= 9 && r <= 13;
               const isCafeRunway = c === 7 && r >= 1 && r <= 5;
               const isRedStart = r === 13 && c === 6;
@@ -654,52 +647,61 @@ export default function LudoVersusCafe() {
           )}
         </div>
 
-        {/* 🟡 BUM BUM CAFE BASE (TOP-RIGHT) - सुधरा हुआ साफ़ डिजाइन */}
-        <div className="absolute top-1 right-1 w-[40%] h-[40%] bg-amber-400 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
+        {/* 🟡 BUM BUM CAFE BASE (Top-Right: Row 0-5, Col 9-14) */}
+        <div
+          style={{ top: '0%', left: `${(9 / 15) * 100}%`, width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
+          className="absolute bg-amber-400 p-2 flex items-center justify-center z-10"
+        >
           <div className="w-full h-full bg-white rounded-xl shadow-inner flex flex-col justify-between p-2">
-            <span className="text-[10px] font-black uppercase text-amber-700 tracking-wider text-center">Bum Bum Cafe ☕</span>
-            <div className="flex justify-around items-center my-auto">
+            <span className="text-[9px] font-black uppercase text-amber-700 tracking-wider text-center">Bum Bum Cafe ☕</span>
+            <div className="grid grid-cols-2 gap-2 my-auto px-1">
               {[0, 1].map(i => (
-                <div key={i} className="w-9 h-9 rounded-full bg-amber-100 border-2 border-amber-300 shadow-inner flex items-center justify-center" />
+                <div key={i} className="aspect-square rounded-full bg-amber-100 border-2 border-amber-300 shadow-inner" />
               ))}
             </div>
           </div>
         </div>
 
-        {/* 🔴 CUSTOMER BASE (BOTTOM-LEFT) - सुधरा हुआ साफ़ डिजाइन */}
-        <div className="absolute bottom-1 left-1 w-[40%] h-[40%] bg-rose-500 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
+        {/* 🔴 CUSTOMER BASE (Bottom-Left: Row 9-14, Col 0-5) */}
+        <div
+          style={{ top: `${(9 / 15) * 100}%`, left: '0%', width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
+          className="absolute bg-rose-500 p-2 flex items-center justify-center z-10"
+        >
           <div className="w-full h-full bg-white rounded-xl shadow-inner flex flex-col justify-between p-2">
-            <span className="text-[10px] font-black uppercase text-rose-600 tracking-wider text-center truncate">
+            <span className="text-[9px] font-black uppercase text-rose-600 tracking-wider text-center truncate">
               {customerName ? customerName : 'You (ग्राहक)'}
             </span>
-            <div className="flex justify-around items-center my-auto">
+            <div className="grid grid-cols-2 gap-2 my-auto px-1">
               {[0, 1].map(i => (
-                <div key={i} className="w-9 h-9 rounded-full bg-rose-100 border-2 border-rose-300 shadow-inner flex items-center justify-center" />
+                <div key={i} className="aspect-square rounded-full bg-rose-100 border-2 border-rose-300 shadow-inner" />
               ))}
             </div>
           </div>
         </div>
 
-        {/* INACTIVE CORNERS */}
-        <div className="absolute top-1 left-1 w-[40%] h-[40%] bg-neutral-100 rounded-2xl p-2 flex items-center justify-center opacity-30 border border-neutral-300">
-          <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Cafe Zone</span>
+        {/* INACTIVE BASES */}
+        <div style={{ top: '0%', left: '0%', width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }} className="absolute bg-neutral-100 p-2 flex items-center justify-center opacity-30 z-10">
+          <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Cafe Arena</span>
         </div>
-        <div className="absolute bottom-1 right-1 w-[40%] h-[40%] bg-neutral-100 rounded-2xl p-2 flex items-center justify-center opacity-30 border border-neutral-300">
-          <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Cafe Zone</span>
+        <div style={{ top: `${(9 / 15) * 100}%`, left: `${(9 / 15) * 100}%`, width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }} className="absolute bg-neutral-100 p-2 flex items-center justify-center opacity-30 z-10">
+          <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Cafe Arena</span>
         </div>
 
-        {/* 🏆 CENTER TRIANGLES */}
-        <div className="absolute top-[40%] left-[40%] w-[20%] h-[20%] overflow-hidden">
+        {/* 🏆 CENTER TRIANGLES (Row 6-8, Col 6-8) */}
+        <div
+          style={{ top: `${(6 / 15) * 100}%`, left: `${(6 / 15) * 100}%`, width: `${(3 / 15) * 100}%`, height: `${(3 / 15) * 100}%` }}
+          className="absolute overflow-hidden z-10"
+        >
           <svg viewBox="0 0 100 100" className="w-full h-full">
             <polygon points="0,0 50,50 100,0" fill="#f59e0b" />
             <polygon points="0,100 50,50 100,100" fill="#f43f5e" />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <Trophy size={18} className="text-white drop-shadow-md" />
+            <Trophy size={16} className="text-white drop-shadow-md" />
           </div>
         </div>
 
-        {/* ♟️ गोटियां (सटीक अलाइनमेंट) */}
+        {/* ♟️ गोटियां (PIXEL-PERFECT POSITIONING) */}
         {tokens.map(token => {
           const [r, c] = getTokenCoords(token);
           const isMyTurn = token.owner === turn;
