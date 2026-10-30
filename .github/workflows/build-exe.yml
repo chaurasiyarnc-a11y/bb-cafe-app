@@ -1,7 +1,7 @@
 name: Build Windows EXE
 
 on:
-  workflow_dispatch: # इससे आप जब चाहें बटन दबाकर .exe बना सकेंगे
+  workflow_dispatch:
   push:
     branches: [ main ]
 
@@ -10,23 +10,27 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
+      # --legacy-peer-deps से कभी भी कोई पैकेज एरर नहीं देगा
       - name: Install Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
-      - name: Build Next.js & Electron EXE
+      # Next.js स्टैटिक आउटपुट और Electron EXE दोनों एक साथ बिल्ड होंगे
+      - name: Build Next.js & Electron Windows App
         run: npm run electron:build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload EXE Artifact
+      # बनी हुई EXE फ़ाइल को डाउनलोड करने के लिए अपलोड करना
+      - name: Upload EXE Installer
         uses: actions/upload-artifact@v4
         with:
-          name: BumBumCafe-Windows-EXE
+          name: BumBumCafe-Windows-Installer
           path: dist/*.exe
