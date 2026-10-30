@@ -1,13 +1,13 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift } from 'lucide-react';
+import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Flame } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
-type Player = 'player' | 'cafe'; // player = Red, cafe = Yellow
+type Player = 'player' | 'cafe';
 
 interface Token {
   id: number;
@@ -32,22 +32,24 @@ const BOARD_PATH: [number, number][] = [
   [7, 0], [6, 0]
 ];
 
-const START_OFFSETS: Record<Player, number> = { player: 0, cafe: 26 };
+// Cafe (Top-Right): Offset 13
+const START_OFFSETS: Record<Player, number> = { player: 0, cafe: 13 };
 
 const RUNWAYS: Record<Player, [number, number][]> = {
   player: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],
-  cafe: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]]
+  cafe: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]]
 };
 
 const BASE_POCKETS: Record<Player, [number, number][]> = {
-  player: [[2, 2], [2, 3], [3, 2], [3, 3]],
-  cafe: [[11, 11], [11, 12], [12, 11], [12, 12]]
+  player: [[11, 2], [11, 3], [12, 2], [12, 3]], // Customer (Bottom-Left)
+  cafe: [[2, 11], [2, 12], [3, 11], [3, 12]]    // Bum Bum Cafe (Top-Right)
 };
 
 const STAR_COORDS: [number, number][] = [
   [6, 1], [2, 6], [1, 8], [6, 12], [8, 13], [12, 8], [13, 6], [8, 2]
 ];
 
+// 🎁 रिवॉर्ड्स का बिज़नेस लॉजिक (25% कस्टमर विनिंग में से डिस्ट्रीब्यूशन)
 const getRandomReward = (): string => {
   const rand = Math.random() * 100;
   if (rand < 4) return "1x Pizza (Small Size) 🍕";
@@ -63,10 +65,10 @@ export default function LudoVersusCafe() {
   const [dice, setDice] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
   const [hasRolled, setHasRolled] = useState(false);
-  const [isAnimatingMove, setIsAnimatingMove] = useState(false); // 🔥 एक-एक कदम चलने के दौरान स्क्रीन लॉक
+  const [isAnimatingMove, setIsAnimatingMove] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   
-  // 75% Cafe Winner Logic
+  // 🎯 75% बार कैफ़े को जिताने का गुप्त फ़ैसला
   const [targetWinner] = useState<Player>(() => Math.random() < 0.75 ? 'cafe' : 'player');
   const [winner, setWinner] = useState<Player | null>(null);
   const [rewardWon, setRewardWon] = useState<string>('');
@@ -130,23 +132,81 @@ export default function LudoVersusCafe() {
     }
   };
 
+  // 🔥 "NEAR-MISS" DRAMATIC DICE CONTROLLER
   const getBiasedDiceRoll = (playerTurn: Player): number => {
     const raw = Math.floor(Math.random() * 6) + 1;
+    const currentTokens = tokensRef.current;
+    const playerTokens = currentTokens.filter(t => t.owner === 'player');
+    const cafeTokens = currentTokens.filter(t => t.owner === 'cafe');
+
+    // जांचें कि क्या ग्राहक जीत के बहुत करीब है?
+    const isPlayerNearWinning = playerTokens.some(t => t.step >= 53) || playerTokens.filter(t => t.step === 56).length === 1;
+
+    // अगर खेल में कैफ़े को जिताना तय है (75% केस):
     if (targetWinner === 'cafe') {
-      if (playerTurn === 'cafe') {
-        const cafeTokens = tokensRef.current.filter(t => t.owner === 'cafe');
-        const inBase = cafeTokens.some(t => t.step === -1);
-        if (inBase && Math.random() < 0.65) return 6;
-        if (Math.random() < 0.5) return Math.random() < 0.5 ? 5 : 6;
-      } else {
-        const playerTokens = tokensRef.current.filter(t => t.owner === 'player');
-        const inBase = playerTokens.every(t => t.step === -1);
-        if (inBase && Math.random() < 0.65) return Math.floor(Math.random() * 5) + 1;
+      
+      // 1. ग्राहक की चाल:
+      if (playerTurn === 'player') {
+        // शुरुआत में ग्राहक को खूब 6 और 5 दो ताकि वह खुश हो जाए और तेज़ी से आगे भागे
+        if (!isPlayerNearWinning) {
+          const inBase = playerTokens.some(t => t.step === -1);
+          if (inBase && Math.random() < 0.65) return 6; // फटाफट बेस से बाहर निकालो
+          if (Math.random() < 0.45) return 5;
+        } else {
+          // 🛑 क्लाइमेक्स: ग्राहक बस 1-2 कदम दूर है! अब उसे सही अंक मत दो
+          // अगर उसे जीतने के लिए 1, 2 या 3 चाहिए, तो उसे बड़ा नंबर (4, 5, 6) दो ताकि गोटी न चले
+          const targetDistances = playerTokens.map(t => 56 - t.step).filter(d => d > 0 && d <= 6);
+          if (targetDistances.length > 0 && Math.random() < 0.8) {
+            // जो नंबर चाहिए उसे छोड़कर कोई और नंबर दो
+            const blockedRolls = [1, 2, 3, 4, 5, 6].filter(n => !targetDistances.includes(n));
+            if (blockedRolls.length > 0) {
+              return blockedRolls[Math.floor(Math.random() * blockedRolls.length)];
+            }
+          }
+        }
+      } 
+      
+      // 2. कैफ़े बोट की चाल:
+      else {
+        // अगर ग्राहक जीत के करीब आ चुका है, तो कैफ़े सुपर-एग्रेसिव (Comeback Mode) बन जाएगा!
+        if (isPlayerNearWinning) {
+          const inBase = cafeTokens.some(t => t.step === -1);
+          if (inBase) return 6; // तुरंत बेस से गोटी बाहर निकालो
+
+          // क्या बोट किसी चाल से ग्राहक की गोटी काट सकता है?
+          for (let r = 1; r <= 6; r++) {
+            const canKill = cafeTokens.some(t => {
+              if (t.step === -1) return false;
+              const nextStep = t.step + r;
+              if (nextStep > 50) return false;
+              const nextGlobal = (START_OFFSETS.cafe + nextStep) % 52;
+              const safe = [0, 8, 13, 21, 26, 34, 39, 47];
+              if (safe.includes(nextGlobal)) return false;
+
+              return playerTokens.some(p => p.step >= 0 && p.step < 51 && (START_OFFSETS.player + p.step) % 52 === nextGlobal);
+            });
+            if (canKill) return r; // वही पासा फेंको जिससे ग्राहक कट जाए!
+          }
+
+          // अगर जीत का खाना सामने है तो सटीक नंबर निकालो
+          for (const t of cafeTokens) {
+            const need = 56 - t.step;
+            if (need >= 1 && need <= 6) return need;
+          }
+
+          // हमेशा बड़े नंबर (5 या 6) निकालो
+          return Math.random() < 0.6 ? 6 : 5;
+        } else {
+          // शुरुआत में कैफ़े सुस्त रहेगा ताकि ग्राहक को लगे कि वह जीत रहा है
+          if (Math.random() < 0.4) return Math.floor(Math.random() * 3) + 1; // 1, 2, 3
+        }
       }
     }
+
     return raw;
   };
 
+  // रोल पासा
   const handleRollDice = (isBot = false) => {
     if (rollingRef.current || winnerRef.current || hasRolledRef.current || isAnimatingMoveRef.current) return;
     if (turnRef.current === 'cafe' && !isBot) return;
@@ -169,6 +229,7 @@ export default function LudoVersusCafe() {
     }, 40);
   };
 
+  // 🤖 बोट का ऑटोमैटिक पासा फेंकना
   useEffect(() => {
     if (turn === 'cafe' && !rolling && !hasRolled && !winner && !isAnimatingMove) {
       const botTimer = setTimeout(() => {
@@ -187,20 +248,31 @@ export default function LudoVersusCafe() {
     });
 
     if (movable.length === 0) {
+      if (currentTurn === 'player') {
+        toast('अरेरे! चाल नहीं बन पाई! ⏭️', { duration: 1200 });
+      }
       setTimeout(() => switchTurn(false), 900);
     } else if (currentTurn === 'cafe') {
       setTimeout(() => {
         const currentTokens = tokensRef.current;
+        
+        // 1. अगर ग्राहक कट सकता है तो सबसे पहले उसे काटो
         const killMove = movable.find(t => {
           const targetStep = t.step === -1 ? 0 : t.step + rollVal;
           const targetGlobal = (START_OFFSETS.cafe + targetStep) % 52;
           return currentTokens.some(other => other.owner === 'player' && other.step >= 0 && other.step < 51 && (START_OFFSETS.player + other.step) % 52 === targetGlobal);
         });
 
+        // 2. अगर कोई गोटी सीधे होम में पहुंच रही है तो उसे चलो
+        const winMove = movable.find(t => t.step + rollVal === 56);
+
+        // 3. अगर 6 आया है और बेस में गोटी है तो बाहर लाओ
         const baseMove = movable.find(t => t.step === -1);
+
+        // 4. जो सबसे आगे है उसे आगे बढ़ाओ
         const forwardMove = [...movable].sort((a, b) => b.step - a.step)[0];
 
-        const chosenToken = killMove || baseMove || forwardMove || movable[0];
+        const chosenToken = killMove || winMove || baseMove || forwardMove || movable[0];
         handleMoveToken(chosenToken, rollVal);
       }, 600);
     } else if (movable.length === 1 && movable[0].step === -1 && rollVal === 6) {
@@ -208,7 +280,7 @@ export default function LudoVersusCafe() {
     }
   };
 
-  // 🔥 एक-एक कदम चलने वाला फ़ंक्शन (Step-by-Step Walking)
+  // स्टेप-बाय-स्टेप चाल
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
     if (!hasRolledRef.current || rollValue === null || isAnimatingMoveRef.current) {
       return toast.error("कृपया पहले पासा (Dice) फेंकें! 🎲");
@@ -223,28 +295,23 @@ export default function LudoVersusCafe() {
       return toast.error("घर पहुंचने के लिए सही अंक चाहिए!");
     }
 
-    // 🔒 स्क्रीन लॉक करें ताकि चाल के दौरान कोई और बटन न दबे
     setIsAnimatingMove(true);
     setHasRolled(false);
 
-    // 1. अगर बेस से बाहर निकलना है
     if (token.step === -1 && rollValue === 6) {
       playSfx('step');
       setTokens(prev => prev.map(t => t.id === token.id ? { ...t, step: 0 } : t));
       await new Promise(r => setTimeout(r, 200));
     } else {
-      // 2. एक-एक कदम आगे बढ़ाना
       let currentStep = token.step;
       for (let i = 1; i <= rollValue; i++) {
         currentStep += 1;
         playSfx('step');
         setTokens(prev => prev.map(t => t.id === token.id ? { ...t, step: currentStep } : t));
-        // हर कदम के बीच 170ms का अंतराल (स्मूथ एनिमेशन)
         await new Promise(r => setTimeout(r, 170));
       }
     }
 
-    // गोटी की अंतिम स्थिति
     const finalStep = token.step === -1 ? 0 : token.step + rollValue;
 
     const getGlobal = (p: Player, s: number) => {
@@ -273,7 +340,7 @@ export default function LudoVersusCafe() {
       }
     }
 
-    setIsAnimatingMove(false); // 🔓 लॉक हटाएं
+    setIsAnimatingMove(false);
 
     // 🏆 जीत की जांच
     const homeCount = updated.filter(t => t.owner === turnRef.current && t.step === 56).length;
@@ -286,9 +353,9 @@ export default function LudoVersusCafe() {
         setRewardWon(reward);
         setVoucherCode(code);
         confetti({ particleCount: 200, spread: 90 });
-        toast.success(`🎉 बधाई हो! आप जीत गए: ${reward}`);
+        toast.success(`🎉 गजब! आप जीत गए: ${reward}`);
       } else {
-        toast.error("😢 Bum Bum Cafe जीत गया! Better luck next time!");
+        toast.error("😱 ओह्ह! बस 1 कदम से रह गए! कैफ़े आखिरी सेकंड में जीत गया!");
       }
       return;
     }
@@ -354,6 +421,9 @@ export default function LudoVersusCafe() {
     return [7, 7];
   };
 
+  // क्या ग्राहक जीतने वाला है? (रोमांचक स्टेटस दिखाने के लिए)
+  const isNearWin = tokens.some(t => t.owner === 'player' && t.step >= 52);
+
   return (
     <div className="min-h-screen bg-[#0c0d12] text-white flex flex-col justify-between items-center p-3 select-none font-sans">
       <Toaster position="top-center" />
@@ -364,10 +434,10 @@ export default function LudoVersusCafe() {
           <ArrowLeft size={18} />
         </button>
         <div className="text-center">
-          <h1 className="text-base sm:text-lg font-black tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-amber-400 to-yellow-500">
+          <h1 className="text-base sm:text-lg font-black tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-400 to-rose-500">
             BUM BUM CAFE 1v1 LUDO
           </h1>
-          <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Customer vs Cafe Bot</p>
+          <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Play & Win Delicious Food</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300">
@@ -381,17 +451,7 @@ export default function LudoVersusCafe() {
 
       {/* 2 PLAYERS HUD CARD */}
       <div className="w-full max-w-md grid grid-cols-2 gap-3 my-2 shrink-0">
-        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'player' ? 'bg-rose-500 text-white border-white shadow-[0_0_20px_rgba(244,63,94,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
-          <div className="flex items-center gap-2">
-            <User size={18} />
-            <div>
-              <p className="text-xs font-black uppercase">You (ग्राहक)</p>
-              <p className="text-[10px] font-mono">{tokens.filter(t => t.owner === 'player' && t.step === 56).length}/2 In</p>
-            </div>
-          </div>
-          <span className="w-3 h-3 rounded-full bg-rose-400 border border-white" />
-        </div>
-
+        {/* CAFE (TOP-RIGHT PLAYER) */}
         <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'cafe' ? 'bg-amber-500 text-black border-white shadow-[0_0_20px_rgba(245,158,11,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
           <div className="flex items-center gap-2">
             <Bot size={18} />
@@ -401,6 +461,23 @@ export default function LudoVersusCafe() {
             </div>
           </div>
           <span className="w-3 h-3 rounded-full bg-amber-400 border border-black" />
+        </div>
+
+        {/* CUSTOMER (BOTTOM-LEFT PLAYER) */}
+        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all relative overflow-hidden ${turn === 'player' ? 'bg-rose-500 text-white border-white shadow-[0_0_20px_rgba(244,63,94,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
+          {isNearWin && (
+            <span className="absolute top-1 right-2 text-[9px] bg-yellow-400 text-black px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-0.5 animate-bounce">
+              <Flame size={10} fill="currentColor" /> Winning!
+            </span>
+          )}
+          <div className="flex items-center gap-2">
+            <User size={18} />
+            <div>
+              <p className="text-xs font-black uppercase">You (ग्राहक)</p>
+              <p className="text-[10px] font-mono">{tokens.filter(t => t.owner === 'player' && t.step === 56).length}/2 In</p>
+            </div>
+          </div>
+          <span className="w-3 h-3 rounded-full bg-rose-400 border border-white" />
         </div>
       </div>
 
@@ -414,7 +491,7 @@ export default function LudoVersusCafe() {
                   <div className="w-16 h-16 bg-amber-400/20 text-amber-400 rounded-full mx-auto flex items-center justify-center">
                     <Gift size={36} />
                   </div>
-                  <h2 className="text-2xl font-black uppercase text-amber-400">YOU WON! 🎉</h2>
+                  <h2 className="text-2xl font-black uppercase text-amber-400">JACKPOT! YOU WON! 🎉</h2>
                   <p className="text-xs text-neutral-300 font-bold">बधाई हो! आपने लूडो में जीता है:</p>
                   
                   <div className="bg-amber-500/10 border-2 border-amber-400 p-3 rounded-2xl">
@@ -442,10 +519,15 @@ export default function LudoVersusCafe() {
                   <div className="w-16 h-16 bg-rose-500/20 text-rose-500 rounded-full mx-auto flex items-center justify-center">
                     <Bot size={36} />
                   </div>
-                  <h2 className="text-xl font-black uppercase text-rose-400">CAFE WON! ☕</h2>
-                  <p className="text-xs text-neutral-300 font-bold">इस बार Bum Bum Cafe जीत गया! अगली बार फिर कोशिश करें।</p>
-                  <button onClick={() => { setTokens(tokens.map(t => ({ ...t, step: -1 }))); setWinner(null); setDice(null); setTurn('player'); }} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-black uppercase text-xs rounded-xl transition-all">
-                    Play Again (दोबारा खेलें)
+                  <h2 className="text-xl font-black uppercase text-rose-400">SO CLOSE! (अरेरे!) 😱</h2>
+                  <p className="text-xs text-neutral-300 font-bold">
+                    आप बस जीतने ही वाले थे! आखिरी सेकंड में Bum Bum Cafe ने मैच निकाल लिया।
+                  </p>
+                  <p className="text-[11px] text-amber-400 font-bold bg-white/5 p-2 rounded-xl border border-white/10">
+                    💡 अगली बार पासा सही बैठा तो पिज्जा आपका होगा!
+                  </p>
+                  <button onClick={() => { setTokens(tokens.map(t => ({ ...t, step: -1 }))); setWinner(null); setTurn('player'); }} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-black uppercase text-xs rounded-xl transition-all shadow-lg">
+                    एक बार और खेलें (Try Again) 🎲
                   </button>
                 </>
               )}
@@ -454,28 +536,29 @@ export default function LudoVersusCafe() {
         )}
       </AnimatePresence>
 
-      {/* 🎯 15×15 1v1 BOARD */}
+      {/* 🎯 15×15 1v1 BOARD (Top: Cafe, Bottom: Customer) */}
       <div className="w-full max-w-[420px] aspect-square bg-[#fff] border-[6px] border-[#222] rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto p-1">
         
         {/* ग्रिड सेल्स */}
         <div className="w-full h-full grid grid-cols-15 grid-rows-15">
           {Array.from({ length: 15 }).map((_, r) =>
             Array.from({ length: 15 }).map((_, c) => {
-              if (r < 6 && c < 6) return null; // Red Base
-              if (r < 6 && c > 8) return null; // Green (Inactive)
-              if (r > 8 && c > 8) return null; // Yellow Base (Cafe)
-              if (r > 8 && c < 6) return null; // Blue (Inactive)
+              if (r < 6 && c < 6) return null; // Top-Left (Inactive)
+              if (r < 6 && c > 8) return null; // Top-Right (Cafe Base 🟡)
+              if (r > 8 && c > 8) return null; // Bottom-Right (Inactive)
+              if (r > 8 && c < 6) return null; // Bottom-Left (Customer Base 🔴)
               if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return null; // Center
 
+              // Runway mapping
               const isRedRunway = r === 7 && c >= 1 && c <= 5;
-              const isYellowRunway = r === 7 && c >= 9 && c <= 13;
+              const isCafeRunway = c === 7 && r >= 1 && r <= 5;
               const isRedStart = r === 6 && c === 1;
-              const isYellowStart = r === 8 && c === 13;
+              const isCafeStart = r === 1 && c === 8;
               const isStar = STAR_COORDS.some(([sr, sc]) => sr === r && sc === c);
 
               let bg = 'bg-white';
               if (isRedRunway || isRedStart) bg = 'bg-rose-500';
-              if (isYellowRunway || isYellowStart) bg = 'bg-amber-400';
+              if (isCafeRunway || isCafeStart) bg = 'bg-amber-400';
 
               return (
                 <div
@@ -490,27 +573,27 @@ export default function LudoVersusCafe() {
           )}
         </div>
 
-        {/* 🔴 RED BASE (PLAYER) */}
-        <div className="absolute top-1 left-1 w-[40%] h-[40%] bg-rose-500 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
+        {/* 🟡 BUM BUM CAFE BASE (TOP-RIGHT - ऊपर) */}
+        <div className="absolute top-1 right-1 w-[40%] h-[40%] bg-amber-400 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
           <div className="w-full h-full bg-white rounded-xl shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
-            {[0, 1].map(i => <div key={i} className="rounded-full bg-rose-100 border border-rose-300 flex items-center justify-center" />)}
-            <div className="col-span-2 text-center text-[10px] font-black text-rose-600 uppercase">You (Player)</div>
+            {[0, 1].map(i => <div key={i} className="rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center" />)}
+            <div className="col-span-2 text-center text-[10px] font-black text-amber-700 uppercase">Bum Bum Cafe ☕</div>
           </div>
         </div>
 
-        {/* 🟡 YELLOW BASE (CAFE BOT) */}
-        <div className="absolute bottom-1 right-1 w-[40%] h-[40%] bg-amber-400 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
+        {/* 🔴 CUSTOMER BASE (BOTTOM-LEFT - नीचे) */}
+        <div className="absolute bottom-1 left-1 w-[40%] h-[40%] bg-rose-500 rounded-2xl p-2.5 shadow-md flex items-center justify-center">
           <div className="w-full h-full bg-white rounded-xl shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
-            {[0, 1].map(i => <div key={i} className="rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center" />)}
-            <div className="col-span-2 text-center text-[10px] font-black text-amber-700 uppercase">Bum Bum Cafe</div>
+            {[0, 1].map(i => <div key={i} className="rounded-full bg-rose-100 border border-rose-300 flex items-center justify-center" />)}
+            <div className="col-span-2 text-center text-[10px] font-black text-rose-600 uppercase">You (ग्राहक)</div>
           </div>
         </div>
 
         {/* INACTIVE CORNERS */}
-        <div className="absolute top-1 right-1 w-[40%] h-[40%] bg-neutral-100 rounded-2xl p-2.5 flex items-center justify-center opacity-40 border border-neutral-300">
+        <div className="absolute top-1 left-1 w-[40%] h-[40%] bg-neutral-100 rounded-2xl p-2.5 flex items-center justify-center opacity-30 border border-neutral-300">
           <span className="text-[10px] font-bold text-neutral-400 uppercase">Cafe Zone</span>
         </div>
-        <div className="absolute bottom-1 left-1 w-[40%] h-[40%] bg-neutral-100 rounded-2xl p-2.5 flex items-center justify-center opacity-40 border border-neutral-300">
+        <div className="absolute bottom-1 right-1 w-[40%] h-[40%] bg-neutral-100 rounded-2xl p-2.5 flex items-center justify-center opacity-30 border border-neutral-300">
           <span className="text-[10px] font-bold text-neutral-400 uppercase">Cafe Zone</span>
         </div>
 
@@ -518,7 +601,7 @@ export default function LudoVersusCafe() {
         <div className="absolute top-[40%] left-[40%] w-[20%] h-[20%] overflow-hidden">
           <svg viewBox="0 0 100 100" className="w-full h-full">
             <polygon points="0,0 50,50 0,100" fill="#f43f5e" />
-            <polygon points="100,0 50,50 100,100" fill="#f59e0b" />
+            <polygon points="0,0 50,50 100,0" fill="#f59e0b" />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Trophy size={18} className="text-white drop-shadow-md" />
