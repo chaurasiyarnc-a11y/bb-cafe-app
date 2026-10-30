@@ -1,6 +1,11 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, initializeFirestore, enableIndexedDbPersistence } from "firebase/firestore"; // <-- enableIndexedDbPersistence इम्पोर्ट करें
+import { 
+  initializeFirestore, 
+  getFirestore,
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -12,24 +17,28 @@ const firebaseConfig = {
   appId: "1:1051643029309:web:3f5a9f9b7f981eaf814754"
 };
 
+// 1. App Initialize
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
-// Next.js क्रैश से बचने और ऑफलाइन-फर्स्ट लॉगिन चलाने के लिए
+// 2. Firestore with Multi-Tab Offline Persistence
 let firestoreDb;
-try {
-  firestoreDb = initializeFirestore(app, {
-    experimentalForceLongPolling: true, // लॉन्ग पोलिंग को बल दें
-  });
 
-  // मोबाइल ब्राउज़र/वेबव्यू में स्थानीय स्टोरेज (Offline Cache) चालू करना
-  if (typeof window !== "undefined") {
-    enableIndexedDbPersistence(firestoreDb).catch((err) => {
-      console.warn("Firestore cache initialization failed: ", err.code);
+if (typeof window !== "undefined") {
+  try {
+    firestoreDb = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager() // 👈 यह .exe, Web और Mobile तीनों पर बिना क्रैश हुए ऑफलाइन चलाएगा
+      }),
+      experimentalForceLongPolling: true,
     });
+  } catch (err) {
+    // अगर पहले से इनिशियलाइज़ है तो पुराना इंस्टेंस उठा लो
+    firestoreDb = getFirestore(app);
   }
-} catch (e) {
+} else {
+  // Server-side / Build Time
   firestoreDb = getFirestore(app);
 }
 
