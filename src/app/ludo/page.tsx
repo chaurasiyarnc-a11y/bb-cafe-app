@@ -7,19 +7,23 @@ import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-type Player = 'player' | 'cafe'; // player = Red (Top-Left), cafe = Yellow (Bottom-Right)
+type Player = 'player' | 'cafe'; 
+// Player = Red (Bottom-Left), Cafe = Yellow (Top-Right - ऊपर)
 
 interface Token {
   id: number;
   owner: Player;
-  slotIndex: number; // 0, 1
+  slotIndex: number;
   step: number; // -1 = Base, 0 to 50 = Track, 51 to 55 = Runway, 56 = Home
 }
 
-// 15x15 ट्रैक कोऑर्डिनेट्स [row, col] (Exact Standard Ludo Route)
+// 15x15 ग्रिड के 52 मुख्य ट्रैक कोऑर्डिनेट्स [row, col]
 const BOARD_PATH: [number, number][] = [
-  // Red Start & Right
-  [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
+  // Red Track Starts (Row 13 Col 6 going up & clockwise)
+  [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
+  [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
+  [7, 0], // Left Arrow junction
+  [6, 0], [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
   [5, 6], [4, 6], [3, 6], [2, 6], [1, 6], [0, 6],
   [0, 7], // Top junction
   [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8],
@@ -27,29 +31,29 @@ const BOARD_PATH: [number, number][] = [
   [7, 14], // Right junction
   [8, 14], [8, 13], [8, 12], [8, 11], [8, 10], [8, 9],
   [9, 8], [10, 8], [11, 8], [12, 8], [13, 8], [14, 8],
-  [14, 7], // Bottom junction
-  [14, 6], [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
-  [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
-  [7, 0], // Left junction
-  [6, 0]  // Red Entry
+  [14, 7], // Bottom Junction
+  [14, 6]  // Red entrance
 ];
 
-// Red Start = 0 (Left), Yellow Start = 26 (Right)
-const START_OFFSETS: Record<Player, number> = { player: 0, cafe: 26 };
+// Player (Red Bottom-Left) Offset = 0, Cafe (Yellow Top-Right) Offset = 26
+const START_OFFSETS: Record<Player, number> = {
+  player: 0,
+  cafe: 26
+};
 
-// Home Runways (जीत के 5 रंगीन खाने)
+// Home Runways (जीत की ओर जाने वाले 5 खाने)
 const RUNWAYS: Record<Player, [number, number][]> = {
-  player: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]], // Red Runway (Left to Center)
-  cafe: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]] // Yellow Runway (Right to Center)
+  player: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]], // Red Runway (Bottom to Center)
+  cafe: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]]       // Yellow Runway (Top to Center)
 };
 
 // 4 बेस के अंदर 2 गोल पॉकेट्स [row, col]
 const BASE_POCKETS: Record<Player, [number, number][]> = {
-  player: [[2.5, 2], [2.5, 3]], // Red Base Inside
-  cafe: [[11.5, 11], [11.5, 12]] // Yellow Base Inside
+  player: [[11, 2], [12, 3]],   // Red Base (Bottom-Left)
+  cafe: [[2, 11], [3, 12]]      // Yellow Base (Top-Right - ऊपर)
 };
 
-export default function PerfectClassicLudo() {
+export default function AuthenticLudoVersusCafe() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [isCustomerVerified, setIsCustomerVerified] = useState(false);
@@ -63,12 +67,12 @@ export default function PerfectClassicLudo() {
   const [isAnimatingMove, setIsAnimatingMove] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   
-  // 75% बार कैफे ही जीतेगा, 25% ग्राहक
+  // 75% बार कैफ़े जीतेगा, 25% ग्राहक
   const [targetWinner, setTargetWinner] = useState<Player>(() => Math.random() < 0.75 ? 'cafe' : 'player');
   const [winner, setWinner] = useState<Player | null>(null);
   const [voucherCode, setVoucherCode] = useState('');
 
-  // 2-2 गोटियां (Customer vs Bum Bum Cafe)
+  // 2-2 गोटियां
   const [tokens, setTokens] = useState<Token[]>([
     { id: 1, owner: 'player', slotIndex: 0, step: -1 },
     { id: 2, owner: 'player', slotIndex: 1, step: -1 },
@@ -91,7 +95,7 @@ export default function PerfectClassicLudo() {
   const diceRef = useRef<number | null>(dice);
   diceRef.current = dice;
 
-  // 🔊 समृद्ध साउंड इफेक्ट्स (Real Synthesized Audio)
+  // 🔊 शुद्ध वेब ऑडियो साउंड्स (Procedural Sound Engine)
   const playSfx = (type: 'roll' | 'step' | 'cut' | 'win') => {
     if (!soundEnabled || typeof window === 'undefined') return;
     try {
@@ -99,13 +103,13 @@ export default function PerfectClassicLudo() {
       const ctx = new AudioCtx();
 
       if (type === 'roll') {
-        // पासा खड़खड़ाने की आवाज़
+        // डाइस की खड़खड़ाहट
         for (let i = 0; i < 6; i++) {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(180 + Math.random() * 260, ctx.currentTime + i * 0.04);
-          gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.04);
+          osc.frequency.setValueAtTime(220 + Math.random() * 260, ctx.currentTime + i * 0.04);
+          gain.gain.setValueAtTime(0.18, ctx.currentTime + i * 0.04);
           gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + i * 0.04 + 0.035);
           osc.connect(gain);
           gain.connect(ctx.destination);
@@ -113,42 +117,42 @@ export default function PerfectClassicLudo() {
           osc.stop(ctx.currentTime + i * 0.04 + 0.035);
         }
       } else if (type === 'step') {
-        // गोटी का लकड़ी पर गिरना (Wood Tap)
+        // लकड़ी पर गोटी पड़ने की असली 'टक' आवाज़
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(450, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.07);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.07);
+        osc.frequency.setValueAtTime(500, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(130, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.1);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(); osc.stop(ctx.currentTime + 0.07);
+        osc.start(); osc.stop(ctx.currentTime + 0.1);
       } else if (type === 'cut') {
-        // गोटी कटना (Heavy Slash Impact)
+        // गोटी कटना (लड़ाकू स्लैश)
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(320, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(60, ctx.currentTime + 0.3);
+        osc.frequency.setValueAtTime(360, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(70, ctx.currentTime + 0.32);
         gain.gain.setValueAtTime(0.4, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.32);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(); osc.stop(ctx.currentTime + 0.3);
+        osc.start(); osc.stop(ctx.currentTime + 0.32);
       } else if (type === 'win') {
-        // जीत का बिगुल (Victory Fanfare)
+        // विजय बिगुल (Victory Fanfare)
         [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
-          gain.gain.setValueAtTime(0.3, ctx.currentTime + idx * 0.12);
-          gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + idx * 0.12 + 0.25);
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.14);
+          gain.gain.setValueAtTime(0.35, ctx.currentTime + idx * 0.14);
+          gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + idx * 0.14 + 0.28);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(ctx.currentTime + idx * 0.12);
-          osc.stop(ctx.currentTime + idx * 0.12 + 0.25);
+          osc.start(ctx.currentTime + idx * 0.14);
+          osc.stop(ctx.currentTime + idx * 0.14 + 0.28);
         });
       }
     } catch {}
@@ -172,7 +176,7 @@ export default function PerfectClassicLudo() {
         } else {
           setIsNewUser(true);
           setCustomerName('');
-          toast('नया खिलाड़ी! अपना नाम लिखें ✍️', { icon: '👤' });
+          toast('नया खिलाड़ी! अपना नाम दर्ज करें ✍️', { icon: '👤' });
         }
       } catch {
         setIsNewUser(true);
@@ -202,7 +206,7 @@ export default function PerfectClassicLudo() {
     toast.success(`चैलेंज शुरू! हराओ Bum Bum Cafe को! ⚔️`);
   };
 
-  // 🔥 75% ड्रामा व लड़ाकू पासा (Aggressive Clash)
+  // 🎲 75% सस्पेंस भरा लड़ाकू पासा (Clash Engine)
   const getBiasedDiceRoll = (playerTurn: Player): number => {
     const raw = Math.floor(Math.random() * 6) + 1;
     const currentTokens = tokensRef.current;
@@ -212,7 +216,7 @@ export default function PerfectClassicLudo() {
     const activeTokens = playerTurn === 'player' ? playerTokens : cafeTokens;
     const enemyTokens = playerTurn === 'player' ? cafeTokens : playerTokens;
 
-    // 1. गोटी काटने की प्राथमिकता (Attack Priority)
+    // ⚔️ गोटी काटने का मौका पहले तलाशें
     for (let r = 1; r <= 6; r++) {
       const canKill = activeTokens.some(t => {
         if (t.step === -1) return false;
@@ -230,14 +234,14 @@ export default function PerfectClassicLudo() {
 
     const isPlayerNearWinning = playerTokens.some(t => t.step >= 53) || playerTokens.filter(t => t.step === 56).length === 1;
 
-    // 75% बार कैफ़े की जीत
+    // 75% बार कैफ़े की जीत तय करने का रोमांचक ड्रामा
     if (targetWinner === 'cafe') {
       if (playerTurn === 'player') {
         if (!isPlayerNearWinning) {
           const inBase = playerTokens.some(t => t.step === -1);
           if (inBase && Math.random() < 0.6) return 6;
         } else {
-          // जीत के मुहाने पर गलत नंबर देना
+          // जीत के मुहाने पर गोटी अटकाना
           const needed = playerTokens.map(t => 56 - t.step).filter(d => d > 0 && d <= 6);
           if (needed.length > 0 && Math.random() < 0.8) {
             const wrong = [1, 2, 3, 4, 5, 6].filter(n => !needed.includes(n));
@@ -319,7 +323,7 @@ export default function PerfectClassicLudo() {
     }
   };
 
-  // स्टेप-बाय-स्टेप चलना और गोटी काटना
+  // 🚶‍♂️ स्टेप-बाय-स्टेप धीमा चलना (Slow Walking: 300ms per step)
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
     if (!hasRolledRef.current || rollValue === null || isAnimatingMoveRef.current) {
       return toast.error("पहले पासा फेंकें! 🎲");
@@ -336,14 +340,15 @@ export default function PerfectClassicLudo() {
     if (token.step === -1 && rollValue === 6) {
       playSfx('step');
       setTokens(prev => prev.map(t => t.id === token.id ? { ...t, step: 0 } : t));
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 320));
     } else {
       let currentStep = token.step;
       for (let i = 1; i <= rollValue; i++) {
         currentStep += 1;
         playSfx('step');
         setTokens(prev => prev.map(t => t.id === token.id ? { ...t, step: currentStep } : t));
-        await new Promise(r => setTimeout(r, 160));
+        // 🐢 Slow walking: 300ms ताकि हर कदम साफ दिखे
+        await new Promise(r => setTimeout(r, 300));
       }
     }
 
@@ -358,6 +363,7 @@ export default function PerfectClassicLudo() {
     const myGlobal = getGlobal(turnRef.current, finalStep);
     let captured = false;
 
+    // ⚔️ काटना (Kill Strike)
     if (myGlobal !== -1) {
       const safe = [0, 8, 13, 21, 26, 34, 39, 47];
       if (!safe.includes(myGlobal)) {
@@ -376,7 +382,7 @@ export default function PerfectClassicLudo() {
 
     setIsAnimatingMove(false);
 
-    // जीत का फ़ैसला
+    // 🏆 जीत का फैसला
     const homeCount = updated.filter(t => t.owner === turnRef.current && t.step === 56).length;
     if (homeCount === 2) {
       const winningSide = turnRef.current;
@@ -386,7 +392,7 @@ export default function PerfectClassicLudo() {
       if (winningSide === 'player') {
         const code = `BOM-MANCHURIAN-${Math.floor(1000 + Math.random() * 9000)}`;
         setVoucherCode(code);
-        confetti({ particleCount: 220, spread: 90 });
+        confetti({ particleCount: 240, spread: 90 });
         toast.success(`🎉 गजब! आपको मिला 1x Veg Manchurian (Half) FREE! 🥟`);
 
         setDoc(doc(db, "customer_points", customerPhone), {
@@ -396,10 +402,10 @@ export default function PerfectClassicLudo() {
           voucherCode: code,
           voucherClaimed: false,
           lastPlayedAt: new Date(),
-          importSource: 'LudoClassic'
+          importSource: 'LudoExact'
         }, { merge: true }).catch(() => {});
       } else {
-        toast.error("😱 ओह्ह! कैफ़े ने मैच छीन लिया! Manchurian हाथ से निकल गया!");
+        toast.error("😱 ओह्ह! कैफ़े ने मैच निकाल लिया! Manchurian हाथ से निकल गया!");
       }
       return;
     }
@@ -407,7 +413,7 @@ export default function PerfectClassicLudo() {
     if (rollValue === 6 || captured) {
       toast(rollValue === 6 ? '6 आया! फिर से पासा फेंकें 🎯' : 'गोटी काटी! बोनस चाल ⚔️', { duration: 1500 });
       if (turnRef.current === 'cafe') {
-        setTimeout(() => handleRollDice(true), 700);
+        setTimeout(() => handleRollDice(true), 750);
       }
     } else {
       switchTurn(false);
@@ -437,7 +443,7 @@ export default function PerfectClassicLudo() {
     setTargetWinner(Math.random() < 0.75 ? 'cafe' : 'player');
   };
 
-  // टोकन कोऑर्डिनेट्स [row, col]
+  // पिक्सेल-परफेक्ट ग्रिड कोऑर्डिनेट्स [row, col]
   const getTokenCoords = (t: Token): [number, number] => {
     if (t.step === -1) {
       const pocket = BASE_POCKETS[t.owner]?.[t.slotIndex];
@@ -461,7 +467,7 @@ export default function PerfectClassicLudo() {
     <div className="min-h-screen bg-[#07080c] text-white flex flex-col justify-between items-center p-2 sm:p-4 select-none font-sans">
       <Toaster position="top-center" />
 
-      {/* 🥟 स्पेशल लॉगिन बॉक्स */}
+      {/* 🥟 स्पेशल लॉगिन बॉक्स (इनाम के साथ) */}
       <AnimatePresence>
         {!isCustomerVerified && (
           <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
@@ -506,7 +512,7 @@ export default function PerfectClassicLudo() {
                     <input
                       type="text"
                       required
-                      placeholder="उदा. राहुल शर्मा"
+                      placeholder="उदा. राम भाई"
                       value={customerName}
                       onChange={e => setCustomerName(e.target.value)}
                       className="w-full bg-black/60 border border-neutral-700 rounded-xl px-3.5 py-3 text-sm font-bold text-white outline-none focus:border-rose-400"
@@ -548,10 +554,22 @@ export default function PerfectClassicLudo() {
         </div>
       </header>
 
-      {/* HUD CARDS */}
+      {/* HUD CARDS: BUM BUM CAFE (TOP) & CUSTOMER (BOTTOM) */}
       <div className="w-full max-w-md grid grid-cols-2 gap-3 my-2 shrink-0">
-        {/* PLAYER (RED - TOP LEFT) */}
-        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all relative overflow-hidden ${turn === 'player' ? 'bg-[#ff2d2d] text-white border-white shadow-[0_0_20px_rgba(255,45,45,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
+        {/* CAFE (YELLOW - TOP RIGHT PLAYER) */}
+        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'cafe' ? 'bg-[#ffc20e] text-black border-white shadow-[0_0_20px_rgba(255,194,14,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
+          <div className="flex items-center gap-2">
+            <Bot size={18} />
+            <div>
+              <p className="text-xs font-black uppercase">Bum Bum Cafe ☕</p>
+              <p className="text-[10px] font-mono">{tokens.filter(t => t.owner === 'cafe' && t.step === 56).length}/2 In</p>
+            </div>
+          </div>
+          <span className="w-3 h-3 rounded-full bg-yellow-400 border border-black" />
+        </div>
+
+        {/* CUSTOMER (RED - BOTTOM LEFT PLAYER) */}
+        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all relative overflow-hidden ${turn === 'player' ? 'bg-[#e61e25] text-white border-white shadow-[0_0_20px_rgba(230,30,37,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
           {isNearWin && (
             <span className="absolute top-1 right-2 text-[8px] bg-yellow-400 text-black px-1 rounded font-black uppercase flex items-center gap-0.5 animate-bounce">
               <Flame size={9} fill="currentColor" /> Winning!
@@ -565,18 +583,6 @@ export default function PerfectClassicLudo() {
             </div>
           </div>
           <span className="w-3 h-3 rounded-full bg-red-400 border border-white" />
-        </div>
-
-        {/* CAFE (YELLOW - BOTTOM RIGHT) */}
-        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'cafe' ? 'bg-[#ffcc00] text-black border-white shadow-[0_0_20px_rgba(255,204,0,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
-          <div className="flex items-center gap-2">
-            <Bot size={18} />
-            <div>
-              <p className="text-xs font-black uppercase">Bum Bum Cafe ☕</p>
-              <p className="text-[10px] font-mono">{tokens.filter(t => t.owner === 'cafe' && t.step === 56).length}/2 In</p>
-            </div>
-          </div>
-          <span className="w-3 h-3 rounded-full bg-yellow-400 border border-black" />
         </div>
       </div>
 
@@ -627,7 +633,7 @@ export default function PerfectClassicLudo() {
         )}
       </AnimatePresence>
 
-      {/* 🎯 HUBAHU CLASSIC 15x15 BOARD (इमेज जैसा 100% सटीक) */}
+      {/* 🎯 EXACT VECTOR IMAGE-MATCHED LUDO BOARD (100% सेम टू सेम) */}
       <div className="w-full max-w-[420px] aspect-square bg-white border-[5px] border-[#000] shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto p-[2px]">
         
         {/* 15x15 ग्रिड सेल्स */}
@@ -635,35 +641,39 @@ export default function PerfectClassicLudo() {
           {Array.from({ length: 15 }).map((_, r) =>
             Array.from({ length: 15 }).map((_, c) => {
               // 4 Base Areas
-              if (r < 6 && c < 6) return null; // Red Base (Top-Left)
-              if (r < 6 && c > 8) return null; // Green Base (Top-Right)
-              if (r > 8 && c < 6) return null; // Blue Base (Bottom-Left)
-              if (r > 8 && c > 8) return null; // Yellow Base (Bottom-Right)
+              if (r < 6 && c < 6) return null; // Top-Left (Green Base)
+              if (r < 6 && c > 8) return null; // Top-Right (Yellow Base)
+              if (r > 8 && c < 6) return null; // Bottom-Left (Red Base)
+              if (r > 8 && c > 8) return null; // Bottom-Right (Cyan/Blue Base)
               if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return null; // Center Box
 
               // Runways
-              const isRedRunway = r === 7 && c >= 1 && c <= 5;
-              const isGreenRunway = c === 7 && r >= 1 && r <= 5;
-              const isYellowRunway = r === 7 && c >= 9 && c <= 13;
-              const isBlueRunway = c === 7 && r >= 9 && r <= 13;
+              const isGreenRunway = r === 7 && c >= 1 && c <= 5;
+              const isYellowRunway = c === 7 && r >= 1 && r <= 5;
+              const isBlueRunway = r === 7 && c >= 9 && c <= 13;
+              const isRedRunway = c === 7 && r >= 9 && r <= 13;
 
-              // Starting Boxes
-              const isRedStart = r === 6 && c === 1;
-              const isGreenStart = r === 1 && c === 8;
-              const isYellowStart = r === 8 && c === 13;
-              const isBlueStart = r === 13 && c === 6;
+              // Starting Boxes matching the image
+              const isGreenStart = r === 6 && c === 1;
+              const isYellowStart = r === 1 && c === 8;
+              const isBlueStart = r === 8 && c === 13;
+              const isRedStart = r === 13 && c === 6;
 
               let bg = 'bg-white';
-              if (isRedRunway || isRedStart) bg = 'bg-[#ff2d2d]';
-              if (isGreenRunway || isGreenStart) bg = 'bg-[#2ecc71]';
-              if (isYellowRunway || isYellowStart) bg = 'bg-[#ffcc00]';
-              if (isBlueRunway || isBlueStart) bg = 'bg-[#00a8ff]';
+              if (isGreenRunway || isGreenStart) bg = 'bg-[#00a651]';
+              if (isYellowRunway || isYellowStart) bg = 'bg-[#ffc20e]';
+              if (isBlueRunway || isBlueStart) bg = 'bg-[#00aeef]';
+              if (isRedRunway || isRedStart) bg = 'bg-[#ed1c24]';
 
-              // Stars / Safe Spots (Exact image spots)
-              const isRedStar = r === 2 && c === 8;
-              const isGreenStar = r === 8 && c === 12;
-              const isYellowStar = r === 12 && c === 6;
-              const isBlueStar = r === 6 && c === 2;
+              // Stars with light gray background matching image exactly
+              const isGreenStar = r === 8 && c === 2;
+              const isYellowStar = r === 2 && c === 6;
+              const isBlueStar = r === 6 && c === 12;
+              const isRedStar = r === 12 && c === 8;
+
+              if (isGreenStar || isYellowStar || isBlueStar || isRedStar) {
+                bg = 'bg-[#e2e8f0]';
+              }
 
               return (
                 <div
@@ -672,84 +682,89 @@ export default function PerfectClassicLudo() {
                   className={`border-[0.5px] border-black relative flex items-center justify-center ${bg}`}
                 >
                   {/* Arrows as per image */}
-                  {r === 7 && c === 0 && <span className="text-[10px] font-black text-[#ff2d2d]">➡</span>}
-                  {r === 0 && c === 7 && <span className="text-[10px] font-black text-[#2ecc71]">⬇</span>}
-                  {r === 7 && c === 14 && <span className="text-[10px] font-black text-[#ffcc00]">⬅</span>}
-                  {r === 14 && c === 7 && <span className="text-[10px] font-black text-[#00a8ff]">⬆</span>}
+                  {r === 7 && c === 0 && <span className="text-[11px] font-black text-[#00a651]">➡</span>}
+                  {r === 0 && c === 7 && <span className="text-[11px] font-black text-[#ffc20e]">⬇</span>}
+                  {r === 7 && c === 14 && <span className="text-[11px] font-black text-[#00aeef]">⬅</span>}
+                  {r === 14 && c === 7 && <span className="text-[11px] font-black text-[#ed1c24]">⬆</span>}
 
-                  {/* Stars matching image */}
-                  {isRedStar && <span className="text-[11px] font-black text-[#ff2d2d]">★</span>}
-                  {isGreenStar && <span className="text-[11px] font-black text-[#2ecc71]">★</span>}
-                  {isYellowStar && <span className="text-[11px] font-black text-[#ffcc00]">★</span>}
-                  {isBlueStar && <span className="text-[11px] font-black text-[#00a8ff]">★</span>}
+                  {/* Gray Stars matching image */}
+                  {(isGreenStar || isYellowStar || isBlueStar || isRedStar) && (
+                    <span className="text-[12px] font-black text-[#475569]">★</span>
+                  )}
                 </div>
               );
             })
           )}
         </div>
 
-        {/* 🔴 RED BASE (TOP-LEFT - 0 to 5) */}
+        {/* 🟢 GREEN BASE (TOP-LEFT) */}
         <div
           style={{ top: '0%', left: '0%', width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
-          className="absolute bg-[#ff2d2d] p-[10px] flex items-center justify-center z-10 border-r border-b border-black"
+          className="absolute bg-[#00a651] p-[10px] flex items-center justify-center z-10 border-r border-b border-black"
         >
-          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
+          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2 border border-black">
             {[0, 1, 2, 3].map(i => (
-              <div key={i} className="aspect-square rounded-full bg-[#ff2d2d]" />
+              <div key={i} className="aspect-square rounded-full bg-[#00a651] border border-black shadow-sm" />
             ))}
           </div>
         </div>
 
-        {/* 🟢 GREEN BASE (TOP-RIGHT - 9 to 14) */}
+        {/* 🟡 YELLOW BASE (TOP-RIGHT - BUM BUM CAFE ☕) */}
         <div
           style={{ top: '0%', left: `${(9 / 15) * 100}%`, width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
-          className="absolute bg-[#2ecc71] p-[10px] flex items-center justify-center z-10 border-l border-b border-black"
+          className="absolute bg-[#ffc20e] p-[10px] flex items-center justify-center z-10 border-l border-b border-black"
         >
-          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
+          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2 border border-black relative">
             {[0, 1, 2, 3].map(i => (
-              <div key={i} className="aspect-square rounded-full bg-[#2ecc71]" />
+              <div key={i} className="aspect-square rounded-full bg-[#ffc20e] border border-black shadow-sm" />
             ))}
+            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black uppercase text-amber-900 bg-white/70 rounded pointer-events-none">
+              Cafe ☕
+            </span>
           </div>
         </div>
 
-        {/* 🔵 BLUE BASE (BOTTOM-LEFT - 9 to 14) */}
+        {/* 🔴 RED BASE (BOTTOM-LEFT - CUSTOMER) */}
         <div
           style={{ top: `${(9 / 15) * 100}%`, left: '0%', width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
-          className="absolute bg-[#00a8ff] p-[10px] flex items-center justify-center z-10 border-r border-t border-black"
+          className="absolute bg-[#ed1c24] p-[10px] flex items-center justify-center z-10 border-r border-t border-black"
         >
-          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
+          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2 border border-black relative">
             {[0, 1, 2, 3].map(i => (
-              <div key={i} className="aspect-square rounded-full bg-[#00a8ff]" />
+              <div key={i} className="aspect-square rounded-full bg-[#ed1c24] border border-black shadow-sm" />
             ))}
+            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black uppercase text-red-900 bg-white/70 rounded pointer-events-none truncate px-1">
+              {customerName || 'You'}
+            </span>
           </div>
         </div>
 
-        {/* 🟡 YELLOW BASE (BOTTOM-RIGHT - 9 to 14) */}
+        {/* 🔵 CYAN/LIGHT BLUE BASE (BOTTOM-RIGHT) */}
         <div
           style={{ top: `${(9 / 15) * 100}%`, left: `${(9 / 15) * 100}%`, width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
-          className="absolute bg-[#ffcc00] p-[10px] flex items-center justify-center z-10 border-l border-t border-black"
+          className="absolute bg-[#00aeef] p-[10px] flex items-center justify-center z-10 border-l border-t border-black"
         >
-          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2">
+          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2 border border-black">
             {[0, 1, 2, 3].map(i => (
-              <div key={i} className="aspect-square rounded-full bg-[#ffcc00]" />
+              <div key={i} className="aspect-square rounded-full bg-[#00aeef] border border-black shadow-sm" />
             ))}
           </div>
         </div>
 
-        {/* 🏆 CENTER TRIANGLES (3x3 Center Box) */}
+        {/* 🏆 CENTER TRIANGLES (Image matching exactly) */}
         <div
           style={{ top: `${(6 / 15) * 100}%`, left: `${(6 / 15) * 100}%`, width: `${(3 / 15) * 100}%`, height: `${(3 / 15) * 100}%` }}
           className="absolute overflow-hidden z-10 border border-black"
         >
           <svg viewBox="0 0 100 100" className="w-full h-full">
-            {/* Top Green */}
-            <polygon points="0,0 50,50 100,0" fill="#2ecc71" stroke="#000" strokeWidth="1" />
-            {/* Right Yellow */}
-            <polygon points="100,0 50,50 100,100" fill="#ffcc00" stroke="#000" strokeWidth="1" />
-            {/* Bottom Blue */}
-            <polygon points="0,100 50,50 100,100" fill="#00a8ff" stroke="#000" strokeWidth="1" />
-            {/* Left Red */}
-            <polygon points="0,0 50,50 0,100" fill="#ff2d2d" stroke="#000" strokeWidth="1" />
+            {/* Top Yellow */}
+            <polygon points="0,0 50,50 100,0" fill="#ffc20e" stroke="#000" strokeWidth="1" />
+            {/* Right Blue */}
+            <polygon points="100,0 50,50 100,100" fill="#00aeef" stroke="#000" strokeWidth="1" />
+            {/* Bottom Red */}
+            <polygon points="0,100 50,50 100,100" fill="#ed1c24" stroke="#000" strokeWidth="1" />
+            {/* Left Green */}
+            <polygon points="0,0 50,50 0,100" fill="#00a651" stroke="#000" strokeWidth="1" />
           </svg>
         </div>
 
@@ -788,10 +803,10 @@ export default function PerfectClassicLudo() {
                 animate={canMove && turn === 'player' ? { scale: [1, 1.25, 1], y: [0, -4, 0] } : { scale: 1 }}
                 transition={canMove ? { repeat: Infinity, duration: 0.6 } : {}}
                 className={`w-full h-full rounded-full border-2 border-white shadow-[0_4px_8px_rgba(0,0,0,0.6)] flex items-center justify-center relative ${
-                  token.owner === 'player' ? 'bg-[#ff2d2d]' : 'bg-[#ffcc00]'
+                  token.owner === 'player' ? 'bg-[#ed1c24]' : 'bg-[#ffc20e]'
                 } ${canMove && turn === 'player' ? 'ring-2 ring-white shadow-[0_0_12px_#fff]' : ''}`}
               >
-                {/* 3D Top Ring */}
+                {/* 3D Top Inner Ring */}
                 <div className="w-[50%] h-[50%] rounded-full bg-white/40 shadow-inner" />
               </motion.div>
             </motion.div>
@@ -799,12 +814,12 @@ export default function PerfectClassicLudo() {
         })}
       </div>
 
-      {/* FOOTER CONTROLS & DICE */}
+      {/* FOOTER CONTROLS & DICE BUTTON */}
       <footer className="w-full max-w-md bg-neutral-900/90 border border-white/10 rounded-3xl p-3 flex justify-between items-center shadow-2xl shrink-0 mt-2">
         <div>
           <span className="text-[10px] text-neutral-400 font-bold uppercase block">किसकी चाल:</span>
-          <p className={`text-base font-black uppercase flex items-center gap-1.5 ${turn === 'player' ? 'text-red-500' : 'text-yellow-400'}`}>
-            <span className={`w-3 h-3 rounded-full ${turn === 'player' ? 'bg-[#ff2d2d]' : 'bg-[#ffcc00]'}`} />
+          <p className={`text-base font-black uppercase flex items-center gap-1.5 ${turn === 'player' ? 'text-[#ed1c24]' : 'text-[#ffc20e]'}`}>
+            <span className={`w-3 h-3 rounded-full ${turn === 'player' ? 'bg-[#ed1c24]' : 'bg-[#ffc20e]'}`} />
             {turn === 'player' ? `${customerName || 'आपकी'} चाल` : 'Bum Bum Cafe (खेल रहा है...)'}
           </p>
           <span className="text-[10px] text-neutral-500 font-bold">
@@ -814,7 +829,7 @@ export default function PerfectClassicLudo() {
           </span>
         </div>
 
-        {/* 🎲 DICE BUTTON */}
+        {/* 🎲 3D DICE BUTTON */}
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => handleRollDice(false)}
@@ -822,7 +837,7 @@ export default function PerfectClassicLudo() {
           className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center font-mono font-black text-3xl shadow-xl transition-all ${
             hasRolled || turn !== 'player' || isAnimatingMove
               ? 'bg-neutral-800 border-neutral-700 text-neutral-500 cursor-not-allowed'
-              : 'bg-[#ff2d2d] border-white text-white shadow-[0_0_20px_rgba(255,45,45,0.4)] animate-pulse cursor-pointer'
+              : 'bg-[#ed1c24] border-white text-white shadow-[0_0_20px_rgba(237,28,36,0.4)] animate-pulse cursor-pointer'
           }`}
         >
           {rolling ? (
