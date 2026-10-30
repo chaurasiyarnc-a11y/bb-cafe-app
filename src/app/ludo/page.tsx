@@ -60,12 +60,12 @@ const getRandomReward = (): string => {
 
 export default function LudoVersusCafe() {
   const [turn, setTurn] = useState<Player>('player');
-  const [dice, setDice] = useState<number>(6);
+  const [dice, setDice] = useState<number | null>(null); // डिफ़ॉल्ट null ताकि बिना रोल किए अंक न दिखे
   const [rolling, setRolling] = useState(false);
-  const [hasRolled, setHasRolled] = useState(false);
+  const [hasRolled, setHasRolled] = useState(false); // जब तक पासा नहीं फेका, तब तक false
   const [soundEnabled, setSoundEnabled] = useState(true);
   
-  // 75% कैफ़े को जिताने का बिज़नेस चांस
+  // 75% Cafe Winner Logic
   const [targetWinner] = useState<Player>(() => Math.random() < 0.75 ? 'cafe' : 'player');
   const [winner, setWinner] = useState<Player | null>(null);
   const [rewardWon, setRewardWon] = useState<string>('');
@@ -80,7 +80,6 @@ export default function LudoVersusCafe() {
     { id: 4, owner: 'cafe', slotIndex: 1, step: -1 },
   ]);
 
-  // 🔥 Stale State फिक्स: हमेशा ताज़ा वैल्यूज रखने के लिए Refs
   const tokensRef = useRef(tokens);
   tokensRef.current = tokens;
   const turnRef = useRef(turn);
@@ -89,6 +88,10 @@ export default function LudoVersusCafe() {
   rollingRef.current = rolling;
   const winnerRef = useRef(winner);
   winnerRef.current = winner;
+  const hasRolledRef = useRef(hasRolled);
+  hasRolledRef.current = hasRolled;
+  const diceRef = useRef<number | null>(dice);
+  diceRef.current = dice;
 
   const playSfx = (type: 'roll' | 'step' | 'cut') => {
     if (!soundEnabled || typeof window === 'undefined') return;
@@ -124,14 +127,13 @@ export default function LudoVersusCafe() {
     }
   };
 
-  // 🎲 75% बायस्ड डाइस लॉजिक
   const getBiasedDiceRoll = (playerTurn: Player): number => {
     const raw = Math.floor(Math.random() * 6) + 1;
     if (targetWinner === 'cafe') {
       if (playerTurn === 'cafe') {
         const cafeTokens = tokensRef.current.filter(t => t.owner === 'cafe');
         const inBase = cafeTokens.some(t => t.step === -1);
-        if (inBase && Math.random() < 0.65) return 6; // बेस से बाहर निकालने में मदद
+        if (inBase && Math.random() < 0.65) return 6;
         if (Math.random() < 0.5) return Math.random() < 0.5 ? 5 : 6;
       } else {
         const playerTokens = tokensRef.current.filter(t => t.owner === 'player');
@@ -142,9 +144,9 @@ export default function LudoVersusCafe() {
     return raw;
   };
 
-  // रोल पासा (कस्टमर या ऑटो बोट)
+  // रोल पासा
   const handleRollDice = (isBot = false) => {
-    if (rollingRef.current || winnerRef.current) return;
+    if (rollingRef.current || winnerRef.current || hasRolledRef.current) return;
     if (turnRef.current === 'cafe' && !isBot) return;
 
     setRolling(true);
@@ -184,36 +186,35 @@ export default function LudoVersusCafe() {
     });
 
     if (movable.length === 0) {
-      // कोई चाल नहीं मिली
+      toast('कोई चाल संभव नहीं! ⏭️', { duration: 1200 });
       setTimeout(() => switchTurn(false), 900);
     } else if (currentTurn === 'cafe') {
-      // 🤖 बोट का ऑटो मूव निर्णय
       setTimeout(() => {
         const currentTokens = tokensRef.current;
-        
-        // 1. क्या किसी चाल से कस्टमर की गोटी कट रही है?
         const killMove = movable.find(t => {
           const targetStep = t.step === -1 ? 0 : t.step + rollVal;
           const targetGlobal = (START_OFFSETS.cafe + targetStep) % 52;
           return currentTokens.some(other => other.owner === 'player' && other.step >= 0 && other.step < 51 && (START_OFFSETS.player + other.step) % 52 === targetGlobal);
         });
 
-        // 2. क्या 6 आया है और कोई गोटी बेस में पड़ी है?
         const baseMove = movable.find(t => t.step === -1);
-
-        // 3. सबसे आगे वाली गोटी को बढ़ाओ
         const forwardMove = [...movable].sort((a, b) => b.step - a.step)[0];
 
         const chosenToken = killMove || baseMove || forwardMove || movable[0];
         handleMoveToken(chosenToken, rollVal);
       }, 600);
     } else if (movable.length === 1 && movable[0].step === -1 && rollVal === 6) {
-      // कस्टमर की सिर्फ 1 गोटी बेस में है और 6 आया तो ऑटो बाहर निकालें
       setTimeout(() => handleMoveToken(movable[0], rollVal), 400);
     }
   };
 
-  const handleMoveToken = (token: Token, rollValue: number = dice) => {
+  // 🛡️ गोटी चलने का सबसे सुरक्षित लॉजिक (बिना पासे के कोई चाल नहीं)
+  const handleMoveToken = (token: Token, rollValue: number | null = diceRef.current) => {
+    // ❌ कड़ा पहरा: अगर पासा नहीं फेंका गया तो चाल बिल्कुल नहीं चलेगी!
+    if (!hasRolledRef.current || rollValue === null) {
+      return toast.error("कृपया पहले पासा (Dice) फेंकें! 🎲");
+    }
+
     if (token.owner !== turnRef.current || winnerRef.current) return;
 
     let targetStep = token.step;
@@ -252,6 +253,7 @@ export default function LudoVersusCafe() {
     }
 
     setTokens(updated);
+    // 🔥 चाल पूरी होते ही पासा तुरंत लॉक करें
     setHasRolled(false);
 
     // 🏆 जीत की जांच
@@ -274,6 +276,7 @@ export default function LudoVersusCafe() {
 
     // 6 आने पर या गोटी काटने पर दोबारा चाल
     if (rollValue === 6 || captured) {
+      toast(rollValue === 6 ? '6 आया! फिर से पासा फेंकें 🎯' : 'गोटी काटी! बोनस चाल ⚔️', { duration: 1500 });
       if (turnRef.current === 'cafe') {
         setTimeout(() => handleRollDice(true), 700);
       }
@@ -284,6 +287,7 @@ export default function LudoVersusCafe() {
 
   const switchTurn = (extra = false) => {
     setHasRolled(false);
+    setDice(null); // पासे का अंक रीसेट करें ताकि भ्रम न हो
     if (!extra) {
       const next: Player = turnRef.current === 'player' ? 'cafe' : 'player';
       setTurn(next);
@@ -350,7 +354,7 @@ export default function LudoVersusCafe() {
           <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300">
             {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
-          <button onClick={() => { setTokens(tokens.map(t => ({ ...t, step: -1 }))); setWinner(null); setHasRolled(false); setTurn('player'); }} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300">
+          <button onClick={() => { setTokens(tokens.map(t => ({ ...t, step: -1 }))); setWinner(null); setHasRolled(false); setDice(null); setTurn('player'); }} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300">
             <RefreshCw size={18} />
           </button>
         </div>
@@ -421,7 +425,7 @@ export default function LudoVersusCafe() {
                   </div>
                   <h2 className="text-xl font-black uppercase text-rose-400">CAFE WON! ☕</h2>
                   <p className="text-xs text-neutral-300 font-bold">इस बार Bum Bum Cafe जीत गया! अगली बार फिर कोशिश करें।</p>
-                  <button onClick={() => { setTokens(tokens.map(t => ({ ...t, step: -1 }))); setWinner(null); setTurn('player'); }} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-black uppercase text-xs rounded-xl transition-all">
+                  <button onClick={() => { setTokens(tokens.map(t => ({ ...t, step: -1 }))); setWinner(null); setDice(null); setTurn('player'); }} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-black uppercase text-xs rounded-xl transition-all">
                     Play Again (दोबारा खेलें)
                   </button>
                 </>
@@ -431,7 +435,7 @@ export default function LudoVersusCafe() {
         )}
       </AnimatePresence>
 
-      {/* 🎯 15×15 ASYMMETRICAL 1v1 BOARD */}
+      {/* 🎯 15×15 1v1 BOARD */}
       <div className="w-full max-w-[420px] aspect-square bg-[#fff] border-[6px] border-[#222] rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto p-1">
         
         {/* ग्रिड सेल्स */}
@@ -506,7 +510,12 @@ export default function LudoVersusCafe() {
         {tokens.map(token => {
           const [r, c] = getTokenCoords(token);
           const isMyTurn = token.owner === turn;
-          const canMove = hasRolled && isMyTurn && ((token.step === -1 && dice === 6) || (token.step >= 0 && token.step + dice <= 56));
+          
+          // 🛡️ सिर्फ और सिर्फ तभी गोटी बाउंस होगी और क्लिक होगी जब पासा फेंका जा चुका हो!
+          const canMove = hasRolled && isMyTurn && dice !== null && (
+            (token.step === -1 && dice === 6) ||
+            (token.step >= 0 && token.step + dice <= 56)
+          );
 
           return (
             <motion.div
@@ -520,9 +529,16 @@ export default function LudoVersusCafe() {
                 height: `${100 / 15}%`
               }}
               onClick={() => {
-                if (turn === 'player') handleMoveToken(token);
+                // अगर पासा नहीं फेंका तो क्लिक बिल्कुल काम नहीं करेगा
+                if (canMove && turn === 'player') {
+                  handleMoveToken(token);
+                } else if (!hasRolled && turn === 'player') {
+                  toast.error("पहले पासा फेंकें! 🎲");
+                }
               }}
-              className="absolute z-30 flex items-center justify-center p-0.5 cursor-pointer"
+              className={`absolute z-30 flex items-center justify-center p-0.5 ${
+                canMove && turn === 'player' ? 'cursor-pointer pointer-events-auto' : 'pointer-events-auto'
+              }`}
             >
               <motion.div
                 animate={canMove && turn === 'player' ? { scale: [1, 1.25, 1], y: [0, -4, 0] } : { scale: 1 }}
@@ -547,10 +563,13 @@ export default function LudoVersusCafe() {
             {turn === 'player' ? 'आपकी चाल (Your Turn)' : 'Bum Bum Cafe (खेल रहा है...)'}
           </p>
           <span className="text-[10px] text-neutral-500 font-bold">
-            {turn === 'player' ? (hasRolled ? '👉 अपनी गोटी पर टैप करें' : 'पासा फेंकें') : 'कंप्यूटर सोच रहा है...'}
+            {turn === 'player' 
+              ? (hasRolled ? '👉 अब अपनी गोटी पर टैप करें' : '👉 पहले पासा फेंकने के लिए बटन दबाएं') 
+              : 'कंप्यूटर सोच रहा है...'}
           </span>
         </div>
 
+        {/* 🎲 DICE BUTTON */}
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => handleRollDice(false)}
@@ -558,7 +577,7 @@ export default function LudoVersusCafe() {
           className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center font-mono font-black text-3xl shadow-xl transition-all ${
             hasRolled || turn !== 'player'
               ? 'bg-neutral-800 border-neutral-700 text-neutral-500 cursor-not-allowed'
-              : 'bg-rose-500 border-white text-white shadow-[0_0_20px_rgba(244,63,94,0.4)] animate-pulse'
+              : 'bg-rose-500 border-white text-white shadow-[0_0_20px_rgba(244,63,94,0.4)] animate-pulse cursor-pointer'
           }`}
         >
           {rolling ? (
@@ -566,7 +585,7 @@ export default function LudoVersusCafe() {
               🎲
             </motion.span>
           ) : (
-            <span>{dice}</span>
+            <span>{dice !== null ? dice : '🎲'}</span>
           )}
         </motion.button>
       </footer>
