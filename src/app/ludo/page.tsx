@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 type Player = 'player' | 'cafe'; 
-// Player = Red (Bottom-Left), Cafe = Yellow (Top-Right - ऊपर)
+// Player = Red (Bottom-Left), Cafe = Yellow (Top-Right)
 
 interface Token {
   id: number;
@@ -17,12 +17,12 @@ interface Token {
   step: number; // -1 = Base, 0 to 50 = Track, 51 to 55 = Runway, 56 = Home
 }
 
-// 15x15 ग्रिड के 52 मुख्य ट्रैक कोऑर्डिनेट्स [row, col]
+// 15x15 ट्रैक कोऑर्डिनेट्स [row, col]
 const BOARD_PATH: [number, number][] = [
   // Red Track Starts (Row 13 Col 6 going up & clockwise)
   [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
   [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
-  [7, 0], // Left Arrow junction
+  [7, 0], // Left Arrow
   [6, 0], [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
   [5, 6], [4, 6], [3, 6], [2, 6], [1, 6], [0, 6],
   [0, 7], // Top junction
@@ -35,25 +35,23 @@ const BOARD_PATH: [number, number][] = [
   [14, 6]  // Red entrance
 ];
 
-// Player (Red Bottom-Left) Offset = 0, Cafe (Yellow Top-Right) Offset = 26
 const START_OFFSETS: Record<Player, number> = {
   player: 0,
   cafe: 26
 };
 
-// Home Runways (जीत की ओर जाने वाले 5 खाने)
 const RUNWAYS: Record<Player, [number, number][]> = {
   player: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]], // Red Runway (Bottom to Center)
   cafe: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]]       // Yellow Runway (Top to Center)
 };
 
-// 4 बेस के अंदर 2 गोल पॉकेट्स [row, col]
+// बेस के गोलों के बिल्कुल केंद्र कोऑर्डिनेट्स [row, col]
 const BASE_POCKETS: Record<Player, [number, number][]> = {
-  player: [[11, 2], [12, 3]],   // Red Base (Bottom-Left)
-  cafe: [[2, 11], [3, 12]]      // Yellow Base (Top-Right - ऊपर)
+  player: [[11.5, 1.8], [11.5, 3.8]], // Red Base Inside
+  cafe: [[2.5, 10.8], [2.5, 12.8]]    // Yellow Base Inside
 };
 
-export default function AuthenticLudoVersusCafe() {
+export default function PerfectClassicLudo() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [isCustomerVerified, setIsCustomerVerified] = useState(false);
@@ -67,12 +65,10 @@ export default function AuthenticLudoVersusCafe() {
   const [isAnimatingMove, setIsAnimatingMove] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   
-  // 75% बार कैफ़े जीतेगा, 25% ग्राहक
   const [targetWinner, setTargetWinner] = useState<Player>(() => Math.random() < 0.75 ? 'cafe' : 'player');
   const [winner, setWinner] = useState<Player | null>(null);
   const [voucherCode, setVoucherCode] = useState('');
 
-  // 2-2 गोटियां
   const [tokens, setTokens] = useState<Token[]>([
     { id: 1, owner: 'player', slotIndex: 0, step: -1 },
     { id: 2, owner: 'player', slotIndex: 1, step: -1 },
@@ -95,7 +91,7 @@ export default function AuthenticLudoVersusCafe() {
   const diceRef = useRef<number | null>(dice);
   diceRef.current = dice;
 
-  // 🔊 शुद्ध वेब ऑडियो साउंड्स (Procedural Sound Engine)
+  // 🔊 सिंथेसाइज्ड साउंड्स
   const playSfx = (type: 'roll' | 'step' | 'cut' | 'win') => {
     if (!soundEnabled || typeof window === 'undefined') return;
     try {
@@ -103,7 +99,6 @@ export default function AuthenticLudoVersusCafe() {
       const ctx = new AudioCtx();
 
       if (type === 'roll') {
-        // डाइस की खड़खड़ाहट
         for (let i = 0; i < 6; i++) {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
@@ -117,7 +112,6 @@ export default function AuthenticLudoVersusCafe() {
           osc.stop(ctx.currentTime + i * 0.04 + 0.035);
         }
       } else if (type === 'step') {
-        // लकड़ी पर गोटी पड़ने की असली 'टक' आवाज़
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
@@ -129,7 +123,6 @@ export default function AuthenticLudoVersusCafe() {
         gain.connect(ctx.destination);
         osc.start(); osc.stop(ctx.currentTime + 0.1);
       } else if (type === 'cut') {
-        // गोटी कटना (लड़ाकू स्लैश)
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sawtooth';
@@ -141,7 +134,6 @@ export default function AuthenticLudoVersusCafe() {
         gain.connect(ctx.destination);
         osc.start(); osc.stop(ctx.currentTime + 0.32);
       } else if (type === 'win') {
-        // विजय बिगुल (Victory Fanfare)
         [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
@@ -158,7 +150,6 @@ export default function AuthenticLudoVersusCafe() {
     } catch {}
   };
 
-  // 🔍 मोबाइल नंबर लुकअप
   const handlePhoneLookup = async (inputPhone: string) => {
     const clean = inputPhone.replace(/\D/g, '').slice(0, 10);
     setCustomerPhone(clean);
@@ -206,7 +197,6 @@ export default function AuthenticLudoVersusCafe() {
     toast.success(`चैलेंज शुरू! हराओ Bum Bum Cafe को! ⚔️`);
   };
 
-  // 🎲 75% सस्पेंस भरा लड़ाकू पासा (Clash Engine)
   const getBiasedDiceRoll = (playerTurn: Player): number => {
     const raw = Math.floor(Math.random() * 6) + 1;
     const currentTokens = tokensRef.current;
@@ -216,7 +206,6 @@ export default function AuthenticLudoVersusCafe() {
     const activeTokens = playerTurn === 'player' ? playerTokens : cafeTokens;
     const enemyTokens = playerTurn === 'player' ? cafeTokens : playerTokens;
 
-    // ⚔️ गोटी काटने का मौका पहले तलाशें
     for (let r = 1; r <= 6; r++) {
       const canKill = activeTokens.some(t => {
         if (t.step === -1) return false;
@@ -234,14 +223,12 @@ export default function AuthenticLudoVersusCafe() {
 
     const isPlayerNearWinning = playerTokens.some(t => t.step >= 53) || playerTokens.filter(t => t.step === 56).length === 1;
 
-    // 75% बार कैफ़े की जीत तय करने का रोमांचक ड्रामा
     if (targetWinner === 'cafe') {
       if (playerTurn === 'player') {
         if (!isPlayerNearWinning) {
           const inBase = playerTokens.some(t => t.step === -1);
           if (inBase && Math.random() < 0.6) return 6;
         } else {
-          // जीत के मुहाने पर गोटी अटकाना
           const needed = playerTokens.map(t => 56 - t.step).filter(d => d > 0 && d <= 6);
           if (needed.length > 0 && Math.random() < 0.8) {
             const wrong = [1, 2, 3, 4, 5, 6].filter(n => !needed.includes(n));
@@ -323,7 +310,7 @@ export default function AuthenticLudoVersusCafe() {
     }
   };
 
-  // 🚶‍♂️ स्टेप-बाय-स्टेप धीमा चलना (Slow Walking: 300ms per step)
+  // 🐢 धीमा चलना (Slow 300ms Step-by-Step)
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
     if (!hasRolledRef.current || rollValue === null || isAnimatingMoveRef.current) {
       return toast.error("पहले पासा फेंकें! 🎲");
@@ -347,7 +334,6 @@ export default function AuthenticLudoVersusCafe() {
         currentStep += 1;
         playSfx('step');
         setTokens(prev => prev.map(t => t.id === token.id ? { ...t, step: currentStep } : t));
-        // 🐢 Slow walking: 300ms ताकि हर कदम साफ दिखे
         await new Promise(r => setTimeout(r, 300));
       }
     }
@@ -363,7 +349,6 @@ export default function AuthenticLudoVersusCafe() {
     const myGlobal = getGlobal(turnRef.current, finalStep);
     let captured = false;
 
-    // ⚔️ काटना (Kill Strike)
     if (myGlobal !== -1) {
       const safe = [0, 8, 13, 21, 26, 34, 39, 47];
       if (!safe.includes(myGlobal)) {
@@ -382,7 +367,6 @@ export default function AuthenticLudoVersusCafe() {
 
     setIsAnimatingMove(false);
 
-    // 🏆 जीत का फैसला
     const homeCount = updated.filter(t => t.owner === turnRef.current && t.step === 56).length;
     if (homeCount === 2) {
       const winningSide = turnRef.current;
@@ -402,7 +386,7 @@ export default function AuthenticLudoVersusCafe() {
           voucherCode: code,
           voucherClaimed: false,
           lastPlayedAt: new Date(),
-          importSource: 'LudoExact'
+          importSource: 'LudoClassic'
         }, { merge: true }).catch(() => {});
       } else {
         toast.error("😱 ओह्ह! कैफ़े ने मैच निकाल लिया! Manchurian हाथ से निकल गया!");
@@ -443,7 +427,6 @@ export default function AuthenticLudoVersusCafe() {
     setTargetWinner(Math.random() < 0.75 ? 'cafe' : 'player');
   };
 
-  // पिक्सेल-परफेक्ट ग्रिड कोऑर्डिनेट्स [row, col]
   const getTokenCoords = (t: Token): [number, number] => {
     if (t.step === -1) {
       const pocket = BASE_POCKETS[t.owner]?.[t.slotIndex];
@@ -467,7 +450,7 @@ export default function AuthenticLudoVersusCafe() {
     <div className="min-h-screen bg-[#07080c] text-white flex flex-col justify-between items-center p-2 sm:p-4 select-none font-sans">
       <Toaster position="top-center" />
 
-      {/* 🥟 स्पेशल लॉगिन बॉक्स (इनाम के साथ) */}
+      {/* 🥟 स्पेशल लॉगिन बॉक्स */}
       <AnimatePresence>
         {!isCustomerVerified && (
           <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
@@ -554,7 +537,7 @@ export default function AuthenticLudoVersusCafe() {
         </div>
       </header>
 
-      {/* HUD CARDS: BUM BUM CAFE (TOP) & CUSTOMER (BOTTOM) */}
+      {/* HUD CARDS */}
       <div className="w-full max-w-md grid grid-cols-2 gap-3 my-2 shrink-0">
         {/* CAFE (YELLOW - TOP RIGHT PLAYER) */}
         <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${turn === 'cafe' ? 'bg-[#ffc20e] text-black border-white shadow-[0_0_20px_rgba(255,194,14,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
@@ -569,7 +552,7 @@ export default function AuthenticLudoVersusCafe() {
         </div>
 
         {/* CUSTOMER (RED - BOTTOM LEFT PLAYER) */}
-        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all relative overflow-hidden ${turn === 'player' ? 'bg-[#e61e25] text-white border-white shadow-[0_0_20px_rgba(230,30,37,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
+        <div className={`p-3 rounded-2xl border flex items-center justify-between transition-all relative overflow-hidden ${turn === 'player' ? 'bg-[#ed1c24] text-white border-white shadow-[0_0_20px_rgba(237,28,36,0.4)] ring-2 ring-white/50' : 'bg-white/5 border-white/10 text-neutral-400 opacity-60'}`}>
           {isNearWin && (
             <span className="absolute top-1 right-2 text-[8px] bg-yellow-400 text-black px-1 rounded font-black uppercase flex items-center gap-0.5 animate-bounce">
               <Flame size={9} fill="currentColor" /> Winning!
@@ -633,142 +616,111 @@ export default function AuthenticLudoVersusCafe() {
         )}
       </AnimatePresence>
 
-      {/* 🎯 EXACT VECTOR IMAGE-MATCHED LUDO BOARD (100% सेम टू सेम) */}
-      <div className="w-full max-w-[420px] aspect-square bg-white border-[5px] border-[#000] shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto p-[2px]">
-        
-        {/* 15x15 ग्रिड सेल्स */}
-        <div className="w-full h-full grid grid-cols-15 grid-rows-15">
+      {/* 🎯 शुद्ध गणितीय 15×15 SVG बोर्ड (सारे खाने 100% एक बराबर साइज के) */}
+      <div className="w-full max-w-[420px] aspect-square bg-white border-[6px] border-[#000] shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto">
+        <svg viewBox="0 0 15 15" className="w-full h-full block">
+          {/* 1. बैकग्राउंड ग्रिड सेल्स (1.0 × 1.0 के 100% बराबर चौकोर खाने) */}
           {Array.from({ length: 15 }).map((_, r) =>
             Array.from({ length: 15 }).map((_, c) => {
-              // 4 Base Areas
-              if (r < 6 && c < 6) return null; // Top-Left (Green Base)
-              if (r < 6 && c > 8) return null; // Top-Right (Yellow Base)
-              if (r > 8 && c < 6) return null; // Bottom-Left (Red Base)
-              if (r > 8 && c > 8) return null; // Bottom-Right (Cyan/Blue Base)
-              if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return null; // Center Box
+              if (r < 6 && c < 6) return null;
+              if (r < 6 && c > 8) return null;
+              if (r > 8 && c < 6) return null;
+              if (r > 8 && c > 8) return null;
+              if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return null;
 
-              // Runways
               const isGreenRunway = r === 7 && c >= 1 && c <= 5;
               const isYellowRunway = c === 7 && r >= 1 && r <= 5;
               const isBlueRunway = r === 7 && c >= 9 && c <= 13;
               const isRedRunway = c === 7 && r >= 9 && r <= 13;
 
-              // Starting Boxes matching the image
               const isGreenStart = r === 6 && c === 1;
               const isYellowStart = r === 1 && c === 8;
               const isBlueStart = r === 8 && c === 13;
               const isRedStart = r === 13 && c === 6;
 
-              let bg = 'bg-white';
-              if (isGreenRunway || isGreenStart) bg = 'bg-[#00a651]';
-              if (isYellowRunway || isYellowStart) bg = 'bg-[#ffc20e]';
-              if (isBlueRunway || isBlueStart) bg = 'bg-[#00aeef]';
-              if (isRedRunway || isRedStart) bg = 'bg-[#ed1c24]';
+              let fill = '#ffffff';
+              if (isGreenRunway || isGreenStart) fill = '#00a651';
+              if (isYellowRunway || isYellowStart) fill = '#ffc20e';
+              if (isBlueRunway || isBlueStart) fill = '#00aeef';
+              if (isRedRunway || isRedStart) fill = '#ed1c24';
 
-              // Stars with light gray background matching image exactly
               const isGreenStar = r === 8 && c === 2;
               const isYellowStar = r === 2 && c === 6;
               const isBlueStar = r === 6 && c === 12;
               const isRedStar = r === 12 && c === 8;
-
-              if (isGreenStar || isYellowStar || isBlueStar || isRedStar) {
-                bg = 'bg-[#e2e8f0]';
-              }
+              if (isGreenStar || isYellowStar || isBlueStar || isRedStar) fill = '#e2e8f0';
 
               return (
-                <div
-                  key={`${r}-${c}`}
-                  style={{ gridRowStart: r + 1, gridColumnStart: c + 1 }}
-                  className={`border-[0.5px] border-black relative flex items-center justify-center ${bg}`}
-                >
-                  {/* Arrows as per image */}
-                  {r === 7 && c === 0 && <span className="text-[11px] font-black text-[#00a651]">➡</span>}
-                  {r === 0 && c === 7 && <span className="text-[11px] font-black text-[#ffc20e]">⬇</span>}
-                  {r === 7 && c === 14 && <span className="text-[11px] font-black text-[#00aeef]">⬅</span>}
-                  {r === 14 && c === 7 && <span className="text-[11px] font-black text-[#ed1c24]">⬆</span>}
-
-                  {/* Gray Stars matching image */}
-                  {(isGreenStar || isYellowStar || isBlueStar || isRedStar) && (
-                    <span className="text-[12px] font-black text-[#475569]">★</span>
-                  )}
-                </div>
+                <rect
+                  key={`cell-${r}-${c}`}
+                  x={c}
+                  y={r}
+                  width="1"
+                  height="1"
+                  fill={fill}
+                  stroke="#000000"
+                  strokeWidth="0.04"
+                />
               );
             })
           )}
-        </div>
 
-        {/* 🟢 GREEN BASE (TOP-LEFT) */}
-        <div
-          style={{ top: '0%', left: '0%', width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
-          className="absolute bg-[#00a651] p-[10px] flex items-center justify-center z-10 border-r border-b border-black"
-        >
-          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2 border border-black">
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className="aspect-square rounded-full bg-[#00a651] border border-black shadow-sm" />
-            ))}
-          </div>
-        </div>
+          {/* 2. चारों कोनों के घर (Exact 6×6 Units) */}
+          {/* Top-Left Green Base */}
+          <rect x="0" y="0" width="6" height="6" fill="#00a651" stroke="#000" strokeWidth="0.04" />
+          <rect x="1" y="1" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
+          <circle cx="2" cy="2" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
+          <circle cx="4" cy="2" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
+          <circle cx="2" cy="4" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
+          <circle cx="4" cy="4" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
 
-        {/* 🟡 YELLOW BASE (TOP-RIGHT - BUM BUM CAFE ☕) */}
-        <div
-          style={{ top: '0%', left: `${(9 / 15) * 100}%`, width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
-          className="absolute bg-[#ffc20e] p-[10px] flex items-center justify-center z-10 border-l border-b border-black"
-        >
-          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2 border border-black relative">
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className="aspect-square rounded-full bg-[#ffc20e] border border-black shadow-sm" />
-            ))}
-            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black uppercase text-amber-900 bg-white/70 rounded pointer-events-none">
-              Cafe ☕
-            </span>
-          </div>
-        </div>
+          {/* Top-Right Yellow Base (Bum Bum Cafe ☕) */}
+          <rect x="9" y="0" width="6" height="6" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
+          <rect x="10" y="1" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
+          <circle cx="11" cy="2" r="0.65" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
+          <circle cx="13" cy="2" r="0.65" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
+          <circle cx="11" cy="4" r="0.65" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
+          <circle cx="13" cy="4" r="0.65" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
+          <text x="12" y="3.15" fontSize="0.45" fontWeight="900" textAnchor="middle" fill="#78350f">CAFE ☕</text>
 
-        {/* 🔴 RED BASE (BOTTOM-LEFT - CUSTOMER) */}
-        <div
-          style={{ top: `${(9 / 15) * 100}%`, left: '0%', width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
-          className="absolute bg-[#ed1c24] p-[10px] flex items-center justify-center z-10 border-r border-t border-black"
-        >
-          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2 border border-black relative">
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className="aspect-square rounded-full bg-[#ed1c24] border border-black shadow-sm" />
-            ))}
-            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black uppercase text-red-900 bg-white/70 rounded pointer-events-none truncate px-1">
-              {customerName || 'You'}
-            </span>
-          </div>
-        </div>
+          {/* Bottom-Left Red Base (Customer / You) */}
+          <rect x="0" y="9" width="6" height="6" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
+          <rect x="1" y="10" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
+          <circle cx="2" cy="11" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
+          <circle cx="4" cy="11" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
+          <circle cx="2" cy="13" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
+          <circle cx="4" cy="13" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
+          <text x="3" y="12.15" fontSize="0.45" fontWeight="900" textAnchor="middle" fill="#7f1d1d">{customerName ? customerName.slice(0, 6) : 'YOU'}</text>
 
-        {/* 🔵 CYAN/LIGHT BLUE BASE (BOTTOM-RIGHT) */}
-        <div
-          style={{ top: `${(9 / 15) * 100}%`, left: `${(9 / 15) * 100}%`, width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
-          className="absolute bg-[#00aeef] p-[10px] flex items-center justify-center z-10 border-l border-t border-black"
-        >
-          <div className="w-full h-full bg-white shadow-inner grid grid-cols-2 grid-rows-2 p-2 gap-2 border border-black">
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className="aspect-square rounded-full bg-[#00aeef] border border-black shadow-sm" />
-            ))}
-          </div>
-        </div>
+          {/* Bottom-Right Blue Base */}
+          <rect x="9" y="9" width="6" height="6" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
+          <rect x="10" y="10" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
+          <circle cx="11" cy="11" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
+          <circle cx="13" cy="11" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
+          <circle cx="11" cy="13" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
+          <circle cx="13" cy="13" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
 
-        {/* 🏆 CENTER TRIANGLES (Image matching exactly) */}
-        <div
-          style={{ top: `${(6 / 15) * 100}%`, left: `${(6 / 15) * 100}%`, width: `${(3 / 15) * 100}%`, height: `${(3 / 15) * 100}%` }}
-          className="absolute overflow-hidden z-10 border border-black"
-        >
-          <svg viewBox="0 0 100 100" className="w-full h-full">
-            {/* Top Yellow */}
-            <polygon points="0,0 50,50 100,0" fill="#ffc20e" stroke="#000" strokeWidth="1" />
-            {/* Right Blue */}
-            <polygon points="100,0 50,50 100,100" fill="#00aeef" stroke="#000" strokeWidth="1" />
-            {/* Bottom Red */}
-            <polygon points="0,100 50,50 100,100" fill="#ed1c24" stroke="#000" strokeWidth="1" />
-            {/* Left Green */}
-            <polygon points="0,0 50,50 0,100" fill="#00a651" stroke="#000" strokeWidth="1" />
-          </svg>
-        </div>
+          {/* 3. बीच के 4 तिकोने (Home Center - Exact 3×3 Box) */}
+          <polygon points="6,6 9,6 7.5,7.5" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
+          <polygon points="9,6 9,9 7.5,7.5" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
+          <polygon points="6,9 9,9 7.5,7.5" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
+          <polygon points="6,6 6,9 7.5,7.5" fill="#00a651" stroke="#000" strokeWidth="0.04" />
+          <rect x="6" y="6" width="3" height="3" fill="none" stroke="#000" strokeWidth="0.05" />
 
-        {/* ♟️ 4 DYNAMIC TOKENS (PIXEL-PERFECT POSITIONING) */}
+          {/* 4. इमेज वाले तीर (Arrows) */}
+          <text x="0.5" y="7.7" fontSize="0.65" textAnchor="middle" fill="#00a651" fontWeight="bold">➡</text>
+          <text x="7.5" y="0.75" fontSize="0.65" textAnchor="middle" fill="#ffc20e" fontWeight="bold">⬇</text>
+          <text x="14.5" y="7.7" fontSize="0.65" textAnchor="middle" fill="#00aeef" fontWeight="bold">⬅</text>
+          <text x="7.5" y="14.75" fontSize="0.65" textAnchor="middle" fill="#ed1c24" fontWeight="bold">⬆</text>
+
+          {/* 5. इमेज वाले सितारे (Stars) */}
+          <text x="2.5" y="8.75" fontSize="0.6" textAnchor="middle" fill="#334155" fontWeight="bold">★</text>
+          <text x="6.5" y="2.75" fontSize="0.6" textAnchor="middle" fill="#334155" fontWeight="bold">★</text>
+          <text x="12.5" y="6.75" fontSize="0.6" textAnchor="middle" fill="#334155" fontWeight="bold">★</text>
+          <text x="8.5" y="12.75" fontSize="0.6" textAnchor="middle" fill="#334155" fontWeight="bold">★</text>
+        </svg>
+
+        {/* ♟️ गोटियां (सटीक 100% गणितीय अलाइनमेंट) */}
         {tokens.map(token => {
           const [r, c] = getTokenCoords(token);
           const isMyTurn = token.owner === turn;
@@ -800,14 +752,13 @@ export default function AuthenticLudoVersusCafe() {
               className="absolute z-30 flex items-center justify-center p-[2px] cursor-pointer"
             >
               <motion.div
-                animate={canMove && turn === 'player' ? { scale: [1, 1.25, 1], y: [0, -4, 0] } : { scale: 1 }}
+                animate={canMove && turn === 'player' ? { scale: [1, 1.25, 1], y: [0, -3, 0] } : { scale: 1 }}
                 transition={canMove ? { repeat: Infinity, duration: 0.6 } : {}}
-                className={`w-full h-full rounded-full border-2 border-white shadow-[0_4px_8px_rgba(0,0,0,0.6)] flex items-center justify-center relative ${
+                className={`w-[85%] h-[85%] rounded-full border-2 border-white shadow-[0_4px_8px_rgba(0,0,0,0.6)] flex items-center justify-center relative ${
                   token.owner === 'player' ? 'bg-[#ed1c24]' : 'bg-[#ffc20e]'
                 } ${canMove && turn === 'player' ? 'ring-2 ring-white shadow-[0_0_12px_#fff]' : ''}`}
               >
-                {/* 3D Top Inner Ring */}
-                <div className="w-[50%] h-[50%] rounded-full bg-white/40 shadow-inner" />
+                <div className="w-[45%] h-[45%] rounded-full bg-white/40 shadow-inner" />
               </motion.div>
             </motion.div>
           );
