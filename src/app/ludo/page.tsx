@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -16,7 +16,7 @@ interface Token {
   step: number; // -1 = Base, 0 to 50 = Track, 51 to 55 = Runway, 56 = Home
 }
 
-// 15x15 ट्रैक कोऑर्डिनेट्स [row, col] - सख्त Tuple टाइपिंग
+// 15x15 ट्रैक कोऑर्डिनेट्स [row, col]
 const BOARD_PATH: [number, number][] = [
   [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
   [5, 6], [4, 6], [3, 6], [2, 6], [1, 6], [0, 6],
@@ -48,7 +48,6 @@ const STAR_COORDS: [number, number][] = [
   [6, 1], [2, 6], [1, 8], [6, 12], [8, 13], [12, 8], [13, 6], [8, 2]
 ];
 
-// 🎁 रिवॉर्ड्स का बिज़नेस लॉजिक (25% कस्टमर विनिंग में से डिस्ट्रीब्यूशन)
 const getRandomReward = (): string => {
   const rand = Math.random() * 100;
   if (rand < 4) return "1x Pizza (Small Size) 🍕";
@@ -66,7 +65,7 @@ export default function LudoVersusCafe() {
   const [hasRolled, setHasRolled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   
-  // गेम का नतीजा पहले से तय (75% Cafe Winner, 25% Player Winner)
+  // 75% कैफ़े को जिताने का बिज़नेस चांस
   const [targetWinner] = useState<Player>(() => Math.random() < 0.75 ? 'cafe' : 'player');
   const [winner, setWinner] = useState<Player | null>(null);
   const [rewardWon, setRewardWon] = useState<string>('');
@@ -74,7 +73,6 @@ export default function LudoVersusCafe() {
   const [claimedPhone, setClaimedPhone] = useState('');
   const [savingReward, setSavingReward] = useState(false);
 
-  // 2-2 गोटियां (त्वरित गेमप्ले के लिए)
   const [tokens, setTokens] = useState<Token[]>([
     { id: 1, owner: 'player', slotIndex: 0, step: -1 },
     { id: 2, owner: 'player', slotIndex: 1, step: -1 },
@@ -82,7 +80,17 @@ export default function LudoVersusCafe() {
     { id: 4, owner: 'cafe', slotIndex: 1, step: -1 },
   ]);
 
-  const playSfx = (type: 'roll' | 'step' | 'cut' | 'win') => {
+  // 🔥 Stale State फिक्स: हमेशा ताज़ा वैल्यूज रखने के लिए Refs
+  const tokensRef = useRef(tokens);
+  tokensRef.current = tokens;
+  const turnRef = useRef(turn);
+  turnRef.current = turn;
+  const rollingRef = useRef(rolling);
+  rollingRef.current = rolling;
+  const winnerRef = useRef(winner);
+  winnerRef.current = winner;
+
+  const playSfx = (type: 'roll' | 'step' | 'cut') => {
     if (!soundEnabled || typeof window === 'undefined') return;
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -112,34 +120,32 @@ export default function LudoVersusCafe() {
         osc.start(); osc.stop(ctx.currentTime + 0.25);
       }
     } catch {
-      // Ignore audio errors
+      // Audio fallback
     }
   };
 
-  // 🎲 75% बिज़नेस AI डाइस लॉजिक
+  // 🎲 75% बायस्ड डाइस लॉजिक
   const getBiasedDiceRoll = (playerTurn: Player): number => {
     const raw = Math.floor(Math.random() * 6) + 1;
-    
     if (targetWinner === 'cafe') {
       if (playerTurn === 'cafe') {
-        const cafeTokens = tokens.filter(t => t.owner === 'cafe');
+        const cafeTokens = tokensRef.current.filter(t => t.owner === 'cafe');
         const inBase = cafeTokens.some(t => t.step === -1);
-        if (inBase && Math.random() < 0.6) return 6; // 60% चांस बेस से बाहर आने का
+        if (inBase && Math.random() < 0.65) return 6; // बेस से बाहर निकालने में मदद
         if (Math.random() < 0.5) return Math.random() < 0.5 ? 5 : 6;
       } else {
-        const playerTokens = tokens.filter(t => t.owner === 'player');
+        const playerTokens = tokensRef.current.filter(t => t.owner === 'player');
         const inBase = playerTokens.every(t => t.step === -1);
-        if (inBase && Math.random() < 0.7) return Math.floor(Math.random() * 5) + 1;
+        if (inBase && Math.random() < 0.65) return Math.floor(Math.random() * 5) + 1;
       }
     }
-
     return raw;
   };
 
-  // डाइस रोल करना
+  // रोल पासा (कस्टमर या ऑटो बोट)
   const handleRollDice = (isBot = false) => {
-    if (rolling || hasRolled || winner) return;
-    if (turn === 'cafe' && !isBot) return;
+    if (rollingRef.current || winnerRef.current) return;
+    if (turnRef.current === 'cafe' && !isBot) return;
 
     setRolling(true);
     playSfx('roll');
@@ -148,19 +154,29 @@ export default function LudoVersusCafe() {
     const timer = setInterval(() => {
       setDice(Math.floor(Math.random() * 6) + 1);
       counter++;
-      if (counter > 8) {
+      if (counter > 7) {
         clearInterval(timer);
-        const finalVal = getBiasedDiceRoll(turn);
+        const finalVal = getBiasedDiceRoll(turnRef.current);
         setDice(finalVal);
         setRolling(false);
         setHasRolled(true);
-        postRollEvaluation(finalVal, turn);
+        postRollEvaluation(finalVal, turnRef.current);
       }
-    }, 45);
+    }, 40);
   };
 
+  // 🤖 बोट के लिए खुद-ब-खुद पासा फेंकने वाला ऑटो इफेक्ट
+  useEffect(() => {
+    if (turn === 'cafe' && !rolling && !hasRolled && !winner) {
+      const botTimer = setTimeout(() => {
+        handleRollDice(true);
+      }, 700);
+      return () => clearTimeout(botTimer);
+    }
+  }, [turn, hasRolled, rolling, winner]);
+
   const postRollEvaluation = (rollVal: number, currentTurn: Player) => {
-    const myTokens = tokens.filter(t => t.owner === currentTurn);
+    const myTokens = tokensRef.current.filter(t => t.owner === currentTurn);
     const movable = myTokens.filter(t => {
       if (t.step === -1 && rollVal === 6) return true;
       if (t.step >= 0 && t.step + rollVal <= 56) return true;
@@ -168,25 +184,37 @@ export default function LudoVersusCafe() {
     });
 
     if (movable.length === 0) {
+      // कोई चाल नहीं मिली
       setTimeout(() => switchTurn(false), 900);
     } else if (currentTurn === 'cafe') {
+      // 🤖 बोट का ऑटो मूव निर्णय
       setTimeout(() => {
-        // AI: गोटी काटने को प्राथमिकता देना
+        const currentTokens = tokensRef.current;
+        
+        // 1. क्या किसी चाल से कस्टमर की गोटी कट रही है?
         const killMove = movable.find(t => {
           const targetStep = t.step === -1 ? 0 : t.step + rollVal;
           const targetGlobal = (START_OFFSETS.cafe + targetStep) % 52;
-          return tokens.some(other => other.owner === 'player' && other.step >= 0 && other.step < 51 && (START_OFFSETS.player + other.step) % 52 === targetGlobal);
+          return currentTokens.some(other => other.owner === 'player' && other.step >= 0 && other.step < 51 && (START_OFFSETS.player + other.step) % 52 === targetGlobal);
         });
 
-        handleMoveToken(killMove || movable[0], rollVal);
-      }, 700);
+        // 2. क्या 6 आया है और कोई गोटी बेस में पड़ी है?
+        const baseMove = movable.find(t => t.step === -1);
+
+        // 3. सबसे आगे वाली गोटी को बढ़ाओ
+        const forwardMove = [...movable].sort((a, b) => b.step - a.step)[0];
+
+        const chosenToken = killMove || baseMove || forwardMove || movable[0];
+        handleMoveToken(chosenToken, rollVal);
+      }, 600);
     } else if (movable.length === 1 && movable[0].step === -1 && rollVal === 6) {
+      // कस्टमर की सिर्फ 1 गोटी बेस में है और 6 आया तो ऑटो बाहर निकालें
       setTimeout(() => handleMoveToken(movable[0], rollVal), 400);
     }
   };
 
   const handleMoveToken = (token: Token, rollValue: number = dice) => {
-    if (!hasRolled || token.owner !== turn || winner) return;
+    if (token.owner !== turnRef.current || winnerRef.current) return;
 
     let targetStep = token.step;
     if (token.step === -1) {
@@ -204,18 +232,18 @@ export default function LudoVersusCafe() {
       return (START_OFFSETS[p] + s) % 52;
     };
 
-    let updated = tokens.map(t => t.id === token.id ? { ...t, step: targetStep } : t);
-    const myGlobal = getGlobal(turn, targetStep);
+    let updated = tokensRef.current.map(t => t.id === token.id ? { ...t, step: targetStep } : t);
+    const myGlobal = getGlobal(turnRef.current, targetStep);
     let captured = false;
 
     if (myGlobal !== -1) {
       const safe = [0, 8, 13, 21, 26, 34, 39, 47];
       if (!safe.includes(myGlobal)) {
         updated = updated.map(t => {
-          if (t.owner !== turn && t.step >= 0 && t.step < 51 && getGlobal(t.owner, t.step) === myGlobal) {
+          if (t.owner !== turnRef.current && t.step >= 0 && t.step < 51 && getGlobal(t.owner, t.step) === myGlobal) {
             captured = true;
             playSfx('cut');
-            toast.success(`💥 ${turn === 'player' ? 'आपने' : 'Bum Bum Cafe ने'} गोटी काटी!`);
+            toast.success(`💥 ${turnRef.current === 'player' ? 'आपने' : 'Bum Bum Cafe ने'} गोटी काटी!`);
             return { ...t, step: -1 };
           }
           return t;
@@ -226,11 +254,12 @@ export default function LudoVersusCafe() {
     setTokens(updated);
     setHasRolled(false);
 
-    // जीत की जांच
-    const homeCount = updated.filter(t => t.owner === turn && t.step === 56).length;
+    // 🏆 जीत की जांच
+    const homeCount = updated.filter(t => t.owner === turnRef.current && t.step === 56).length;
     if (homeCount === 2) {
-      setWinner(turn);
-      if (turn === 'player') {
+      const winningSide = turnRef.current;
+      setWinner(winningSide);
+      if (winningSide === 'player') {
         const reward = getRandomReward();
         const code = `BOM-${Math.floor(1000 + Math.random() * 9000)}`;
         setRewardWon(reward);
@@ -243,9 +272,10 @@ export default function LudoVersusCafe() {
       return;
     }
 
+    // 6 आने पर या गोटी काटने पर दोबारा चाल
     if (rollValue === 6 || captured) {
-      if (turn === 'cafe') {
-        setTimeout(() => handleRollDice(true), 800);
+      if (turnRef.current === 'cafe') {
+        setTimeout(() => handleRollDice(true), 700);
       }
     } else {
       switchTurn(false);
@@ -255,15 +285,11 @@ export default function LudoVersusCafe() {
   const switchTurn = (extra = false) => {
     setHasRolled(false);
     if (!extra) {
-      const next: Player = turn === 'player' ? 'cafe' : 'player';
+      const next: Player = turnRef.current === 'player' ? 'cafe' : 'player';
       setTurn(next);
-      if (next === 'cafe') {
-        setTimeout(() => handleRollDice(true), 900);
-      }
     }
   };
 
-  // इनाम सेव करना
   const handleClaimReward = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = claimedPhone.replace(/\D/g, '').slice(-10);
@@ -288,7 +314,6 @@ export default function LudoVersusCafe() {
     }
   };
 
-  // 100% सुरक्षित टुपल कोऑर्डिनेट फ़ंक्शन (TypeScript Safe)
   const getTokenCoords = (t: Token): [number, number] => {
     if (t.step === -1) {
       const pocket = BASE_POCKETS[t.owner]?.[t.slotIndex];
@@ -414,9 +439,9 @@ export default function LudoVersusCafe() {
           {Array.from({ length: 15 }).map((_, r) =>
             Array.from({ length: 15 }).map((_, c) => {
               if (r < 6 && c < 6) return null; // Red Base
-              if (r < 6 && c > 8) return null; // Green (Empty/Gray)
+              if (r < 6 && c > 8) return null; // Green (Inactive)
               if (r > 8 && c > 8) return null; // Yellow Base (Cafe)
-              if (r > 8 && c < 6) return null; // Blue (Empty/Gray)
+              if (r > 8 && c < 6) return null; // Blue (Inactive)
               if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return null; // Center
 
               const isRedRunway = r === 7 && c >= 1 && c <= 5;
@@ -494,7 +519,9 @@ export default function LudoVersusCafe() {
                 width: `${100 / 15}%`,
                 height: `${100 / 15}%`
               }}
-              onClick={() => handleMoveToken(token)}
+              onClick={() => {
+                if (turn === 'player') handleMoveToken(token);
+              }}
               className="absolute z-30 flex items-center justify-center p-0.5 cursor-pointer"
             >
               <motion.div
@@ -517,10 +544,10 @@ export default function LudoVersusCafe() {
           <span className="text-[10px] text-neutral-400 font-bold uppercase block">किसकी चाल:</span>
           <p className={`text-base font-black uppercase flex items-center gap-1.5 ${turn === 'player' ? 'text-rose-500' : 'text-amber-400'}`}>
             <span className={`w-3 h-3 rounded-full ${turn === 'player' ? 'bg-rose-500' : 'bg-amber-400'}`} />
-            {turn === 'player' ? 'आपकी चाल (Your Turn)' : 'Bum Bum Cafe (Thinking...)'}
+            {turn === 'player' ? 'आपकी चाल (Your Turn)' : 'Bum Bum Cafe (खेल रहा है...)'}
           </p>
           <span className="text-[10px] text-neutral-500 font-bold">
-            {turn === 'player' ? (hasRolled ? '👉 अपनी गोटी पर टैप करें' : 'पासा फेंकें') : 'कंप्यूटर खेल रहा है...'}
+            {turn === 'player' ? (hasRolled ? '👉 अपनी गोटी पर टैप करें' : 'पासा फेंकें') : 'कंप्यूटर सोच रहा है...'}
           </span>
         </div>
 
