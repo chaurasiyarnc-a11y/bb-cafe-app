@@ -6,7 +6,7 @@ import confetti from 'canvas-confetti';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
-import GameGuard from '@/components/GameGuard'; // 👈 Game Guard इंपोर्ट किया गया
+import GameGuard from '@/components/GameGuard';
 
 type SeatId = 'p1' | 'p2' | 'p3' | 'cafe';
 
@@ -46,10 +46,10 @@ const BOARD_PATH: [number, number][] = [
 ];
 
 const START_OFFSETS: Record<SeatId, number> = {
-  p1: 0,   // Red (Bottom-Left exit at [13, 6])
-  p3: 13,  // Green (Top-Left exit at [6, 1])
-  cafe: 26,// Yellow (Top-Right exit at [1, 8])
-  p2: 39   // Blue (Bottom-Right exit at [8, 13])
+  p1: 0,   // Red (Bottom-Left)
+  p3: 13,  // Green (Top-Left)
+  cafe: 26,// Yellow (Top-Right Boss)
+  p2: 39   // Blue (Bottom-Right)
 };
 
 const RUNWAYS: Record<SeatId, [number, number][]> = {
@@ -80,7 +80,7 @@ function getAudioContext(): AudioContext | null {
   return globalAudioCtx;
 }
 
-export default function AuthenticLudoVersusCafe() {
+export default function AuthenticLudoKingVsCafe() {
   const [gameMode, setGameMode] = useState<'local' | 'online' | null>(null);
   const [onlineAction, setOnlineAction] = useState<'create' | 'join' | null>(null);
   const [friendCount, setFriendCount] = useState<1 | 2 | 3>(1);
@@ -196,7 +196,7 @@ export default function AuthenticLudoVersusCafe() {
     }
   };
 
-  // 🔊 LOUD RING & DICE ROLLING SOUNDS
+  // 🔊 LOUD AUDIO ENGINE
   const playSfx = (type: 'roll' | 'step' | 'cut' | 'win') => {
     if (!soundEnabled) return;
     const ctx = getAudioContext();
@@ -378,6 +378,7 @@ export default function AuthenticLudoVersusCafe() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
+  // 🎲 75% बायस्ड डाइस लॉजिक
   const getBiasedDiceRoll = (currentSeat: SeatId): number => {
     const raw = Math.floor(Math.random() * 6) + 1;
     const curTokens = tokensRef.current;
@@ -497,6 +498,7 @@ export default function AuthenticLudoVersusCafe() {
     }
   };
 
+  // 🚶‍♂️ 300ms धीमा चलना
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
     if (!hasRolledRef.current || rollValue === null || isAnimatingMoveRef.current) {
       return toast.error("पहले पासा फेंकें! 🎲");
@@ -655,6 +657,7 @@ export default function AuthenticLudoVersusCafe() {
     return [7, 7];
   };
 
+  // 🎲 रीयूजेबल कॉर्नर डाइस कंपोनेंट
   const renderCornerPlayerHUD = (seat: SeatId) => {
     const p = players[seat];
     if (seat === 'p2' && friendCount < 2) return <div className="invisible" />;
@@ -716,6 +719,61 @@ export default function AuthenticLudoVersusCafe() {
           )}
         </motion.button>
       </div>
+    );
+  };
+
+  // ♟️ HUBAHU 3D MAP-PIN PAWN WITH PEDESTAL BASE (Ludo King Style)
+  const render3DPinPawn = (color: string, owner: SeatId) => {
+    const isRed = color === '#ed1c24';
+    const isBlue = color === '#00aeef';
+    const isGreen = color === '#00a651';
+    
+    const gradStart = isRed ? '#ff4d4d' : isBlue ? '#00c6ff' : isGreen ? '#2ecc71' : '#ffe066';
+    const gradEnd = isRed ? '#b30000' : isBlue ? '#0072bc' : isGreen ? '#1b5e20' : '#e6ac00';
+    const ringColor = isRed ? '#800000' : isBlue ? '#004080' : isGreen ? '#0d3813' : '#997300';
+    const gradId = `pawn-grad-${owner}-${color.replace('#', '')}`;
+
+    return (
+      <svg viewBox="0 0 36 46" className="w-full h-full drop-shadow-[0_5px_5px_rgba(0,0,0,0.65)] overflow-visible">
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={gradStart} />
+            <stop offset="60%" stopColor={color} />
+            <stop offset="100%" stopColor={gradEnd} />
+          </linearGradient>
+        </defs>
+
+        {/* 1. Ground Shadow */}
+        <ellipse cx="18" cy="42" rx="11" ry="3.8" fill="rgba(0,0,0,0.4)" filter="blur(1px)" />
+
+        {/* 2. Geared Pedestal Base (स्टैंड) */}
+        <ellipse cx="18" cy="38" rx="10.5" ry="4.2" fill="#1e293b" stroke="#0f172a" strokeWidth="0.8" />
+        <ellipse cx="18" cy="37" rx="9" ry="3.5" fill={ringColor} stroke="#ffffff" strokeWidth="0.7" strokeDasharray="2 1.5" />
+        <ellipse cx="18" cy="36.2" rx="6" ry="2" fill="#ffffff" opacity="0.9" />
+
+        {/* 3. Standing 3D Location Pin */}
+        <path
+          d="M 18 3 C 9.5 3 3 9.5 3 18 C 3 26 18 36.5 18 36.5 C 18 36.5 33 26 33 18 C 33 9.5 26.5 3 18 3 Z"
+          fill={`url(#${gradId})`}
+          stroke="#ffffff"
+          strokeWidth="2.2"
+          strokeLinejoin="round"
+        />
+
+        {/* Pin Center Hole */}
+        <circle cx="18" cy="17" r="5.8" fill="#ffffff" stroke="rgba(0,0,0,0.25)" strokeWidth="0.8" />
+        <circle cx="18" cy="17" r="4" fill={`url(#${gradId})`} />
+        
+        {/* 3D Highlight */}
+        <path
+          d="M 12 7 C 8 10 7 15 8 19"
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          opacity="0.75"
+        />
+      </svg>
     );
   };
 
@@ -915,7 +973,7 @@ export default function AuthenticLudoVersusCafe() {
           </div>
         </header>
 
-        {/* 🔝 TOP 2 BASES HUD */}
+        {/* 🔝 TOP 2 BASES HUD (GREEN P3 & YELLOW CAFE BOSS ☕) */}
         <div className="w-full max-w-[420px] grid grid-cols-2 gap-2 my-1 shrink-0">
           {renderCornerPlayerHUD('p3')}
           {renderCornerPlayerHUD('cafe')}
@@ -970,6 +1028,7 @@ export default function AuthenticLudoVersusCafe() {
         {/* 🎯 15×15 EXACT MATHEMATICAL SVG LUDO BOARD */}
         <div className="w-full max-w-[420px] aspect-square bg-white border-[6px] border-[#000] shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto">
           <svg viewBox="0 0 15 15" className="w-full h-full block">
+            {/* ग्रिड सेल्स (1.0 × 1.0 के 100% बराबर चौकोर खाने) */}
             {Array.from({ length: 15 }).map((_, r) =>
               Array.from({ length: 15 }).map((_, c) => {
                 if (r < 6 && c < 6) return null;
@@ -1015,7 +1074,8 @@ export default function AuthenticLudoVersusCafe() {
               })
             )}
 
-            {/* Bases */}
+            {/* 4 कोनों के पक्के बेस */}
+            {/* Top-Left Green Base (P3) */}
             <rect x="0" y="0" width="6" height="6" fill="#00a651" stroke="#000" strokeWidth="0.04" />
             <rect x="1" y="1" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
             <circle cx="2" cy="2" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
@@ -1023,6 +1083,7 @@ export default function AuthenticLudoVersusCafe() {
             <circle cx="2" cy="4" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
             <circle cx="4" cy="4" r="0.65" fill="#00a651" stroke="#000" strokeWidth="0.04" />
 
+            {/* Top-Right Yellow Base (Bum Bum Cafe Boss ☕) */}
             <rect x="9" y="0" width="6" height="6" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
             <rect x="10" y="1" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
             <circle cx="11" cy="2" r="0.65" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
@@ -1030,6 +1091,7 @@ export default function AuthenticLudoVersusCafe() {
             <circle cx="11" cy="4" r="0.65" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
             <circle cx="13" cy="4" r="0.65" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
 
+            {/* Bottom-Left Red Base (P1 / You) */}
             <rect x="0" y="9" width="6" height="6" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
             <rect x="1" y="10" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
             <circle cx="2" cy="11" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
@@ -1037,6 +1099,7 @@ export default function AuthenticLudoVersusCafe() {
             <circle cx="2" cy="13" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
             <circle cx="4" cy="13" r="0.65" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
 
+            {/* Bottom-Right Blue Base (P2) */}
             <rect x="9" y="9" width="6" height="6" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
             <rect x="10" y="10" width="4" height="4" fill="#ffffff" stroke="#000" strokeWidth="0.04" />
             <circle cx="11" cy="11" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
@@ -1044,14 +1107,14 @@ export default function AuthenticLudoVersusCafe() {
             <circle cx="11" cy="13" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
             <circle cx="13" cy="13" r="0.65" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
 
-            {/* Triangles */}
+            {/* सेंटर ट्रायएंगल्स */}
             <polygon points="6,6 9,6 7.5,7.5" fill="#ffc20e" stroke="#000" strokeWidth="0.04" />
             <polygon points="9,6 9,9 7.5,7.5" fill="#00aeef" stroke="#000" strokeWidth="0.04" />
             <polygon points="6,9 9,9 7.5,7.5" fill="#ed1c24" stroke="#000" strokeWidth="0.04" />
             <polygon points="6,6 6,9 7.5,7.5" fill="#00a651" stroke="#000" strokeWidth="0.04" />
             <rect x="6" y="6" width="3" height="3" fill="none" stroke="#000" strokeWidth="0.05" />
 
-            {/* Arrows & Stars */}
+            {/* तीर व सितारे */}
             <text x="0.5" y="7.7" fontSize="0.65" textAnchor="middle" fill="#00a651" fontWeight="bold">➡</text>
             <text x="7.5" y="0.75" fontSize="0.65" textAnchor="middle" fill="#ffc20e" fontWeight="bold">⬇</text>
             <text x="14.5" y="7.7" fontSize="0.65" textAnchor="middle" fill="#00aeef" fontWeight="bold">⬅</text>
@@ -1063,7 +1126,7 @@ export default function AuthenticLudoVersusCafe() {
             <text x="8.5" y="12.75" fontSize="0.6" textAnchor="middle" fill="#334155" fontWeight="bold">★</text>
           </svg>
 
-          {/* ♟️ गोटियां */}
+          {/* ♟️ गोटियां (3D PIN WITH PEDESTAL) */}
           {tokens.map(token => {
             if (token.ownerSeat === 'p2' && friendCount < 2) return null;
             if (token.ownerSeat === 'p3' && friendCount < 3) return null;
@@ -1099,18 +1162,21 @@ export default function AuthenticLudoVersusCafe() {
                     toast.error("पहले पासा फेंकें! 🎲");
                   }
                 }}
-                className="absolute z-30 flex items-center justify-center p-[2px] cursor-pointer"
+                className="absolute z-30 flex items-center justify-center p-[1px] cursor-pointer"
               >
                 <motion.div
                   animate={canMove ? { scale: [1, 1.25, 1], y: [0, -3, 0] } : { scale: 1 }}
                   transition={canMove ? { repeat: Infinity, duration: 0.6 } : {}}
-                  className={`w-[85%] h-[85%] rounded-full border-2 border-white shadow-[0_4px_8px_rgba(0,0,0,0.6)] flex items-center justify-center relative ${
-                    token.ownerSeat === 'p1' ? 'bg-[#ed1c24]' :
-                    token.ownerSeat === 'p2' ? 'bg-[#00aeef]' :
-                    token.ownerSeat === 'p3' ? 'bg-[#00a651]' : 'bg-[#ffc20e]'
-                  } ${canMove ? 'ring-2 ring-white shadow-[0_0_12px_#fff]' : ''}`}
+                  className={`w-full h-full flex items-center justify-center relative ${
+                    canMove ? 'filter drop-shadow-[0_0_8px_#fff]' : ''
+                  }`}
                 >
-                  <div className="w-[45%] h-[45%] rounded-full bg-white/40 shadow-inner" />
+                  {render3DPinPawn(
+                    token.ownerSeat === 'p1' ? '#ed1c24' :
+                    token.ownerSeat === 'p2' ? '#00aeef' :
+                    token.ownerSeat === 'p3' ? '#00a651' : '#ffc20e',
+                    token.ownerSeat
+                  )}
                 </motion.div>
               </motion.div>
             );
