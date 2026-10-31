@@ -7306,7 +7306,8 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       <h3 className="text-sm font-black uppercase text-neutral-800 dark:text-neutral-200 border-b border-neutral-100 dark:border-neutral-800 pb-3 flex items-center gap-2">
                         <Gamepad2 size={18} className="text-purple-500"/> Experience & Interface
                       </h3>
-                     <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-3">
                           <div><p className="text-xs font-bold uppercase text-purple-600 dark:text-purple-400">Active Customer Game:</p></div>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {['Ludo', 'SpinGame', 'CatchGame', 'FruitNinja', 'MemoryGame', 'Cafe2048', 'HungrySnake'].map(game => (
@@ -7334,7 +7335,6 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                         </div>
                       </div>
                     </div>
-
                     {/* 👉 NEW: STAFF MANAGEMENT SECTION */}
                     <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-sm lg:col-span-2 space-y-4">
                       <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-3">
