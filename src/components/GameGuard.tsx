@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 
 // Firebase में जो नाम है, उसे सही URL से जोड़ने के लिए लिस्ट
 const gameRoutes: Record<string, string> = {
+  Ludo: "ludo", // 👈 नया Ludo रूट जोड़ा गया
   CatchGame: "catch-game",
   FruitNinja: "FruitNinja",
   MemoryGame: "MemoryGame",
