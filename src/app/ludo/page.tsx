@@ -30,27 +30,26 @@ interface Token {
 
 // 15x15 ग्रिड के 52 मुख्य ट्रैक कोऑर्डिनेट्स [row, col]
 const BOARD_PATH: [number, number][] = [
-  // Red Track Starts (Row 13 Col 6 going up & clockwise)
   [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
   [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
-  [7, 0], // Left Arrow
+  [7, 0],
   [6, 0], [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
   [5, 6], [4, 6], [3, 6], [2, 6], [1, 6], [0, 6],
-  [0, 7], // Top junction
+  [0, 7],
   [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8],
   [6, 9], [6, 10], [6, 11], [6, 12], [6, 13], [6, 14],
-  [7, 14], // Right junction
+  [7, 14],
   [8, 14], [8, 13], [8, 12], [8, 11], [8, 10], [8, 9],
   [9, 8], [10, 8], [11, 8], [12, 8], [13, 8], [14, 8],
-  [14, 7], // Bottom Junction
-  [14, 6]  // Red entrance
+  [14, 7],
+  [14, 6]
 ];
 
 const START_OFFSETS: Record<SeatId, number> = {
-  p1: 0,   // Red (Bottom-Left exit at [13, 6])
-  p3: 13,  // Green (Top-Left exit at [6, 1])
-  cafe: 26,// Yellow (Top-Right exit at [1, 8])
-  p2: 39   // Blue (Bottom-Right exit at [8, 13])
+  p1: 0,   // Red (Bottom-Left)
+  p3: 13,  // Green (Top-Left)
+  cafe: 26,// Yellow (Top-Right Boss)
+  p2: 39   // Blue (Bottom-Right)
 };
 
 const RUNWAYS: Record<SeatId, [number, number][]> = {
@@ -104,7 +103,7 @@ export default function AuthenticLudoKingVsCafe() {
     cafe: { seat: 'cafe', name: 'Bum Bum Cafe ☕', phone: '', colorName: 'Yellow', hex: '#ffc20e', baseLabel: 'Top-Right (Boss)', joined: true, isBot: true },
   });
 
-  // कोर गेमप्ले स्टेट्स
+  // गेमप्ले स्टेट्स
   const [turn, setTurn] = useState<SeatId>('p1');
   const [dice, setDice] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -150,6 +149,9 @@ export default function AuthenticLudoKingVsCafe() {
   isAnimatingMoveRef.current = isAnimatingMove;
   const diceRef = useRef<number | null>(dice);
   diceRef.current = dice;
+
+  // ⏱️ ऑटो-मूव टाइमर रेफरेंस
+  const autoMoveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // URL से WhatsApp इनवाइट रूम कोड पढ़ना
   useEffect(() => {
@@ -285,7 +287,6 @@ export default function AuthenticLudoKingVsCafe() {
     }
   };
 
-  // लोकल मोड शुरू करना
   const handleStartLocalGame = (e: React.FormEvent) => {
     e.preventDefault();
     if (myPhone.length !== 10 || !myName.trim()) return toast.error("फ़ोन नंबर और नाम दर्ज करें!");
@@ -299,7 +300,6 @@ export default function AuthenticLudoKingVsCafe() {
     toast.success(`खेल शुरू! शुभकामनाएँ ${myName}! 🎲`);
   };
 
-  // ऑनलाइन रूम बनाना
   const handleCreateOnlineRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (myPhone.length !== 10 || !myName.trim()) return toast.error("फ़ोन नंबर और नाम दर्ज करें!");
@@ -433,6 +433,7 @@ export default function AuthenticLudoKingVsCafe() {
     return raw;
   };
 
+  // 🎲 पासा फेंकना (सिर्फ जब खिलाड़ी खुद क्लिक करे)
   const handleRollDice = (seat: SeatId, isBot = false) => {
     if (rollingRef.current || winnerRef.current || hasRolledRef.current || isAnimatingMoveRef.current) return;
     
@@ -473,6 +474,7 @@ export default function AuthenticLudoKingVsCafe() {
     }, 40);
   };
 
+  // कैफ़े ऑटो-बॉट इफेक्ट
   useEffect(() => {
     if (isSetupDone && turn === 'cafe' && !rolling && !hasRolled && !winner && !isAnimatingMove) {
       const botTimer = setTimeout(() => {
@@ -481,6 +483,37 @@ export default function AuthenticLudoKingVsCafe() {
       return () => clearTimeout(botTimer);
     }
   }, [turn, hasRolled, rolling, winner, isAnimatingMove, isSetupDone]);
+
+  // ⏱️ स्मार्ट ऑटो-मूव टाइमर: पासा फेंकने के बाद अगर आप 4 सेकंड तक नहीं चलेंगे तो गोटी खुद चल देगी
+  useEffect(() => {
+    if (autoMoveTimerRef.current) clearTimeout(autoMoveTimerRef.current);
+
+    const isMyTurnNow = gameMode === 'local' ? (turn !== 'cafe') : (mySeat === turn);
+
+    if (isMyTurnNow && hasRolled && dice !== null && !isAnimatingMove && !winner) {
+      const myTokens = tokensRef.current.filter(t => t.ownerSeat === turnRef.current);
+      const movable = myTokens.filter(t => {
+        if (t.step === -1 && dice === 6) return true;
+        if (t.step >= 0 && t.step + dice <= 56) return true;
+        return false;
+      });
+
+      if (movable.length > 0) {
+        autoMoveTimerRef.current = setTimeout(() => {
+          if (hasRolledRef.current && !isAnimatingMoveRef.current && !winnerRef.current) {
+            // सबसे आगे वाली गोटी को खुद आगे बढ़ाएं
+            const best = [...movable].sort((a, b) => b.step - a.step)[0];
+            toast("ऑटो चाल (Auto Move)... ⏱️", { duration: 1200 });
+            handleMoveToken(best, diceRef.current);
+          }
+        }, 4000);
+      }
+    }
+
+    return () => {
+      if (autoMoveTimerRef.current) clearTimeout(autoMoveTimerRef.current);
+    };
+  }, [turn, hasRolled, dice, isAnimatingMove, winner, gameMode, mySeat]);
 
   // 🎯 चाल न बनने पर ऑटोमैटिक टर्न आगे बढ़ाना
   const postRollEvaluation = (rollVal: number, currentSeat: SeatId) => {
@@ -517,6 +550,8 @@ export default function AuthenticLudoKingVsCafe() {
 
   // 🚶‍♂️ 300ms धीमा एक-एक कदम चलना
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
+    if (autoMoveTimerRef.current) clearTimeout(autoMoveTimerRef.current);
+
     if (!hasRolledRef.current || rollValue === null || isAnimatingMoveRef.current) {
       return toast.error("पहले पासा फेंकें! 🎲");
     }
@@ -642,6 +677,7 @@ export default function AuthenticLudoKingVsCafe() {
   };
 
   const handleRestart = () => {
+    if (autoMoveTimerRef.current) clearTimeout(autoMoveTimerRef.current);
     const resetTokens: Token[] = [
       { id: 1, ownerSeat: 'p1', slotIndex: 0, step: -1 },
       { id: 2, ownerSeat: 'p1', slotIndex: 1, step: -1 },
@@ -1128,21 +1164,38 @@ export default function AuthenticLudoKingVsCafe() {
             <text x="8.5" y="12.75" fontSize="0.6" textAnchor="middle" fill="#334155" fontWeight="bold">★</text>
           </svg>
 
-          {/* ♟️ गोटियां */}
+          {/* ♟️ गोटियां (स्मार्ट साइड-बाय-साइड स्टैकिंग और पक्का क्लिक फ़िक्स) */}
           {tokens.map(token => {
             if (token.ownerSeat === 'p2' && friendCount < 2) return null;
             if (token.ownerSeat === 'p3' && friendCount < 3) return null;
 
             const [r, c] = getTokenCoords(token);
             const isMyTurn = token.ownerSeat === turn;
-            // लोकल मोड में इंसान की हर गोटी अपनी है, ऑनलाइन में सिर्फ अपनी सीट
             const isMyPiece = gameMode === 'local' ? (token.ownerSeat !== 'cafe') : (mySeat === token.ownerSeat);
             
-            // क्या यह गोटी अभी चलने लायक है?
-            const canMove = hasRolled && isMyTurn && dice !== null && !isAnimatingMove && (
+            const canMove = hasRolled && isMyTurn && isMyPiece && dice !== null && !isAnimatingMove && (
               (token.step === -1 && dice === 6) ||
               (token.step >= 0 && token.step + dice <= 56)
             );
+
+            // 🔥 1. साइड-बाय-साइड स्टैकिंग: जब एक ही खाने में 2 गोटियां होंगी तो दोनों अलग-अलग हटेंगी
+            let offsetX = 0;
+            let offsetY = 0;
+            let tokenScale = 1;
+
+            if (token.step !== -1) {
+              const tokensOnCell = tokens.filter(other => {
+                if (other.step === -1) return false;
+                const [or, oc] = getTokenCoords(other);
+                return or === r && oc === c;
+              });
+
+              if (tokensOnCell.length > 1) {
+                const myIdx = tokensOnCell.findIndex(t => t.id === token.id);
+                tokenScale = 0.82;
+                offsetX = myIdx === 0 ? -12 : 12; // एक बाईं ओर, दूसरी दाईं ओर
+              }
+            }
 
             return (
               <motion.div
@@ -1153,42 +1206,40 @@ export default function AuthenticLudoKingVsCafe() {
                   top: `${(r / 15) * 100}%`,
                   left: `${(c / 15) * 100}%`,
                   width: `${100 / 15}%`,
-                  height: `${100 / 15}%`
+                  height: `${100 / 15}%`,
+                  // 🔥 2. क्लिक फ़िक्स: विरोधी की गोटी पर क्लिक कभी नहीं लगेगा (pointer-events: none)
+                  pointerEvents: isMyPiece ? 'auto' : 'none',
+                  zIndex: canMove ? 50 : (isMyPiece ? 35 : 20)
                 }}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (isAnimatingMove) return;
 
-                  // 1. अगर कैफे की गोटी को छुआ
-                  if (token.ownerSeat === 'cafe') {
-                    return toast.error("यह कैफ़े की गोटी है! अपनी गोटी पर टैप करें। 🚫");
+                  if (!isMyPiece) {
+                    return toast.error("यह आपकी गोटी नहीं है!");
                   }
 
-                  // 2. ऑनलाइन मोड में अगर किसी और दोस्त की गोटी छूई
-                  if (gameMode === 'online' && token.ownerSeat !== mySeat) {
-                    return toast.error("यह आपके दोस्त की गोटी है! अपनी गोटी चलें। 🚫");
-                  }
-
-                  // 3. अगर अपनी गोटी है लेकिन पासा नहीं फेंका
                   if (!hasRolled) {
                     return toast.error("पहले पासा फेंकें! 🎲");
                   }
 
-                  // 4. अगर गोटी बेस में है और 6 नहीं आया
                   if (token.step === -1 && dice !== 6) {
                     return toast.error("गोटी बाहर निकालने के लिए 6 चाहिए! 🎲");
                   }
 
-                  // 5. अगर गोटी चल सकती है
                   if (canMove) {
                     handleMoveToken(token);
                   }
                 }}
-                className={`absolute ${canMove ? 'z-40' : 'z-30'} flex items-center justify-center p-[2px] cursor-pointer`}
+                className="absolute flex items-center justify-center p-[1px] cursor-pointer"
               >
-                {/* 🌟 सिर्फ चलने लायक गोटी हवा में उछलेगी (Bouncing Halo) */}
+                {/* 🌟 सिर्फ चलने वाली गोटी उछलेगी (Bouncing) */}
                 <motion.div
-                  animate={canMove && isMyPiece ? { scale: [1, 1.28, 1], y: [0, -5, 0] } : { scale: 1 }}
+                  animate={canMove && isMyPiece ? { scale: [1, 1.25, 1], y: [0, -5, 0] } : { scale: 1 }}
                   transition={canMove ? { repeat: Infinity, duration: 0.55 } : {}}
+                  style={{
+                    transform: `translate(${offsetX}px, ${offsetY}px) scale(${tokenScale})`
+                  }}
                   className={`w-[85%] h-[85%] flex items-center justify-center relative ${
                     canMove && isMyPiece ? 'filter drop-shadow-[0_0_12px_#ffffff]' : ''
                   }`}
