@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Phone, ArrowRight, Loader2, Swords, Users, Share2, LogIn, Lock } from 'lucide-react';
+import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Phone, ArrowRight, Loader2, Swords, Users, Share2, LogIn, Lock, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
@@ -97,6 +97,9 @@ export default function AuthenticLudoKingVsCafe() {
   const [myPhone, setMyPhone] = useState('');
   const [myName, setMyName] = useState('');
 
+  // 🔒 आज के लिए जीत लॉक (अगर आज पहले जीत चुका है तो ट्रू होगा)
+  const [hasAlreadyWonToday, setHasAlreadyWonToday] = useState(false);
+
   const [players, setPlayers] = useState<Record<SeatId, PlayerSlot>>({
     p1: { seat: 'p1', name: '', phone: '', colorName: 'Red', hex: '#ed1c24', baseLabel: 'Bottom-Left', joined: false },
     p2: { seat: 'p2', name: 'Friend 2', phone: '', colorName: 'Blue', hex: '#00aeef', baseLabel: 'Bottom-Right', joined: false },
@@ -112,7 +115,7 @@ export default function AuthenticLudoKingVsCafe() {
   const [isAnimatingMove, setIsAnimatingMove] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // 🎯 70% कैफे जीत (30% कस्टमर जीत)
+  // 🎯 70% कैफे जीत (अगर आज पहले जीत चुका है तो 100% कैफे जीत)
   const [targetWinner, setTargetWinner] = useState<'friends' | 'cafe'>(() => Math.random() < 0.70 ? 'cafe' : 'friends');
   const [turnCount, setTurnCount] = useState(0);
   const [winner, setWinner] = useState<'friends' | 'cafe' | null>(null);
@@ -153,8 +156,9 @@ export default function AuthenticLudoKingVsCafe() {
   diceRef.current = dice;
   const targetWinnerRef = useRef(targetWinner);
   targetWinnerRef.current = targetWinner;
+  const hasAlreadyWonTodayRef = useRef(hasAlreadyWonToday);
+  hasAlreadyWonTodayRef.current = hasAlreadyWonToday;
 
-  // ऑटो-मूव टाइमर
   const autoMoveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // URL से रूम कोड पढ़ना
@@ -204,7 +208,7 @@ export default function AuthenticLudoKingVsCafe() {
     }
   };
 
-  // 🔊 LOUD AUDIO ENGINE
+  // 🔊 AUDIO ENGINE
   const playSfx = (type: 'roll' | 'step' | 'cut' | 'win') => {
     if (!soundEnabled) return;
     const ctx = getAudioContext();
@@ -224,17 +228,6 @@ export default function AuthenticLudoKingVsCafe() {
         osc.start(now + i * 0.035);
         osc.stop(now + i * 0.035 + 0.032);
       }
-      const ringOsc = ctx.createOscillator();
-      const ringGain = ctx.createGain();
-      ringOsc.type = 'sine';
-      ringOsc.frequency.setValueAtTime(1250, now);
-      ringOsc.frequency.exponentialRampToValueAtTime(980, now + 0.35);
-      ringGain.gain.setValueAtTime(0.48, now);
-      ringGain.gain.exponentialRampToValueAtTime(0.005, now + 0.35);
-      ringOsc.connect(ringGain);
-      ringGain.connect(ctx.destination);
-      ringOsc.start(now);
-      ringOsc.stop(now + 0.35);
     } else if (type === 'step') {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -275,6 +268,7 @@ export default function AuthenticLudoKingVsCafe() {
     }
   };
 
+  // 🔍 फ़ोन नंबर लुकअप + आज का विनिंग/क्लेम स्टेटस चेक (Daily Limit Check)
   const handlePhoneLookup = async (phoneStr: string) => {
     const clean = phoneStr.replace(/\D/g, '').slice(0, 10);
     setMyPhone(clean);
@@ -283,9 +277,38 @@ export default function AuthenticLudoKingVsCafe() {
       setIsCheckingPhone(true);
       try {
         const snap = await getDoc(doc(db, 'customer_points', clean));
-        if (snap.exists() && snap.data().name) {
-          setMyName(snap.data().name);
-          toast.success(`नमस्ते ${snap.data().name}! 👋`);
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.name) setMyName(data.name);
+
+          // 🛡️ चेक करें कि क्या ग्राहक ने आज पहले इनाम जीता या क्लेम किया है?
+          const today = new Date();
+          const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+          const getSafeTime = (field: any) => {
+            if (!field) return 0;
+            if (field.toDate) return field.toDate().getTime();
+            return new Date(field).getTime();
+          };
+
+          const playedTime = getSafeTime(data.lastPlayedAt);
+          const wonTime = getSafeTime(data.lastWonAt);
+          const claimedTime = getSafeTime(data.voucherClaimedAt);
+
+          const wonToday = (playedTime >= todayStart || wonTime >= todayStart) && data.lastPrizeWon && data.lastPrizeWon !== 'Better Luck';
+          const claimedToday = claimedTime >= todayStart || (data.voucherClaimed && playedTime >= todayStart);
+
+          if (wonToday || claimedToday) {
+            setHasAlreadyWonToday(true);
+            hasAlreadyWonTodayRef.current = true;
+            setTargetWinner('cafe');
+            targetWinnerRef.current = 'cafe';
+            toast.error("⚠️ आप आज का इनाम पहले ही प्राप्त कर चुके हैं! आज दोबारा इनाम नहीं मिलेगा (Only Practice Play)।", { duration: 5000 });
+          } else {
+            setHasAlreadyWonToday(false);
+            hasAlreadyWonTodayRef.current = false;
+            toast.success(`नमस्ते ${data.name || 'दोस्त'}! 👋`);
+          }
         }
       } catch {}
       setIsCheckingPhone(false);
@@ -302,7 +325,12 @@ export default function AuthenticLudoKingVsCafe() {
       p1: { ...prev.p1, name: myName.trim(), phone: myPhone, joined: true }
     }));
     setIsSetupDone(true);
-    toast.success(`चैलेंज शुरू! शुभकामनाएँ ${myName}! 🎲`);
+
+    if (hasAlreadyWonToday) {
+      toast("आज आप सिर्फ मनोरंजन के लिए खेल रहे हैं (दैनिक इनाम लिमिट समाप्त) ☕", { duration: 4000 });
+    } else {
+      toast.success(`चैलेंज शुरू! शुभकामनाएँ ${myName}! 🎲`);
+    }
   };
 
   const handleCreateOnlineRoom = async (e: React.FormEvent) => {
@@ -314,6 +342,8 @@ export default function AuthenticLudoKingVsCafe() {
     setRoomId(newRoomCode);
     setMySeat('p1');
 
+    const effectiveTargetWinner = hasAlreadyWonToday ? 'cafe' : targetWinner;
+
     const updatedPlayers = {
       ...players,
       p1: { ...players.p1, name: myName.trim(), phone: myPhone, joined: true },
@@ -323,7 +353,7 @@ export default function AuthenticLudoKingVsCafe() {
     await setDoc(doc(db, 'ludo_rooms', newRoomCode), {
       roomId: newRoomCode,
       createdAt: new Date(),
-      targetWinner,
+      targetWinner: effectiveTargetWinner,
       turn: 'p1',
       dice: null,
       hasRolled: false,
@@ -375,10 +405,19 @@ export default function AuthenticLudoKingVsCafe() {
         joined: true
       };
 
-      await updateDoc(roomRef, {
+      const roomUpdates: any = {
         players: currentPlayers,
         friendCount: Math.max(rData.friendCount || 1, assignedSeat === 'p2' ? 2 : 3)
-      });
+      };
+
+      // अगर जुड़ने वाला खिलाड़ी आज पहले जीत चुका है तो पूरे रूम में कैफे जीत लॉक कर दो
+      if (hasAlreadyWonToday) {
+        roomUpdates.targetWinner = 'cafe';
+        setTargetWinner('cafe');
+        targetWinnerRef.current = 'cafe';
+      }
+
+      await updateDoc(roomRef, roomUpdates);
 
       setRoomId(targetRoom);
       setMySeat(assignedSeat);
@@ -399,12 +438,14 @@ export default function AuthenticLudoKingVsCafe() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
-  // 🎲 100% FIXED: RIGGED SMART DICE ENGINE (GUARANTEED 70% CAFE WIN)
+  // 🎲 100% BULLETPROOF BIASED DICE ENGINE
   const getBiasedDiceRoll = (currentSeat: SeatId): number => {
     const curTokens = tokensRef.current;
     const myTokens = curTokens.filter(t => t.ownerSeat === currentSeat);
     const cafeTokens = curTokens.filter(t => t.ownerSeat === 'cafe');
-    const isTargetCafe = targetWinnerRef.current === 'cafe';
+    
+    // अगर आज पहले जीत चुका है तो 100% कैफे जीतेगा
+    const forceCafeWin = hasAlreadyWonTodayRef.current || targetWinnerRef.current === 'cafe';
 
     const getGlobalPos = (seat: SeatId, step: number) => {
       if (step < 0 || step >= 51) return -1;
@@ -412,18 +453,18 @@ export default function AuthenticLudoKingVsCafe() {
     };
 
     // ==========================================
-    // केस 1: जब कैफ़े की बारी हो (Cafe Bot Turn)
+    // 1. कैफ़े की बारी (Cafe Bot Turn)
     // ==========================================
     if (currentSeat === 'cafe') {
-      // 1. क्या कैफे कोई भी चाल चलकर सीधे Home (56) पहुंच सकता है?
+      // (क) तुरंत होम जीतकर खेल खत्म करो
       for (const t of myTokens) {
         if (t.step >= 50 && t.step < 56) {
           const needed = 56 - t.step;
-          if (needed >= 1 && needed <= 6) return needed; // तुरंत Home जीतें!
+          if (needed >= 1 && needed <= 6) return needed;
         }
       }
 
-      // 2. क्या कैफे किसी भी विरोधी को काट सकता है? (Kill Move)
+      // (ख) विरोधी की गोटी काटो
       for (let r = 1; r <= 6; r++) {
         const canKill = myTokens.some(t => {
           const targetStep = t.step === -1 ? (r === 6 ? 0 : -1) : t.step + r;
@@ -434,13 +475,13 @@ export default function AuthenticLudoKingVsCafe() {
 
           return curTokens.some(other => other.ownerSeat !== 'cafe' && other.step >= 0 && other.step < 51 && getGlobalPos(other.ownerSeat, other.step) === targetGlobal);
         });
-        if (canKill) return r; // विरोधी को तुरंत काटें!
+        if (canKill) return r;
       }
 
-      // 3. अगर targetWinner कैफे है तो कैफे को सुपर स्पीड दें
-      if (isTargetCafe) {
+      // (ग) कैफे को सुपर स्पीड दो
+      if (forceCafeWin) {
         const anyInBase = myTokens.some(t => t.step === -1);
-        if (anyInBase && Math.random() < 0.75) return 6; // तेजी से बाहर निकालें
+        if (anyInBase && Math.random() < 0.80) return 6;
         const fastRolls = [6, 5, 4, 6, 5];
         return fastRolls[Math.floor(Math.random() * fastRolls.length)];
       }
@@ -449,12 +490,12 @@ export default function AuthenticLudoKingVsCafe() {
     }
 
     // ==========================================
-    // केस 2: जब ग्राहक (Friends/Player) की बारी हो
+    // 2. ग्राहक की बारी (Player Turn)
     // ==========================================
-    if (isTargetCafe) {
-      // (क) गोटी काटने पर रोक: ग्राहक को ऐसा अंक बिल्कुल न दें जिससे कैफे की गोटी कटे
+    if (forceCafeWin) {
       const safeRolls: number[] = [];
       for (let r = 1; r <= 6; r++) {
+        // कैफे की गोटी काटने वाला अंक ब्लॉक करो
         const wouldKillCafe = myTokens.some(t => {
           const targetStep = t.step === -1 ? (r === 6 ? 0 : -1) : t.step + r;
           if (targetStep < 0 || targetStep > 50) return false;
@@ -465,7 +506,7 @@ export default function AuthenticLudoKingVsCafe() {
           return cafeTokens.some(ct => ct.step >= 0 && ct.step < 51 && getGlobalPos('cafe', ct.step) === targetGlobal);
         });
 
-        // (ख) घर पहुंचने पर रोक: अगर ग्राहक Runway पर है, तो उसे जीतने वाला अंक ब्लॉक करें
+        // होम में जीतने वाला अंक ब्लॉक करो
         const wouldEnterHome = myTokens.some(t => t.step >= 50 && t.step + r === 56);
 
         if (!wouldKillCafe && !wouldEnterHome) {
@@ -473,7 +514,6 @@ export default function AuthenticLudoKingVsCafe() {
         }
       }
 
-      // अगर सुरक्षित अंक मौजूद हैं, तो उन्हीं में से एक दें (अक्सर 1, 2 या 3 ताकि चाल धीमी रहे)
       if (safeRolls.length > 0) {
         const smallRolls = safeRolls.filter(n => n <= 3);
         if (smallRolls.length > 0 && Math.random() < 0.75) {
@@ -482,10 +522,9 @@ export default function AuthenticLudoKingVsCafe() {
         return safeRolls[Math.floor(Math.random() * safeRolls.length)];
       }
 
-      return 1; // डिफॉल्ट सुरक्षित चाल
+      return 1;
     }
 
-    // सामान्य चाल (जब 30% चांस में ग्राहक को जीतना हो)
     return Math.floor(Math.random() * 6) + 1;
   };
 
@@ -532,7 +571,6 @@ export default function AuthenticLudoKingVsCafe() {
   };
 
   useEffect(() => {
-    // ऑनलाइन मोड में सिर्फ होस्ट (p1) बॉट की चाल चलेगा ताकि मल्टी-क्लाइंट रेस न हो
     const canControlBot = gameMode === 'local' || (gameMode === 'online' && mySeat === 'p1');
 
     if (isSetupDone && turn === 'cafe' && !rolling && !hasRolled && !winner && !isAnimatingMove && canControlBot) {
@@ -543,7 +581,7 @@ export default function AuthenticLudoKingVsCafe() {
     }
   }, [turn, hasRolled, rolling, winner, isAnimatingMove, isSetupDone, gameMode, mySeat]);
 
-  // ⏱️ ऑटो-मूव टाइमर: पासा फेंकने के बाद 4 सेकंड तक टैप न करने पर सबसे बेहतरीन गोटी खुद चलेगी
+  // ⏱️ ऑटो-मूव टाइमर
   useEffect(() => {
     if (autoMoveTimerRef.current) clearTimeout(autoMoveTimerRef.current);
 
@@ -591,10 +629,10 @@ export default function AuthenticLudoKingVsCafe() {
       setTimeout(() => {
         const curTokens = tokensRef.current;
         
-        // 1. सीधे होम पहुंचें (Win Move)
+        // 1. सीधे होम पहुंचें
         const winMove = movable.find(t => t.step + rollVal === 56);
         
-        // 2. विरोधी को काटें (Kill Move)
+        // 2. विरोधी को काटें
         const killMove = movable.find(t => {
           const targetStep = t.step === -1 ? 0 : t.step + rollVal;
           if (targetStep > 50) return false;
@@ -605,20 +643,19 @@ export default function AuthenticLudoKingVsCafe() {
           return curTokens.some(other => other.ownerSeat !== 'cafe' && other.step >= 0 && other.step < 51 && (START_OFFSETS[other.ownerSeat] + other.step) % 52 === targetGlobal);
         });
 
-        // 3. सबसे आगे चल रही गोटी को आगे बढ़ाएं (Forward Move)
+        // 3. आगे चल रही गोटी को आगे बढ़ाएं
         const forwardMove = movable.filter(t => t.step >= 0).sort((a, b) => b.step - a.step)[0];
         
-        // 4. बेस से गोटी निकालें (Base Move)
+        // 4. बेस से गोटी निकालें
         const baseMove = movable.find(t => t.step === -1);
 
-        // ✅ AI PRIORITY FIXED: winMove -> killMove -> forwardMove -> baseMove
         const chosen = winMove || killMove || forwardMove || baseMove || movable[0];
         handleMoveToken(chosen, rollVal);
       }, 600);
     }
   };
 
-  // 🚶‍♂️ धीमा एक-एक कदम चलना
+  // 🚶‍♂️ टोकन चलना
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
     if (autoMoveTimerRef.current) clearTimeout(autoMoveTimerRef.current);
 
@@ -660,7 +697,6 @@ export default function AuthenticLudoKingVsCafe() {
       return (START_OFFSETS[s] + step) % 52;
     };
 
-    // ✅ FIXED: हमेशा सटीक और ताज़ा टोकन लिस्ट से अपडेट करें
     let updated = tokensRef.current.map(t => t.id === token.id ? { ...t, step: finalStep } : t);
     const myGlobal = getGlobal(turnRef.current, finalStep);
     let captured = false;
@@ -695,12 +731,22 @@ export default function AuthenticLudoKingVsCafe() {
       playSfx('win');
 
       if (!isCafe) {
+        // 🛡️ डबल चेक: अगर आज पहले जीत चुका है तो वाउचर नहीं मिलेगा
+        if (hasAlreadyWonTodayRef.current) {
+          toast.error("⚠️ आज का दैनिक इनाम पहले ही रिडीम/जीता जा चुका है! (No New Voucher)");
+          syncOnlineRoom({ winner: 'friends', tokens: updated });
+          return;
+        }
+
         const champName = players[turnRef.current].name;
         setWinningPlayerName(champName);
         const code = `BOM-MANCHURIAN-${Math.floor(1000 + Math.random() * 9000)}`;
         setVoucherCode(code);
         confetti({ particleCount: 260, spread: 100 });
         toast.success(`🎉 गजब! ${champName} और दोस्तों ने कैफे को हरा दिया! सबको Manchurian FREE 🥟`);
+
+        setHasAlreadyWonToday(true);
+        hasAlreadyWonTodayRef.current = true;
 
         [players.p1, players.p2, players.p3].forEach(p => {
           if (p.phone && p.phone.length === 10) {
@@ -711,6 +757,7 @@ export default function AuthenticLudoKingVsCafe() {
               voucherCode: code,
               voucherClaimed: false,
               lastPlayedAt: new Date(),
+              lastWonAt: new Date(),
               importSource: 'LudoRaid'
             }, { merge: true }).catch(() => {});
           }
@@ -767,8 +814,12 @@ export default function AuthenticLudoKingVsCafe() {
     setTurnCount(0);
     setSeatDiceValues({ p1: null, p2: null, p3: null, cafe: null });
     setTurn('p1');
-    const newTarget = Math.random() < 0.70 ? 'cafe' : 'friends';
+
+    // 🔒 अगर आज पहले जीत चुका है तो दोबारा कभी फ्रेंड्स को टारगेट न दो
+    const newTarget = hasAlreadyWonToday ? 'cafe' : (Math.random() < 0.70 ? 'cafe' : 'friends');
     setTargetWinner(newTarget);
+    targetWinnerRef.current = newTarget;
+
     syncOnlineRoom({ tokens: resetTokens, winner: null, turn: 'p1', dice: null, hasRolled: false, targetWinner: newTarget, seatDiceValues: { p1: null, p2: null, p3: null, cafe: null } });
   };
 
@@ -1000,6 +1051,14 @@ export default function AuthenticLudoKingVsCafe() {
                       </button>
                     </div>
 
+                    {/* दैनिक लॉक चेतावनी बॉक्स */}
+                    {hasAlreadyWonToday && (
+                      <div className="bg-red-500/10 border border-red-500/40 p-2.5 rounded-xl flex items-center gap-2 text-red-400 text-[10px] font-bold">
+                        <AlertTriangle size={18} className="shrink-0" />
+                        <span>आज का मुफ़्त इनाम क्लेम हो चुका है। आप केवल अभ्यास के लिए खेल सकते हैं।</span>
+                      </div>
+                    )}
+
                     {gameMode === 'online' && onlineAction === 'create' && (
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-neutral-400">कितने दोस्त साथ खेलेंगे?</label>
@@ -1072,7 +1131,7 @@ export default function AuthenticLudoKingVsCafe() {
               CLASSIC LUDO RAID
             </h1>
             <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
-              {gameMode === 'online' && roomId ? `Room: ${roomId}` : 'Win 1x Veg Manchurian Half 🥟'}
+              {hasAlreadyWonToday ? '🔒 Practice Mode (Daily Limit Reached)' : (gameMode === 'online' && roomId ? `Room: ${roomId}` : 'Win 1x Veg Manchurian Half 🥟')}
             </p>
           </div>
           <div className="flex gap-2">
@@ -1145,7 +1204,7 @@ export default function AuthenticLudoKingVsCafe() {
         {/* 🎯 15×15 EXACT MATHEMATICAL SVG LUDO BOARD */}
         <div className="w-full max-w-[420px] aspect-square bg-white border-[6px] border-[#000] shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto">
           <svg viewBox="0 0 15 15" className="w-full h-full block">
-            {/* ग्रिड सेल्स (1.0 × 1.0 के 100% बराबर चौकोर खाने) */}
+            {/* ग्रिड सेल्स */}
             {Array.from({ length: 15 }).map((_, r) =>
               Array.from({ length: 15 }).map((_, c) => {
                 if (r < 6 && c < 6) return null;
@@ -1239,7 +1298,7 @@ export default function AuthenticLudoKingVsCafe() {
             <text x="8.5" y="12.75" fontSize="0.6" textAnchor="middle" fill="#334155" fontWeight="bold">★</text>
           </svg>
 
-          {/* ♟️ गोटियां (स्मार्ट साइड-बाय-साइड स्टैकिंग और पक्का क्लिक फ़िक्स) */}
+          {/* ♟️ गोटियां */}
           {tokens.map(token => {
             if (token.ownerSeat === 'p2' && friendCount < 2) return null;
             if (token.ownerSeat === 'p3' && friendCount < 3) return null;
@@ -1253,7 +1312,6 @@ export default function AuthenticLudoKingVsCafe() {
               (token.step >= 0 && token.step + dice <= 56)
             );
 
-            // 1. साइड-बाय-साइड स्टैकिंग: जब एक ही खाने में 2 गोटियां होंगी तो दोनों अलग-अलग दिखेंगी
             let offsetX = 0;
             let offsetY = 0;
             let tokenScale = 1;
@@ -1268,7 +1326,7 @@ export default function AuthenticLudoKingVsCafe() {
               if (tokensOnCell.length > 1) {
                 const myIdx = tokensOnCell.findIndex(t => t.id === token.id);
                 tokenScale = 0.82;
-                offsetX = myIdx === 0 ? -12 : 12; // एक बाईं ओर, दूसरी दाईं ओर
+                offsetX = myIdx === 0 ? -12 : 12;
               }
             }
 
@@ -1307,7 +1365,6 @@ export default function AuthenticLudoKingVsCafe() {
                 }}
                 className="absolute flex items-center justify-center p-[1px] cursor-pointer"
               >
-                {/* सिर्फ चलने वाली गोटी हवा में उछलेगी (Bouncing) */}
                 <motion.div
                   animate={canMove && isMyPiece ? { scale: [1, 1.25, 1], y: [0, -5, 0] } : { scale: 1 }}
                   transition={canMove ? { repeat: Infinity, duration: 0.55 } : {}}
