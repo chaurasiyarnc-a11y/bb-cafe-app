@@ -13,13 +13,15 @@ export default function SmartGameRouter() {
         const docRef = doc(db, "system_settings", "game_config");
         const docSnap = await getDoc(docRef);
         
-        let targetGame = "spin-game"; // डिफ़ॉल्ट गेम
+        let targetGame = "spin-game"; // डिफ़ॉल्ट गेम
         
         if (docSnap.exists()) {
           const config = docSnap.data();
           
-          // 👉 यहाँ पूरे 6 गेम्स की लिस्ट है
-          if (config.activeGame === "CatchGame") {
+          // 👉 सभी 7 गेम्स की सही लिस्ट
+          if (config.activeGame === "Ludo") {
+            targetGame = "ludo";
+          } else if (config.activeGame === "CatchGame") {
             targetGame = "catch-game";
           } else if (config.activeGame === "FruitNinja") {
             targetGame = "FruitNinja"; 
@@ -42,7 +44,7 @@ export default function SmartGameRouter() {
         
         setTimeout(() => {
           window.location.replace(`/${targetGame}${queryString}`);
-        }, 500);
+        }, 400);
 
       } catch (error) {
         window.location.replace("/spin-game");
