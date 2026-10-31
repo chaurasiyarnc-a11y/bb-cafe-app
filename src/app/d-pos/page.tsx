@@ -7306,12 +7306,21 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       <h3 className="text-sm font-black uppercase text-neutral-800 dark:text-neutral-200 border-b border-neutral-100 dark:border-neutral-800 pb-3 flex items-center gap-2">
                         <Gamepad2 size={18} className="text-purple-500"/> Experience & Interface
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-3">
+                     <div className="space-y-3">
                           <div><p className="text-xs font-bold uppercase text-purple-600 dark:text-purple-400">Active Customer Game:</p></div>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {['SpinGame', 'CatchGame', 'FruitNinja', 'MemoryGame', 'Cafe2048', 'HungrySnake'].map(game => (
-                              <button key={game} onClick={() => handleToggleGame(game)} className={`py-2 px-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeGameType === game ? 'bg-purple-100 text-purple-700 ring-2 ring-purple-500' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600'}`}>{game}</button>
+                            {['Ludo', 'SpinGame', 'CatchGame', 'FruitNinja', 'MemoryGame', 'Cafe2048', 'HungrySnake'].map(game => (
+                              <button 
+                                key={game} 
+                                onClick={() => handleToggleGame(game)} 
+                                className={`py-2 px-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                                  activeGameType === game 
+                                    ? 'bg-purple-600 text-white shadow-lg ring-2 ring-purple-400 font-black' 
+                                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                                }`}
+                              >
+                                {game === 'Ludo' ? '🎲 Ludo' : game}
+                              </button>
                             ))}
                           </div>
                         </div>
