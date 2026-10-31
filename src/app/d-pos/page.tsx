@@ -241,16 +241,17 @@ export default function BbCafeDesktopPos() {
     return () => unsub();
   }, [isLoggedIn]);
 
-  const handleToggleGame = async (gameType: string) => {
+ const handleToggleGame = async (gameType: string) => {
     triggerBeep('tap');
     await setDoc(doc(db, "system_settings", "game_config"), { activeGame: gameType }, { merge: true });
     
     let gameName = 'Spin Wheel';
+    if (gameType === 'Ludo') gameName = 'Ludo (1v1 Manchurian)'; // 👈 नया Ludo जोड़ा गया
     if (gameType === 'CatchGame') gameName = 'Catch Game';
     if (gameType === 'FruitNinja') gameName = 'Fruit Cutter';
     if (gameType === 'MemoryGame') gameName = 'Food Match'; 
     if (gameType === 'Cafe2048') gameName = 'Cafe 2048'; 
-    if (gameType === 'HungrySnake') gameName = 'Hungry Snake';// 5वां गेम
+    if (gameType === 'HungrySnake') gameName = 'Hungry Snake';
 
     toast.success(`सफलतापूर्वक ${gameName} चालू कर दिया गया! 🎮`);
   };
