@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Phone, ArrowRight, Loader2, Swords, Users, Share2, LogIn, Lock, AlertTriangle, Coins, Sparkles } from 'lucide-react';
+import { Trophy, RefreshCw, ArrowLeft, Volume2, VolumeX, Bot, User, Gift, Phone, ArrowRight, Loader2, Swords, Users, Share2, LogIn, Lock, AlertTriangle, Coins, Sparkles, Flame } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/firebase';
@@ -120,8 +120,8 @@ export default function AuthenticLudoKingVsCafe() {
   const [targetPrize, setTargetPrize] = useState<PrizeType>(() => {
     const r = Math.random();
     if (r < 0.70) return 'cafe';        // 70%
-    if (r < 0.95) return 'tokens';      // 25% (0.70 से 0.95)
-    return 'manchurian';                // 5%  (0.95 से 1.00)
+    if (r < 0.95) return 'tokens';      // 25%
+    return 'manchurian';                // 5%
   });
 
   const [turnCount, setTurnCount] = useState(0);
@@ -290,7 +290,6 @@ export default function AuthenticLudoKingVsCafe() {
           const data = snap.data();
           if (data.name) setMyName(data.name);
 
-          // आज का चेक
           const today = new Date();
           const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
@@ -446,32 +445,95 @@ export default function AuthenticLudoKingVsCafe() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
-  // 🎲 एडवांस्ड पासा इंजन: तुरंत गोटी बाहर + कैफे द्वारा बार-बार काटना + 70/25/5 अनुपात
+  // 🎲🎭 DRAMATIC SCRIPTED DICE ENGINE (नोक-झोंक + ग्राहक द्वारा काटना + अंतिम सेकंड में कैफे की जीत)
   const getBiasedDiceRoll = (currentSeat: SeatId): number => {
     const curTokens = tokensRef.current;
     const myTokens = curTokens.filter(t => t.ownerSeat === currentSeat);
     const cafeTokens = curTokens.filter(t => t.ownerSeat === 'cafe');
     const customerTokens = curTokens.filter(t => t.ownerSeat !== 'cafe');
     
-    // अगर आज पहले जीत चुका है या 70% में कैफे जीतना है
-    const forceCafeWin = hasAlreadyWonTodayRef.current || targetPrizeRef.current === 'cafe';
+    const isScriptedCafeWin = hasAlreadyWonTodayRef.current || targetPrizeRef.current === 'cafe';
 
     const getGlobalPos = (seat: SeatId, step: number) => {
       if (step < 0 || step >= 51) return -1;
       return (START_OFFSETS[seat] + step) % 52;
     };
 
-    // 🚀 नियम 1: शुरुआत में दोनों की गोटियां झटपट बाहर निकालें (85% चांस 6 आने का)
+    // 🚀 फेज़ 1: शुरुआत में दोनों की गोटियां झटपट बाहर निकालें (85% चांस 6 आने का)
     const anyInBase = myTokens.some(t => t.step === -1);
-    if (anyInBase && turnCount < 12) {
+    if (anyInBase && turnCount < 10) {
       if (Math.random() < 0.85) return 6;
     }
 
+    // ग्राहक की स्थिति की जांच
+    const custFinishedCount = customerTokens.filter(t => t.step === 56).length;
+    const custInClimaxZone = customerTokens.some(t => t.step >= 50 && t.step < 56);
+
     // ==========================================
-    // ⚔️ कैफ़े की बारी (Cafe Bot Turn)
+    // ⚔️ 1. ग्राहक की बारी (Customer Turn)
+    // ==========================================
+    if (currentSeat !== 'cafe') {
+      // 💥 नोक-झोंक नियम: अगर ग्राहक कैफे की गोटी काट सकता है, तो 55% चांस दो कि वो काट ले!
+      // (इससे ग्राहक को लगेगा कि वह पूरी तरह गेम में हावी है और जीत रहा है)
+      for (let r = 1; r <= 6; r++) {
+        const canKillCafe = myTokens.some(t => {
+          const targetStep = t.step === -1 ? (r === 6 ? 0 : -1) : t.step + r;
+          if (targetStep < 0 || targetStep > 50) return false;
+          const targetGlobal = (START_OFFSETS[currentSeat] + targetStep) % 52;
+          const safe = [0, 8, 13, 21, 26, 34, 39, 47];
+          if (safe.includes(targetGlobal)) return false;
+
+          return cafeTokens.some(ct => ct.step >= 0 && ct.step < 51 && getGlobalPos('cafe', ct.step) === targetGlobal);
+        });
+
+        // मैच के मध्य में ग्राहक को कैफे की गोटी काटने दो (रोमांच बढ़ेगा!)
+        if (canKillCafe && turnCount > 8 && turnCount < 26 && Math.random() < 0.55) {
+          return r;
+        }
+      }
+
+      // 🏆 ग्राहक की पहली गोटी आसानी से होम जाने दो (ताकि उसे लगे कि वो बस जीतने ही वाला है!)
+      if (isScriptedCafeWin && custFinishedCount === 0) {
+        const enterFirstHomeRoll = myTokens.find(t => t.step >= 50 && t.step < 56);
+        if (enterFirstHomeRoll) {
+          const needed = 56 - enterFirstHomeRoll.step;
+          if (needed >= 1 && needed <= 6 && Math.random() < 0.70) {
+            return needed; // पहली गोटी होम घुसा दो! ग्राहक खुश हो जाएगा!
+          }
+        }
+      }
+
+      // 🛑 लेकिन दूसरी (अंतिम) गोटी को 56 में घुसने से 100% ब्लॉक रखो जब कैफे को जीतना हो!
+      if (isScriptedCafeWin && (custFinishedCount >= 1 || custInClimaxZone)) {
+        const safeRolls: number[] = [];
+        for (let r = 1; r <= 6; r++) {
+          const wouldWinGame = myTokens.some(t => t.step >= 50 && t.step + r === 56);
+          if (!wouldWinGame) {
+            safeRolls.push(r);
+          }
+        }
+
+        if (safeRolls.length > 0) {
+          // ग्राहक को 1, 2 या 3 देकर 53-54 के मुहाने पर अटका दो
+          const smallRolls = safeRolls.filter(n => n <= 3);
+          if (smallRolls.length > 0 && Math.random() < 0.80) {
+            return smallRolls[Math.floor(Math.random() * smallRolls.length)];
+          }
+          return safeRolls[Math.floor(Math.random() * safeRolls.length)];
+        }
+
+        // ओवरशूट अंक (ताकि गोटी हिले ही नहीं)
+        return 6;
+      }
+
+      return Math.floor(Math.random() * 6) + 1;
+    }
+
+    // ==========================================
+    // ☕ 2. कैफ़े बॉस की बारी (Cafe Bot Turn)
     // ==========================================
     if (currentSeat === 'cafe') {
-      // 1. अगर कैफे सीधे होम (56) पहुंच सकता है
+      // 1. अगर कैफे की गोटी सीधे होम (56) जा सकती है, तो तुरंत जीतो
       for (const t of myTokens) {
         if (t.step >= 50 && t.step < 56) {
           const needed = 56 - t.step;
@@ -479,7 +541,7 @@ export default function AuthenticLudoKingVsCafe() {
         }
       }
 
-      // 2. 🎯 ग्राहक की गोटी काटना (Sniper Kill Move) - 100% काट ले!
+      // 2. 🎯 ग्राहक की गोटी काटना (Sniper Kill) - कैफे कभी मौका नहीं छोड़ेगा!
       for (let r = 1; r <= 6; r++) {
         const canKill = myTokens.some(t => {
           const targetStep = t.step === -1 ? (r === 6 ? 0 : -1) : t.step + r;
@@ -490,87 +552,21 @@ export default function AuthenticLudoKingVsCafe() {
 
           return customerTokens.some(other => other.step >= 0 && other.step < 51 && getGlobalPos(other.ownerSeat, other.step) === targetGlobal);
         });
-        if (canKill) return r; // 🎯 तुरंत काटने वाला अंक दो!
+        if (canKill) return r;
       }
 
-      // 3. अगर कोई गोटी अभी बेस में है तो 6 देकर बाहर निकालो
-      if (anyInBase && Math.random() < 0.75) return 6;
-
-      // 4. अगर कैफे को जीतना है, तो बड़े अंक दो (4, 5, 6)
-      if (forceCafeWin) {
-        const fastRolls = [6, 5, 4, 6, 5];
-        return fastRolls[Math.floor(Math.random() * fastRolls.length)];
+      // 3. 🏁 अंतिम क्लाइमेक्स: जब ग्राहक जीत के पास हो, तो कैफे को 6, 5, 6 देकर तेजी से आगे लाओ!
+      if (isScriptedCafeWin && (custFinishedCount >= 1 || custInClimaxZone)) {
+        if (anyInBase) return 6; // बेस से गोटी तुरंत निकालो
+        const turboRolls = [6, 5, 6, 4, 5];
+        return turboRolls[Math.floor(Math.random() * turboRolls.length)];
       }
 
+      // सामान्य चाल
+      if (anyInBase && Math.random() < 0.60) return 6;
       return Math.floor(Math.random() * 6) + 1;
     }
 
-    // ==========================================
-    // 🛡️ ग्राहक की बारी (Player Turn)
-    // ==========================================
-    if (forceCafeWin) {
-      // (क) चेक करें कि क्या ग्राहक किसी ऐसी चाल से कैफे के ठीक आगे गिर सकता है, ताकि कैफे अगली बारी में काट सके!
-      const baitRolls: number[] = [];
-      const safeRolls: number[] = [];
-
-      for (let r = 1; r <= 6; r++) {
-        // कैफे को काटने वाला अंक पूरी तरह ब्लॉक करें
-        const wouldKillCafe = myTokens.some(t => {
-          const targetStep = t.step === -1 ? (r === 6 ? 0 : -1) : t.step + r;
-          if (targetStep < 0 || targetStep > 50) return false;
-          const targetGlobal = (START_OFFSETS[currentSeat] + targetStep) % 52;
-          const safe = [0, 8, 13, 21, 26, 34, 39, 47];
-          if (safe.includes(targetGlobal)) return false;
-
-          return cafeTokens.some(ct => ct.step >= 0 && ct.step < 51 && getGlobalPos('cafe', ct.step) === targetGlobal);
-        });
-
-        // होम में जीतने वाला अंक ब्लॉक करें
-        const wouldEnterHome = myTokens.some(t => t.step >= 50 && t.step + r === 56);
-
-        if (!wouldKillCafe && !wouldEnterHome) {
-          safeRolls.push(r);
-
-          // 🪤 चारा (Bait): क्या यह चाल ग्राहक को कैफे के 1 से 5 कदम आगे खड़ा कर देगी?
-          const leavesNearCafe = myTokens.some(t => {
-            const targetStep = t.step === -1 ? (r === 6 ? 0 : -1) : t.step + r;
-            if (targetStep < 0 || targetStep > 50) return false;
-            const targetGlobal = (START_OFFSETS[currentSeat] + targetStep) % 52;
-            const safe = [0, 8, 13, 21, 26, 34, 39, 47];
-            if (safe.includes(targetGlobal)) return false;
-
-            return cafeTokens.some(ct => {
-              if (ct.step < 0 || ct.step > 50) return false;
-              const cafeGlobal = getGlobalPos('cafe', ct.step);
-              const dist = (targetGlobal - cafeGlobal + 52) % 52;
-              return dist >= 1 && dist <= 5; // कैफे के मुंह के आगे खड़ा हो जाए!
-            });
-          });
-
-          if (leavesNearCafe) {
-            baitRolls.push(r);
-          }
-        }
-      }
-
-      // 60% चांस है कि ग्राहक खुद कैफे के आगे जा गिरेगा ताकि कैफे उसे काट सके!
-      if (baitRolls.length > 0 && Math.random() < 0.65) {
-        return baitRolls[Math.floor(Math.random() * baitRolls.length)];
-      }
-
-      if (safeRolls.length > 0) {
-        const smallRolls = safeRolls.filter(n => n <= 3);
-        if (smallRolls.length > 0 && Math.random() < 0.70) {
-          return smallRolls[Math.floor(Math.random() * smallRolls.length)];
-        }
-        return safeRolls[Math.floor(Math.random() * safeRolls.length)];
-      }
-
-      // सुरक्षित ओवरशूट
-      return myTokens.some(t => t.step >= 50) ? 6 : 1;
-    }
-
-    // अगर 30% वाले चांस में ग्राहक को जीतना है (फेयर पासा)
     return Math.floor(Math.random() * 6) + 1;
   };
 
@@ -757,7 +753,7 @@ export default function AuthenticLudoKingVsCafe() {
           if (isEnemy && t.step >= 0 && t.step < 51 && getGlobal(t.ownerSeat, t.step) === myGlobal) {
             captured = true;
             playSfx('cut');
-            toast.success(`⚔️ ${players[turnRef.current].name} ने गोटी काटी!`);
+            toast.success(`⚔️ ${players[turnRef.current].name} ने गोटी काटी! बदला लिया गया 🔥`);
             return { ...t, step: -1 };
           }
           return t;
@@ -777,7 +773,6 @@ export default function AuthenticLudoKingVsCafe() {
       playSfx('win');
 
       if (!isCafe) {
-        // डबल चेक: अगर आज पहले जीत चुका है तो नया वाउचर नहीं मिलेगा
         if (hasAlreadyWonTodayRef.current) {
           toast.error("⚠️ आज का दैनिक इनाम पहले ही प्राप्त हो चुका है! (No New Prize)");
           syncOnlineRoom({ winner: 'friends', tokens: updated });
@@ -787,7 +782,6 @@ export default function AuthenticLudoKingVsCafe() {
         const champName = players[turnRef.current].name;
         setWinningPlayerName(champName);
 
-        // 🎁 इनाम का निर्धारण (5% मंचूरियन या 25% 10 टोकन)
         const prizeWon: PrizeType = targetPrizeRef.current === 'manchurian' ? 'manchurian' : 'tokens';
         setWonPrizeType(prizeWon);
 
@@ -807,7 +801,6 @@ export default function AuthenticLudoKingVsCafe() {
         setHasAlreadyWonToday(true);
         hasAlreadyWonTodayRef.current = true;
 
-        // फायरबेस में सभी दोस्तों के खाते में इनाम सेव करना
         [players.p1, players.p2, players.p3].forEach(p => {
           if (p.phone && p.phone.length === 10) {
             const prizeLabel = prizeWon === 'manchurian' 
@@ -825,7 +818,6 @@ export default function AuthenticLudoKingVsCafe() {
               importSource: 'LudoRaid'
             };
 
-            // अगर 10 टोकन जीते हैं, तो सीधे अकाउंट में 10 लॉयल्टी पॉइंट्स जोड़ें!
             if (prizeWon === 'tokens') {
               updatePayload.points = increment(10);
               updatePayload.gamePoints = increment(10);
@@ -843,7 +835,7 @@ export default function AuthenticLudoKingVsCafe() {
           tokens: updated 
         });
       } else {
-        toast.error("😱 ओह्ह! कैफ़े Boss ने सबको हरा दिया! कोई बात नहीं, अगली बार फिर कोशिश करें!");
+        toast.error("😱 ओह्ह! बिल्कुल अंतिम सेकंड में कैफ़े Boss ने मैच निकाल लिया! गजब मुकाबला रहा ☕");
         syncOnlineRoom({ winner: 'cafe', tokens: updated });
       }
       return;
@@ -894,7 +886,6 @@ export default function AuthenticLudoKingVsCafe() {
     setSeatDiceValues({ p1: null, p2: null, p3: null, cafe: null });
     setTurn('p1');
 
-    // 🔒 नया टारगेट चुनना
     let newTarget: PrizeType = 'cafe';
     if (!hasAlreadyWonToday) {
       const r = Math.random();
@@ -1059,8 +1050,12 @@ export default function AuthenticLudoKingVsCafe() {
                     <Gift size={13} /> Co-op Cafe Challenge
                   </span>
                   <div className="text-xs font-bold text-white space-y-0.5">
-                    <p className="text-amber-400 font-black">🏆 जीतें 1x Veg Manchurian Half (5% Jackpot)! 🥟</p>
-                    <p className="text-green-400 font-bold">⭐ या जीतें 10 Cafe Tokens (25% चांस - ₹10 छूट)!</p>
+                    <p className="text-amber-400 font-black flex items-center justify-center gap-1">
+                      <Sparkles size={13} /> 1x Veg Manchurian Half (5% Jackpot)! 🥟
+                    </p>
+                    <p className="text-green-400 font-bold flex items-center justify-center gap-1">
+                      <Coins size={13} /> 10 Cafe Tokens (25% चांस - ₹10 छूट)!
+                    </p>
                   </div>
                 </div>
 
@@ -1293,10 +1288,10 @@ export default function AuthenticLudoKingVsCafe() {
                     </div>
                     <h2 className="text-xl font-black uppercase text-rose-400">CAFE BOSS WON! ☕</h2>
                     <p className="text-xs text-neutral-300 font-bold">
-                      सब मिलकर भी Bum Bum Cafe को नहीं हरा पाए! कैफ़े ने बार-बार गोटी काटकर मैच जीत लिया।
+                      गजब का रोमांचक मुकाबला रहा! आप बिल्कुल जीत के करीब थे, पर आखिरी सेकंड में कैफ़े ने बाजी पलट दी।
                     </p>
                     <button onClick={handleRestart} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-black uppercase text-xs rounded-xl transition-all shadow-lg">
-                      एक बार और मिलकर लड़ो (Retry Raid) ⚔️
+                      एक बार और मुकाबला करें (Play Again) ⚔️
                     </button>
                   </>
                 )}
@@ -1308,7 +1303,6 @@ export default function AuthenticLudoKingVsCafe() {
         {/* 🎯 15×15 बोर्ड */}
         <div className="w-full max-w-[420px] aspect-square bg-white border-[6px] border-[#000] shadow-[0_15px_50px_rgba(0,0,0,0.9)] relative overflow-hidden my-auto">
           <svg viewBox="0 0 15 15" className="w-full h-full block">
-            {/* ग्रिड सेल्स */}
             {Array.from({ length: 15 }).map((_, r) =>
               Array.from({ length: 15 }).map((_, c) => {
                 if (r < 6 && c < 6) return null;
