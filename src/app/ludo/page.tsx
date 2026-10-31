@@ -112,9 +112,9 @@ export default function AuthenticLudoKingVsCafe() {
   const [isAnimatingMove, setIsAnimatingMove] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // 🎯 70% कैफे विनिंग प्रोबेबिलिटी (30% कस्टमर विनिंग)
+  // 🎯 70% कैफे जीत (30% कस्टमर जीत)
   const [targetWinner, setTargetWinner] = useState<'friends' | 'cafe'>(() => Math.random() < 0.70 ? 'cafe' : 'friends');
-  const [turnCount, setTurnCount] = useState(0); // टर्न काउंट जिससे शुरू में गोटियां जल्दी बाहर निकलें
+  const [turnCount, setTurnCount] = useState(0);
   const [winner, setWinner] = useState<'friends' | 'cafe' | null>(null);
   const [winningPlayerName, setWinningPlayerName] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
@@ -151,6 +151,8 @@ export default function AuthenticLudoKingVsCafe() {
   isAnimatingMoveRef.current = isAnimatingMove;
   const diceRef = useRef<number | null>(dice);
   diceRef.current = dice;
+  const targetWinnerRef = useRef(targetWinner);
+  targetWinnerRef.current = targetWinner;
 
   // ऑटो-मूव टाइमर
   const autoMoveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -187,6 +189,7 @@ export default function AuthenticLudoKingVsCafe() {
         if (d.friendCount) setFriendCount(d.friendCount);
         if (d.seatDiceValues) setSeatDiceValues(d.seatDiceValues);
         if (d.rolling !== undefined) setRolling(d.rolling);
+        if (d.targetWinner) setTargetWinner(d.targetWinner);
       }
     });
 
@@ -396,58 +399,94 @@ export default function AuthenticLudoKingVsCafe() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
-  // 🎲 DYNAMIC BALANCED DICE ENGINE (शुरू में तेज़ गोटी बाहर + आपसी लड़ाई + अंत में 70% कैफे जीत)
+  // 🎲 100% FIXED: RIGGED SMART DICE ENGINE (GUARANTEED 70% CAFE WIN)
   const getBiasedDiceRoll = (currentSeat: SeatId): number => {
-    const raw = Math.floor(Math.random() * 6) + 1;
     const curTokens = tokensRef.current;
     const myTokens = curTokens.filter(t => t.ownerSeat === currentSeat);
-    const enemyTokens = curTokens.filter(t => t.ownerSeat !== currentSeat);
-
-    // 🚀 नियम 1: शुरूआती 6 टर्न में गोटियां झटपट बाहर निकालें (दोनों को बराबर 6 मिलेगा!)
-    const allInBase = myTokens.every(t => t.step === -1);
-    if (allInBase && turnCount < 8) {
-      if (Math.random() < 0.65) return 6; // 65% चांस जल्दी गोटी निकलने का
-    }
-
-    // ⚔️ नियम 2: आपसी लड़ाई (Mutual Kills) - चाहे ग्राहक हो या कैफ़े, अगर विरोधी पास में है तो काटने का मौका दो!
-    for (let r = 1; r <= 6; r++) {
-      const canKill = myTokens.some(t => {
-        if (t.step === -1) return false;
-        const targetStep = t.step + r;
-        if (targetStep > 50) return false;
-        const targetGlobal = (START_OFFSETS[currentSeat] + targetStep) % 52;
-        const safe = [0, 8, 13, 21, 26, 34, 39, 47];
-        if (safe.includes(targetGlobal)) return false;
-
-        return enemyTokens.some(e => e.step >= 0 && e.step < 51 && (START_OFFSETS[e.ownerSeat] + e.step) % 52 === targetGlobal);
-      });
-
-      // 45% चांस गोटी काटने वाला अंक निकलने का ताकि खेल में दोनों तरफ से बदला चले
-      if (canKill && Math.random() < 0.45) return r;
-    }
-
-    // 🏁 नियम 3: अंत में 70% कैफ़े को जितवाने का क्लाइमेक्स
-    const isPlayerVeryNearWin = curTokens.filter(t => t.ownerSeat !== 'cafe' && t.step >= 53).length > 0;
     const cafeTokens = curTokens.filter(t => t.ownerSeat === 'cafe');
-    const isCafeNearWin = cafeTokens.some(t => t.step >= 50);
+    const isTargetCafe = targetWinnerRef.current === 'cafe';
 
-    if (targetWinner === 'cafe' && isPlayerVeryNearWin) {
-      if (currentSeat === 'cafe') {
-        // कैफ़े को फ़ास्ट-फ़ॉरवर्ड करो
-        const inBase = cafeTokens.some(t => t.step === -1);
-        if (inBase) return 6;
-        return Math.random() < 0.6 ? 6 : (Math.random() < 0.5 ? 5 : 4);
-      } else {
-        // ग्राहक को होम के मुहाने पर थोड़ा अटकाओ
-        const needed = myTokens.map(t => 56 - t.step).filter(d => d > 0 && d <= 6);
-        if (needed.length > 0 && Math.random() < 0.70) {
-          const wrongRolls = [1, 2, 3, 4, 5, 6].filter(n => !needed.includes(n));
-          if (wrongRolls.length > 0) return wrongRolls[Math.floor(Math.random() * wrongRolls.length)];
+    const getGlobalPos = (seat: SeatId, step: number) => {
+      if (step < 0 || step >= 51) return -1;
+      return (START_OFFSETS[seat] + step) % 52;
+    };
+
+    // ==========================================
+    // केस 1: जब कैफ़े की बारी हो (Cafe Bot Turn)
+    // ==========================================
+    if (currentSeat === 'cafe') {
+      // 1. क्या कैफे कोई भी चाल चलकर सीधे Home (56) पहुंच सकता है?
+      for (const t of myTokens) {
+        if (t.step >= 50 && t.step < 56) {
+          const needed = 56 - t.step;
+          if (needed >= 1 && needed <= 6) return needed; // तुरंत Home जीतें!
         }
       }
+
+      // 2. क्या कैफे किसी भी विरोधी को काट सकता है? (Kill Move)
+      for (let r = 1; r <= 6; r++) {
+        const canKill = myTokens.some(t => {
+          const targetStep = t.step === -1 ? (r === 6 ? 0 : -1) : t.step + r;
+          if (targetStep < 0 || targetStep > 50) return false;
+          const targetGlobal = (START_OFFSETS.cafe + targetStep) % 52;
+          const safe = [0, 8, 13, 21, 26, 34, 39, 47];
+          if (safe.includes(targetGlobal)) return false;
+
+          return curTokens.some(other => other.ownerSeat !== 'cafe' && other.step >= 0 && other.step < 51 && getGlobalPos(other.ownerSeat, other.step) === targetGlobal);
+        });
+        if (canKill) return r; // विरोधी को तुरंत काटें!
+      }
+
+      // 3. अगर targetWinner कैफे है तो कैफे को सुपर स्पीड दें
+      if (isTargetCafe) {
+        const anyInBase = myTokens.some(t => t.step === -1);
+        if (anyInBase && Math.random() < 0.75) return 6; // तेजी से बाहर निकालें
+        const fastRolls = [6, 5, 4, 6, 5];
+        return fastRolls[Math.floor(Math.random() * fastRolls.length)];
+      }
+
+      return Math.floor(Math.random() * 6) + 1;
     }
 
-    return raw;
+    // ==========================================
+    // केस 2: जब ग्राहक (Friends/Player) की बारी हो
+    // ==========================================
+    if (isTargetCafe) {
+      // (क) गोटी काटने पर रोक: ग्राहक को ऐसा अंक बिल्कुल न दें जिससे कैफे की गोटी कटे
+      const safeRolls: number[] = [];
+      for (let r = 1; r <= 6; r++) {
+        const wouldKillCafe = myTokens.some(t => {
+          const targetStep = t.step === -1 ? (r === 6 ? 0 : -1) : t.step + r;
+          if (targetStep < 0 || targetStep > 50) return false;
+          const targetGlobal = (START_OFFSETS[currentSeat] + targetStep) % 52;
+          const safe = [0, 8, 13, 21, 26, 34, 39, 47];
+          if (safe.includes(targetGlobal)) return false;
+
+          return cafeTokens.some(ct => ct.step >= 0 && ct.step < 51 && getGlobalPos('cafe', ct.step) === targetGlobal);
+        });
+
+        // (ख) घर पहुंचने पर रोक: अगर ग्राहक Runway पर है, तो उसे जीतने वाला अंक ब्लॉक करें
+        const wouldEnterHome = myTokens.some(t => t.step >= 50 && t.step + r === 56);
+
+        if (!wouldKillCafe && !wouldEnterHome) {
+          safeRolls.push(r);
+        }
+      }
+
+      // अगर सुरक्षित अंक मौजूद हैं, तो उन्हीं में से एक दें (अक्सर 1, 2 या 3 ताकि चाल धीमी रहे)
+      if (safeRolls.length > 0) {
+        const smallRolls = safeRolls.filter(n => n <= 3);
+        if (smallRolls.length > 0 && Math.random() < 0.75) {
+          return smallRolls[Math.floor(Math.random() * smallRolls.length)];
+        }
+        return safeRolls[Math.floor(Math.random() * safeRolls.length)];
+      }
+
+      return 1; // डिफॉल्ट सुरक्षित चाल
+    }
+
+    // सामान्य चाल (जब 30% चांस में ग्राहक को जीतना हो)
+    return Math.floor(Math.random() * 6) + 1;
   };
 
   // 🎲 पासा फेंकना
@@ -493,13 +532,16 @@ export default function AuthenticLudoKingVsCafe() {
   };
 
   useEffect(() => {
-    if (isSetupDone && turn === 'cafe' && !rolling && !hasRolled && !winner && !isAnimatingMove) {
+    // ऑनलाइन मोड में सिर्फ होस्ट (p1) बॉट की चाल चलेगा ताकि मल्टी-क्लाइंट रेस न हो
+    const canControlBot = gameMode === 'local' || (gameMode === 'online' && mySeat === 'p1');
+
+    if (isSetupDone && turn === 'cafe' && !rolling && !hasRolled && !winner && !isAnimatingMove && canControlBot) {
       const botTimer = setTimeout(() => {
         handleRollDice('cafe', true);
       }, 700);
       return () => clearTimeout(botTimer);
     }
-  }, [turn, hasRolled, rolling, winner, isAnimatingMove, isSetupDone]);
+  }, [turn, hasRolled, rolling, winner, isAnimatingMove, isSetupDone, gameMode, mySeat]);
 
   // ⏱️ ऑटो-मूव टाइमर: पासा फेंकने के बाद 4 सेकंड तक टैप न करने पर सबसे बेहतरीन गोटी खुद चलेगी
   useEffect(() => {
@@ -518,7 +560,6 @@ export default function AuthenticLudoKingVsCafe() {
       if (movable.length > 0) {
         autoMoveTimerRef.current = setTimeout(() => {
           if (hasRolledRef.current && !isAnimatingMoveRef.current && !winnerRef.current) {
-            // सबसे आगे वाली गोटी खुद चलेगी
             const best = [...movable].sort((a, b) => b.step - a.step)[0];
             toast("ऑटो चाल (Auto Move)... ⏱️", { duration: 1200 });
             handleMoveToken(best, diceRef.current);
@@ -549,24 +590,35 @@ export default function AuthenticLudoKingVsCafe() {
     } else if (currentSeat === 'cafe') {
       setTimeout(() => {
         const curTokens = tokensRef.current;
-        // बोट: अगर गोटी कट रही है तो पहले काटो, वर्ना आगे बढ़ो
+        
+        // 1. सीधे होम पहुंचें (Win Move)
+        const winMove = movable.find(t => t.step + rollVal === 56);
+        
+        // 2. विरोधी को काटें (Kill Move)
         const killMove = movable.find(t => {
           const targetStep = t.step === -1 ? 0 : t.step + rollVal;
+          if (targetStep > 50) return false;
           const targetGlobal = (START_OFFSETS.cafe + targetStep) % 52;
+          const safe = [0, 8, 13, 21, 26, 34, 39, 47];
+          if (safe.includes(targetGlobal)) return false;
+
           return curTokens.some(other => other.ownerSeat !== 'cafe' && other.step >= 0 && other.step < 51 && (START_OFFSETS[other.ownerSeat] + other.step) % 52 === targetGlobal);
         });
 
-        const winMove = movable.find(t => t.step + rollVal === 56);
+        // 3. सबसे आगे चल रही गोटी को आगे बढ़ाएं (Forward Move)
+        const forwardMove = movable.filter(t => t.step >= 0).sort((a, b) => b.step - a.step)[0];
+        
+        // 4. बेस से गोटी निकालें (Base Move)
         const baseMove = movable.find(t => t.step === -1);
-        const forwardMove = [...movable].sort((a, b) => b.step - a.step)[0];
 
-        const chosen = killMove || winMove || baseMove || forwardMove || movable[0];
+        // ✅ AI PRIORITY FIXED: winMove -> killMove -> forwardMove -> baseMove
+        const chosen = winMove || killMove || forwardMove || baseMove || movable[0];
         handleMoveToken(chosen, rollVal);
       }, 600);
     }
   };
 
-  // 🚶‍♂️ 300ms धीमा एक-एक कदम चलना
+  // 🚶‍♂️ धीमा एक-एक कदम चलना
   const handleMoveToken = async (token: Token, rollValue: number | null = diceRef.current) => {
     if (autoMoveTimerRef.current) clearTimeout(autoMoveTimerRef.current);
 
@@ -597,7 +649,7 @@ export default function AuthenticLudoKingVsCafe() {
         currentStep += 1;
         playSfx('step');
         setTokens(prev => prev.map(t => t.id === token.id ? { ...t, step: currentStep } : t));
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 260));
       }
     }
 
@@ -608,7 +660,8 @@ export default function AuthenticLudoKingVsCafe() {
       return (START_OFFSETS[s] + step) % 52;
     };
 
-    let updated = tokensRef.current;
+    // ✅ FIXED: हमेशा सटीक और ताज़ा टोकन लिस्ट से अपडेट करें
+    let updated = tokensRef.current.map(t => t.id === token.id ? { ...t, step: finalStep } : t);
     const myGlobal = getGlobal(turnRef.current, finalStep);
     let captured = false;
 
@@ -627,10 +680,10 @@ export default function AuthenticLudoKingVsCafe() {
           }
           return t;
         });
-        setTokens(updated);
       }
     }
 
+    setTokens(updated);
     setIsAnimatingMove(false);
 
     // 🏆 जीत की जांच
@@ -663,10 +716,10 @@ export default function AuthenticLudoKingVsCafe() {
           }
         });
 
-        syncOnlineRoom({ winner: 'friends', winningPlayerName: champName, voucherCode: code });
+        syncOnlineRoom({ winner: 'friends', winningPlayerName: champName, voucherCode: code, tokens: updated });
       } else {
         toast.error("😱 ओह्ह! कैफ़े Boss ने सबको हरा दिया! Manchurian हाथ से निकल गया!");
-        syncOnlineRoom({ winner: 'cafe' });
+        syncOnlineRoom({ winner: 'cafe', tokens: updated });
       }
       return;
     }
@@ -714,8 +767,9 @@ export default function AuthenticLudoKingVsCafe() {
     setTurnCount(0);
     setSeatDiceValues({ p1: null, p2: null, p3: null, cafe: null });
     setTurn('p1');
-    setTargetWinner(Math.random() < 0.70 ? 'cafe' : 'friends');
-    syncOnlineRoom({ tokens: resetTokens, winner: null, turn: 'p1', dice: null, hasRolled: false, seatDiceValues: { p1: null, p2: null, p3: null, cafe: null } });
+    const newTarget = Math.random() < 0.70 ? 'cafe' : 'friends';
+    setTargetWinner(newTarget);
+    syncOnlineRoom({ tokens: resetTokens, winner: null, turn: 'p1', dice: null, hasRolled: false, targetWinner: newTarget, seatDiceValues: { p1: null, p2: null, p3: null, cafe: null } });
   };
 
   const getTokenCoords = (t: Token): [number, number] => {
@@ -1228,7 +1282,6 @@ export default function AuthenticLudoKingVsCafe() {
                   left: `${(c / 15) * 100}%`,
                   width: `${100 / 15}%`,
                   height: `${100 / 15}%`,
-                  // 2. विरोधी की गोटी पर क्लिक कभी नहीं लगेगा (pointer-events: none)
                   pointerEvents: isMyPiece ? 'auto' : 'none',
                   zIndex: canMove ? 50 : (isMyPiece ? 35 : 20)
                 }}
