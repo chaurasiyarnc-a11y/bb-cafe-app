@@ -564,6 +564,7 @@ export default function BbCafeDesktopPos() {
   const [purchaseSearchTerm, setPurchaseSearchTerm] = useState('');
   const [showPurchaseDropdown, setShowPurchaseDropdown] = useState(false);
   const [purchaseItemList, setPurchaseItemList] = useState<any[]>([]);
+  const [showVendorDropdown, setShowVendorDropdown] = useState(false); // 👉 नया: वेंडर ड्रॉपडाउन स्टेट
 
   // 👉 NEW: Purchase History States & Function (माल का खाता + डेट फ़िल्टर)
   const [purchaseVendorName, setPurchaseVendorName] = useState('');
