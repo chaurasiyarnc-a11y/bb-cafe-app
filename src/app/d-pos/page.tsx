@@ -2132,7 +2132,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       setPurchaseHistoryList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => { unsubRaw(); unsubVendors(); unsubPurchases(); };
-  }, [isLoggedIn]);  }, [isLoggedIn]);
+  }, [isLoggedIn]);
 // Real-time listener for live orders
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100));
