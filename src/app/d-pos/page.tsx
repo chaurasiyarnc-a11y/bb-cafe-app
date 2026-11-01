@@ -706,7 +706,7 @@ export default function BbCafeDesktopPos() {
     window.open(`https://wa.me/91${cleanPhone}?text=${msg}`, '_blank');
   };
 
-  // वेंडर खरीद का चालू महीने / चुनी तारीख के हिसाब से फ़िल्टर (Safe from error)
+ // वेंडर खरीद का चालू महीने / चुनी तारीख के हिसाब से फ़िल्टर
   const vendorPeriodStats = useMemo(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -737,17 +737,42 @@ export default function BbCafeDesktopPos() {
         }
       }
 
-      const vName = (p.vendorName || '').trim().toLowerCase().replace(/\s+/g, '_');
-      if (!stats[vName]) stats[vName] = { periodBuy: 0, entries: 0 };
-      const amt = Number(p.amount) || 0;
-      stats[vName].periodBuy += amt;
-      stats[vName].entries += 1;
-      totalPeriodPurchased += amt;
+      // नाम से कोष्ठक व स्पेस हटाकर 100% सही मिलान
+      const vKey = (p.vendorName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (vKey) {
+        if (!stats[vKey]) stats[vKey] = { periodBuy: 0, entries: 0 };
+        const amt = Number(p.amount) || 0;
+        stats[vKey].periodBuy += amt;
+        stats[vKey].entries += 1;
+        totalPeriodPurchased += amt;
+      }
     });
 
     return { stats, totalPeriodPurchased };
   }, [purchaseHistoryList, vendorDateFilter, vendorStartDate, vendorEndDate]);
 
+  // 👉 'This Month' में सिर्फ वही वेंडर चुनने का क्लीन लॉजिक
+  const activePeriodVendors = useMemo(() => {
+    return vendorsList.filter(vendor => {
+      const vKey = (vendor.name || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const periodBuy = vendorPeriodStats.stats[vKey]?.periodBuy || 0;
+
+      // अगर 'All Time' नहीं है, तो सिर्फ वही वेंडर दिखाओ जिनसे माल खरीदा गया है
+      if (vendorDateFilter !== 'all') {
+        if (periodBuy <= 0) return false;
+      }
+
+      // सर्च फ़िल्टर
+      if (vendorSearchQuery.trim()) {
+        const q = vendorSearchQuery.toLowerCase().trim();
+        const matchName = (vendor.name || '').toLowerCase().includes(q);
+        const matchPhone = String(vendor.phone || '').includes(q);
+        if (!matchName && !matchPhone) return false;
+      }
+
+      return true;
+    });
+  }, [vendorsList, vendorPeriodStats, vendorDateFilter, vendorSearchQuery]);
  // 👉 NEW: Stock Audit (माहवारी स्टॉक गिनती) States & Functions
   const [isStockAuditModalOpen, setIsStockAuditModalOpen] = useState(false);
   const [auditDate, setAuditDate] = useState(new Date().toISOString().split('T')[0]);
