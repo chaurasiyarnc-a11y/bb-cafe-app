@@ -529,10 +529,135 @@ export default function BbCafeDesktopPos() {
   const [rawMaterials, setRawMaterials] = useState<any[]>([]);
   const [rawSearchQuery, setRawSearchQuery] = useState(''); // 👉 NEW: Raw Search
  const [inventorySubTab, setInventorySubTab] = useState<'menu' | 'raw' | 'vendors'>('menu');
-  // 👉 NEW: Vendors Khata States
+  // 👉 NEW: Vendors Khata States, Filters & Payment Functions
   const [vendorsList, setVendorsList] = useState<any[]>([]);
   const [payVendorObj, setPayVendorObj] = useState<any>(null);
   const [vendorPayAmount, setVendorPayAmount] = useState<number | ''>('');
+  const [vendorPayMethod, setVendorPayMethod] = useState<'cash' | 'upi'>('cash');
+  const [vendorDateFilter, setVendorDateFilter] = useState<'this_month' | 'last_month' | 'all' | 'custom'>('this_month');
+  const [vendorStartDate, setVendorStartDate] = useState(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+  );
+  const [vendorEndDate, setVendorEndDate] = useState(
+    () => new Date().toISOString().split('T')[0]
+  );
+  const [vendorSearchQuery, setVendorSearchQuery] = useState('');
+  const [editingVendorPhoneObj, setEditingVendorPhoneObj] = useState<any>(null);
+  const [vendorPhoneInput, setVendorPhoneInput] = useState('');
+  const [purchaseVendorPhone, setPurchaseVendorPhone] = useState('');
+
+  // वेंडर को उधार चुकाने का फंक्शन (गल्ला और वेंडर खाता दोनों से कटेगा)
+  const handlePayVendorDue = async () => {
+    if (!payVendorObj) return;
+    const payAmt = Number(vendorPayAmount);
+    if (isNaN(payAmt) || payAmt <= 0) return toast.error("कृपया सही राशि दर्ज करें!");
+    if (payAmt > (payVendorObj.totalDue || 0)) return toast.error("भुगतान राशि कुल उधारी से अधिक नहीं हो सकती!");
+
+    const toastId = toast.loading("भुगतान दर्ज किया जा रहा है...");
+    try {
+      const batch = writeBatch(db);
+      const vendorRef = doc(db, "vendors", payVendorObj.id);
+
+      batch.update(vendorRef, {
+        totalDue: increment(-payAmt),
+        totalPaid: increment(payAmt),
+        lastPaymentDate: new Date().toISOString().split('T')[0],
+        updatedAt: new Date()
+      });
+
+      const expRef = doc(collection(db, "daily_expenses"));
+      batch.set(expRef, {
+        title: `Vendor Payment: ${payVendorObj.name} (${vendorPayMethod.toUpperCase()})`,
+        amount: payAmt,
+        category: 'Vendor Payment',
+        timestamp: new Date(),
+        enteredBy: currentUser?.name || 'Staff'
+      });
+
+      await batch.commit();
+
+      toast.dismiss(toastId);
+      toast.success(`₹${payAmt} का भुगतान दर्ज हुआ! गल्ले और वेंडर खाते में अपडेट हो गया। ✅`);
+      setPayVendorObj(null);
+      setVendorPayAmount('');
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("भुगतान दर्ज करने में त्रुटि आई!");
+    }
+  };
+
+  // वेंडर का मोबाइल नंबर सेव करने का फंक्शन
+  const handleSaveVendorPhone = async () => {
+    if (!editingVendorPhoneObj) return;
+    const clean = vendorPhoneInput.replace(/\D/g, '').slice(-10);
+    if (clean.length !== 10) return toast.error("10 अंकों का सही मोबाइल नंबर डालें!");
+
+    const toastId = toast.loading("मोबाइल नंबर सेव हो रहा है...");
+    try {
+      await updateDoc(doc(db, "vendors", editingVendorPhoneObj.id), {
+        phone: clean
+      });
+      toast.dismiss(toastId);
+      toast.success("मोबाइल नंबर सेव हो गया! 📞✅");
+      setEditingVendorPhoneObj(null);
+      setVendorPhoneInput('');
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("सेव करने में समस्या आई!");
+    }
+  };
+
+  // वेंडर को WhatsApp पर हिसाब भेजने का फंक्शन
+  const handleSendVendorStatement = (vendor: any) => {
+    const cleanPhone = (vendor.phone || '').replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) return toast.error("पहले वेंडर का 10 अंकों का मोबाइल नंबर जोड़ें!");
+
+    const msg = `*☕ BUM BUM CAFE - VENDOR KHATA STATEMENT*%0A------------------------------%0A*Vendor:* ${vendor.name}%0A*Total Purchases:* ₹${Number(vendor.totalPurchased || 0).toFixed(2)}%0A*Total Paid:* ₹${Number(vendor.totalPaid || 0).toFixed(2)}%0A*Pending Due (कुल उधारी):* ₹${Number(vendor.totalDue || 0).toFixed(2)}%0A------------------------------%0A_Sent via Bum Bum Cafe POS_ 🙏`;
+
+    window.open(`https://wa.me/91${cleanPhone}?text=${msg}`, '_blank');
+  };
+
+  // वेंडर खरीद का चालू महीने / चुनी तारीख के हिसाब से फ़िल्टर
+  const vendorPeriodStats = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    const thisMonthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+    const thisMonthEnd = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+
+    const lastMonthStart = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
+    const lastMonthEnd = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+
+    const stats: { [key: string]: { periodBuy: number; entries: number } } = {};
+    let totalPeriodPurchased = 0;
+
+    purchaseHistoryList.forEach(p => {
+      let pDate = p.date;
+      if (!pDate && p.timestamp) {
+        const d = p.timestamp?.toDate ? p.timestamp.toDate() : new Date(p.timestamp);
+        pDate = d.toISOString().split('T')[0];
+      }
+
+      if (pDate) {
+        if (vendorDateFilter === 'this_month' && (pDate < thisMonthStart || pDate > thisMonthEnd)) return;
+        if (vendorDateFilter === 'last_month' && (pDate < lastMonthStart || pDate > lastMonthEnd)) return;
+        if (vendorDateFilter === 'custom') {
+          if (vendorStartDate && pDate < vendorStartDate) return;
+          if (vendorEndDate && pDate > vendorEndDate) return;
+        }
+      }
+
+      const vName = (p.vendorName || '').trim().toLowerCase().replace(/\s+/g, '_');
+      if (!stats[vName]) stats[vName] = { periodBuy: 0, entries: 0 };
+      const amt = Number(p.amount) || 0;
+      stats[vName].periodBuy += amt;
+      stats[vName].entries += 1;
+      totalPeriodPurchased += amt;
+    });
+
+    return { stats, totalPeriodPurchased };
+  }, [purchaseHistoryList, vendorDateFilter, vendorStartDate, vendorEndDate]);
   const [isRawModalOpen, setIsRawModalOpen] = useState(false);
   const [rawFormName, setRawFormName] = useState('');
   const [rawFormUnit, setRawFormUnit] = useState('Kg');
