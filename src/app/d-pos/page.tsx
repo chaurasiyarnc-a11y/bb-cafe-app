@@ -570,6 +570,130 @@ export default function BbCafeDesktopPos() {
       setIsPurchaseHistoryLoading(false);
     }
   };
+ // 👉 NEW: Stock Audit (माहवारी स्टॉक गिनती) States & Functions
+  const [isStockAuditModalOpen, setIsStockAuditModalOpen] = useState(false);
+  const [auditDate, setAuditDate] = useState(new Date().toISOString().split('T')[0]);
+  const [auditCounts, setAuditCounts] = useState<{ [rawId: string]: number | '' }>({});
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [isSavingAudit, setIsSavingAudit] = useState(false);
+  const [auditSummaryResult, setAuditSummaryResult] = useState<{
+    shortages: any[];
+    reorderList: any[];
+    totalShortageValue: number;
+  } | null>(null);
+
+  const handleOpenStockAudit = () => {
+    const initialCounts: { [rawId: string]: number | '' } = {};
+    rawMaterials.forEach(rm => {
+      initialCounts[rm.id] = Number(rm.stock) || 0;
+    });
+    setAuditCounts(initialCounts);
+    setAuditDate(new Date().toISOString().split('T')[0]);
+    setAuditSearchQuery('');
+    setAuditSummaryResult(null);
+    setIsStockAuditModalOpen(true);
+  };
+
+  const handleSaveStockAudit = async () => {
+    if (rawMaterials.length === 0) return toast.error("कोई कच्चा माल नहीं है!");
+    setIsSavingAudit(true);
+    const toastId = toast.loading("माहवारी स्टॉक अपडेट हो रहा है...");
+
+    try {
+      const batch = writeBatch(db);
+      const shortages: any[] = [];
+      const reorderList: any[] = [];
+      let totalShortageValue = 0;
+
+      rawMaterials.forEach((rm) => {
+        const physicalVal = auditCounts[rm.id] !== '' && auditCounts[rm.id] !== undefined 
+          ? Number(auditCounts[rm.id]) 
+          : Number(rm.stock) || 0;
+        
+        const oldStock = Number(rm.stock) || 0;
+        const diff = physicalVal - oldStock;
+        const rate = Number(rm.lastRate) || 0;
+
+        if (diff < 0) {
+          const lossAmt = Math.abs(diff) * rate;
+          totalShortageValue += lossAmt;
+          shortages.push({
+            name: rm.name,
+            unit: rm.unit,
+            diff: diff,
+            lossAmount: lossAmt
+          });
+        }
+
+        if (physicalVal <= Number(rm.lowAlert || 0)) {
+          const needed = Math.max(0, (Number(rm.lowAlert || 0) * 2) - physicalVal);
+          reorderList.push({
+            name: rm.name,
+            unit: rm.unit,
+            current: physicalVal,
+            alert: rm.lowAlert,
+            suggestedBuy: needed > 0 ? needed : Number(rm.lowAlert)
+          });
+        }
+
+        const rawRef = doc(db, "raw_materials", rm.id);
+        batch.update(rawRef, {
+          stock: physicalVal,
+          lastAuditDate: auditDate,
+          openingStock: physicalVal
+        });
+      });
+
+      const auditLogRef = doc(collection(db, "stock_audits"));
+      batch.set(auditLogRef, {
+        date: auditDate,
+        timestamp: new Date(),
+        auditedBy: currentUser?.name || 'Admin',
+        totalItems: rawMaterials.length,
+        shortageItemsCount: shortages.length,
+        totalShortageValue: totalShortageValue,
+        shortages: shortages
+      });
+
+      await batch.commit();
+
+      setRawMaterials(prev => prev.map(rm => ({
+        ...rm,
+        stock: auditCounts[rm.id] !== '' ? Number(auditCounts[rm.id]) : rm.stock
+      })));
+
+      toast.dismiss(toastId);
+      toast.success("स्टॉक सफलतापूर्वक अपडेट हो गया! 🎉");
+
+      setAuditSummaryResult({
+        shortages,
+        reorderList,
+        totalShortageValue
+      });
+
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("स्टॉक ऑडिट सेव करने में समस्या आई!");
+      console.error(err);
+    } finally {
+      setIsSavingAudit(false);
+    }
+  };
+
+  const handleSendReorderWhatsApp = () => {
+    if (!auditSummaryResult || auditSummaryResult.reorderList.length === 0) {
+      return toast.error("कोई माल खत्म नहीं है!");
+    }
+
+    const itemsText = auditSummaryResult.reorderList
+      .map(it => `• *${it.name}*: ${it.suggestedBuy} ${it.unit} (बचा है: ${it.current} ${it.unit})`)
+      .join('%0A');
+
+    const msg = `*📋 BUM BUM CAFE - RAW MATERIAL PURCHASE ORDER*%0A------------------------------%0A*Date:* ${auditDate}%0A*कृपया नीचे लिखा माल जल्द से जल्द भेजें:*%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Sent via Bum Bum Cafe POS_ ☕`;
+
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
+  };
+
   // 👉 NEW: Month End Stock Report States & Function
   const [isStockReportModalOpen, setIsStockReportModalOpen] = useState(false);
   const [stockStartDate, setStockStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
