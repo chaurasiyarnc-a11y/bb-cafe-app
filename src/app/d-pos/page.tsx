@@ -9445,6 +9445,233 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
           </div>
         )}
       </AnimatePresence>
+
+      {/* 👉 NEW POPUP: STOCK AUDIT MODAL (माहवारी स्टॉक गिनती) */}
+      <AnimatePresence>
+        {isStockAuditModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-4xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col">
+              
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
+                <div>
+                  <h3 className="font-black text-sm uppercase text-amber-600 flex items-center gap-2">
+                    <Check size={18} /> Physical Stock Audit (माहवारी स्टॉक गिनती व मिलान)
+                  </h3>
+                  <p className="text-[10px] text-neutral-500 font-bold mt-0.5">
+                    किचन में गिना हुआ माल यहाँ लिखें। सिस्टम अपने-आप पुराना स्टॉक बदलकर नया स्टॉक सेट कर देगा।
+                  </p>
+                </div>
+                <button onClick={() => setIsStockAuditModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {!auditSummaryResult ? (
+                <>
+                  <div className="flex flex-col sm:flex-row justify-between gap-3 bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase text-neutral-500">Audit Date:</span>
+                      <input 
+                        type="date" 
+                        value={auditDate} 
+                        onChange={e => setAuditDate(e.target.value)} 
+                        className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs font-bold outline-none cursor-pointer" 
+                      />
+                    </div>
+
+                    <div className="flex-1 max-w-xs relative">
+                      <SafeSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
+                      <input 
+                        type="text" 
+                        placeholder="कच्चा माल खोजें..." 
+                        value={auditSearchQuery} 
+                        onChange={e => setAuditSearchQuery(e.target.value)} 
+                        className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg pl-8 pr-3 py-1 text-xs font-bold outline-none" 
+                      />
+                    </div>
+
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const filled: { [key: string]: number } = {};
+                        rawMaterials.forEach(rm => filled[rm.id] = Number(rm.stock) || 0);
+                        setAuditCounts(filled);
+                        toast.success("सभी आइटम सिस्टम स्टॉक से भर दिए गए!");
+                      }} 
+                      className="px-3 py-1 bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 text-neutral-700 dark:text-neutral-200 rounded-lg text-[10px] font-black uppercase transition-colors"
+                    >
+                      ⚡ Reset to System Stock
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-2xl bg-neutral-50/50 dark:bg-neutral-900/50">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0 z-10">
+                        <tr>
+                          <th className="py-2.5 px-3 font-black">Item Name</th>
+                          <th className="py-2.5 px-3 font-black text-center">System Stock (कंप्यूटर)</th>
+                          <th className="py-2.5 px-3 font-black text-center bg-amber-500/10 text-amber-700 dark:text-amber-400">हाथ से गिना माल (Counted)</th>
+                          <th className="py-2.5 px-3 font-black text-center">अंतर (Difference)</th>
+                          <th className="py-2.5 px-3 font-black text-center">Low Alert</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        {rawMaterials
+                          .filter(rm => rm.name.toLowerCase().includes(auditSearchQuery.toLowerCase()))
+                          .map(rm => {
+                            const systemStock = Number(rm.stock) || 0;
+                            const enteredCount = auditCounts[rm.id];
+                            const physical = enteredCount !== '' && enteredCount !== undefined ? Number(enteredCount) : systemStock;
+                            const diff = physical - systemStock;
+                            const isLow = physical <= Number(rm.lowAlert);
+
+                            return (
+                              <tr key={rm.id} className="bg-white dark:bg-neutral-900 hover:bg-amber-50/50 dark:hover:bg-neutral-800/50 transition-colors">
+                                <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-neutral-100">
+                                  {rm.name}
+                                </td>
+                                
+                                <td className="py-2.5 px-3 text-center font-mono font-bold text-neutral-500">
+                                  {systemStock} <span className="text-[10px]">{rm.unit}</span>
+                                </td>
+
+                                <td className="py-2 px-3 text-center bg-amber-500/5">
+                                  <div className="inline-flex items-center gap-1">
+                                    <input 
+                                      type="number" 
+                                      step="0.001" 
+                                      min={0}
+                                      value={enteredCount !== undefined ? enteredCount : systemStock} 
+                                      onChange={e => {
+                                        const val = e.target.value === '' ? '' : Number(e.target.value);
+                                        setAuditCounts(prev => ({ ...prev, [rm.id]: val }));
+                                      }}
+                                      className="w-24 bg-white dark:bg-neutral-950 border-2 border-amber-500/40 focus:border-amber-500 rounded-lg px-2 py-1 text-xs font-mono font-black text-center outline-none" 
+                                    />
+                                    <span className="text-[10px] font-bold text-neutral-400">{rm.unit}</span>
+                                  </div>
+                                </td>
+
+                                <td className="py-2.5 px-3 text-center font-mono font-black">
+                                  {diff === 0 ? (
+                                    <span className="text-neutral-400 font-normal">0 (बराबर)</span>
+                                  ) : diff < 0 ? (
+                                    <span className="text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md border border-red-200 dark:border-red-800/40">
+                                      {diff.toFixed(2)} {rm.unit} (कम)
+                                    </span>
+                                  ) : (
+                                    <span className="text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-md border border-green-200 dark:border-green-800/40">
+                                      +{diff.toFixed(2)} {rm.unit} (ज्यादा)
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-center">
+                                  {isLow ? (
+                                    <span className="bg-red-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-sm animate-pulse">
+                                      मंगवाना है ⚠️
+                                    </span>
+                                  ) : (
+                                    <span className="text-neutral-400 text-[10px] font-bold">
+                                      पर्याप्त ({rm.lowAlert} {rm.unit})
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-neutral-200 dark:border-neutral-800 shrink-0">
+                    <p className="text-[11px] text-neutral-500 font-bold">
+                      कुल कच्चे माल: <span className="font-black text-neutral-800 dark:text-neutral-200">{rawMaterials.length} Items</span>
+                    </p>
+
+                    <button 
+                      type="button" 
+                      onClick={handleSaveStockAudit} 
+                      disabled={isSavingAudit}
+                      className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all flex items-center gap-2"
+                    >
+                      {isSavingAudit ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
+                      <span>Save & Close Month (स्टॉक सेव करें)</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 p-4 rounded-2xl">
+                      <p className="text-[10px] font-black uppercase text-red-600">कुल अंतर / नुकसान (Loss / Wastage)</p>
+                      <p className="text-2xl font-black font-mono text-red-600 mt-1">₹{auditSummaryResult.totalShortageValue.toFixed(2)}</p>
+                      <p className="text-[10px] text-red-700/70 dark:text-red-400/70 font-bold mt-1">
+                        {auditSummaryResult.shortages.length} सामानों में खपत से ज्यादा कमी निकली।
+                      </p>
+                    </div>
+
+                    <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 p-4 rounded-2xl flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-green-600">खत्म होने वाला माल (To Reorder)</p>
+                        <p className="text-2xl font-black font-mono text-green-700 dark:text-green-400 mt-1">
+                          {auditSummaryResult.reorderList.length} Items
+                        </p>
+                        <p className="text-[10px] text-green-700/70 dark:text-green-400/70 font-bold mt-1">
+                          यह सामान तुरंत वेंडर से मंगवाना पड़ेगा।
+                        </p>
+                      </div>
+
+                      <button 
+                        onClick={handleSendReorderWhatsApp} 
+                        className="bg-green-600 hover:bg-green-500 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase shadow flex items-center gap-1.5 transition-colors"
+                      >
+                        <SafeSend size={14} /> WhatsApp Order
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 shadow-sm">
+                    <h4 className="text-xs font-black uppercase text-neutral-800 dark:text-neutral-200 mb-3 flex items-center gap-1.5">
+                      🛒 क्या-क्या माल मंगवाना है (Purchase Reorder List):
+                    </h4>
+
+                    {auditSummaryResult.reorderList.length === 0 ? (
+                      <p className="text-xs text-neutral-400 py-6 text-center font-bold">सभी सामान पर्याप्त मात्रा में उपलब्ध हैं!</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {auditSummaryResult.reorderList.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/50 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                            <div>
+                              <p className="font-bold text-xs text-neutral-900 dark:text-white">{item.name}</p>
+                              <p className="text-[10px] text-neutral-500 font-mono">
+                                अभी बचा है: <span className="font-bold text-red-500">{item.current} {item.unit}</span> (अलर्ट सीमा: {item.alert} {item.unit})
+                              </p>
+                            </div>
+                            <span className="text-xs font-black font-mono text-green-600 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-3 py-1.5 rounded-lg">
+                              + {item.suggestedBuy} {item.unit} मंगवाएं
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button 
+                      onClick={() => setIsStockAuditModalOpen(false)} 
+                      className="px-6 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-black uppercase rounded-xl"
+                    >
+                      Done (समाप्त)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
