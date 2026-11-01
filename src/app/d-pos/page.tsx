@@ -2117,18 +2117,22 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     })();
   }, [isLoggedIn]);
 
-// 👉 NEW: Fetch Raw Materials (कच्चा माल लोड करना)
+
+ // 👉 NEW: Fetch Raw Materials, Vendors & Purchases (Real-Time Auto-Load)
   useEffect(() => {
     if (!isLoggedIn) return;
     const unsubRaw = onSnapshot(collection(db, "raw_materials"), (snap) => {
       setRawMaterials(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    // 👉 NEW: Fetch Vendors List (व्यापारियों की लिस्ट)
     const unsubVendors = onSnapshot(collection(db, "vendors"), (snap) => {
       setVendorsList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => { unsubRaw(); unsubVendors(); };
-  }, [isLoggedIn]);
+    // खरीदे गए माल को हमेशा बैकग्राउंड में लोड रखें ताकि वेंडर टोटल कभी ₹0.00 न आए
+    const unsubPurchases = onSnapshot(query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(1000)), (snap) => {
+      setPurchaseHistoryList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubRaw(); unsubVendors(); unsubPurchases(); };
+  }, [isLoggedIn]);  }, [isLoggedIn]);
 // Real-time listener for live orders
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100));
