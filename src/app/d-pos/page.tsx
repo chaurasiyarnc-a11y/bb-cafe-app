@@ -5938,7 +5938,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                     )}
                   </div>
                 </div>
-             ) : (
+            ) : (
                 /* 👉 UPGRADED: VENDORS KHATA DASHBOARD WITH DATE FILTER & MOBILE NUMBER */
                 <div className="space-y-4">
                   
@@ -6011,203 +6011,177 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   )}
 
                   {/* Summary Cards */}
-                  {(() => {
-                    // नाम के कोष्ठक और स्पेस हटाकर पक्का मिलान करने का लॉजिक
-                    const normalizeName = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-300 dark:border-neutral-800 shadow-sm flex flex-col justify-center">
+                      <p className="text-[10px] font-black uppercase text-neutral-500">
+                        {vendorDateFilter === 'all' ? 'कुल व्यापारी (Total Vendors)' : 'इस महीने एक्टिव व्यापारी'}
+                      </p>
+                      <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white">
+                        {activePeriodVendors.length} {vendorDateFilter !== 'all' && <span className="text-xs text-neutral-400 font-bold">/ {vendorsList.length} कुल</span>}
+                      </p>
+                    </div>
 
-                    // 👉 जादुई फ़िल्टर: 'This Month' में सिर्फ वही वेंडर दिखेंगे जिनसे इस महीने खरीद हुई है
-                    const activePeriodVendors = vendorsList.filter(vendor => {
-                      const vKey = normalizeName(vendor.name);
-                      const periodBuy = vendorPeriodStats.stats[vKey]?.periodBuy || 0;
+                    <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-200 dark:border-blue-800/50 shadow-sm flex flex-col justify-center">
+                      <p className="text-[10px] font-black uppercase text-blue-600">
+                        {vendorDateFilter === 'this_month' ? 'इस महीने का कुल माल (This Month Purchased)' :
+                         vendorDateFilter === 'last_month' ? 'पिछले महीने का कुल माल (Last Month Purchased)' :
+                         vendorDateFilter === 'custom' ? 'चुनी तारीख का कुल माल' : 'अब तक कुल खरीदा माल'}
+                      </p>
+                      <p className="text-2xl font-black font-mono text-blue-600">
+                        ₹{(vendorDateFilter === 'all' 
+                            ? vendorsList.reduce((acc, v) => acc + (Number(v.totalPurchased) || 0), 0)
+                            : vendorPeriodStats.totalPeriodPurchased
+                         ).toFixed(2)}
+                      </p>
+                    </div>
 
-                      // अगर 'All Time' नहीं है, तो सिर्फ वही दिखेंगे जिनका इस महीने का माल > 0 है
-                      if (vendorDateFilter !== 'all') {
-                        if (periodBuy <= 0) return false;
-                      }
+                    <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-2xl border border-red-200 dark:border-red-800/50 shadow-sm flex flex-col justify-center">
+                      <p className="text-[10px] font-black uppercase text-red-600">
+                        {vendorDateFilter === 'all' ? 'कुल उधारी बाकी है (Total Due)' : 'एक्टिव वेंडरों की उधारी'}
+                      </p>
+                      <p className="text-2xl font-black font-mono text-red-600">
+                        ₹{activePeriodVendors.reduce((acc, v) => acc + (Number(v.totalDue) || 0), 0).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
 
-                      // सर्च बार फ़िल्टर
-                      if (vendorSearchQuery.trim()) {
-                        const q = vendorSearchQuery.toLowerCase().trim();
-                        const matchName = vendor.name.toLowerCase().includes(q);
-                        const matchPhone = String(vendor.phone || '').includes(q);
-                        if (!matchName && !matchPhone) return false;
-                      }
+                  {/* Vendor List */}
+                  <div className="flex flex-col gap-2 pb-10">
+                    <div className="hidden lg:flex justify-between items-center px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-[10px] font-black uppercase text-neutral-500 shadow-sm">
+                      <div className="w-1/3">Vendor Name & Phone (व्यापारी व फ़ोन)</div>
+                      <div className="w-1/5 text-center">Period Buy / Total</div>
+                      <div className="w-1/5 text-center">Amount Due (उधार)</div>
+                      <div className="w-1/4 text-right">Actions</div>
+                    </div>
 
-                      return true;
-                    });
+                    {activePeriodVendors.length === 0 ? (
+                      <div className="text-center py-12 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                        <p className="text-neutral-500 font-bold text-xs">
+                          {vendorDateFilter === 'this_month' 
+                            ? 'इस महीने किसी व्यापारी से नया माल नहीं खरीदा गया है।' 
+                            : 'इस फ़िल्टर में कोई व्यापारी नहीं मिला।'}
+                        </p>
+                        <button 
+                          onClick={() => setVendorDateFilter('all')} 
+                          className="mt-2 text-xs font-black uppercase text-orange-600 hover:underline"
+                        >
+                          सारे व्यापारी देखने के लिए यहाँ क्लिक करें (View All)
+                        </button>
+                      </div>
+                    ) : (
+                      activePeriodVendors.map(vendor => {
+                        const vKey = (vendor.name || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const periodBuy = vendorPeriodStats.stats[vKey]?.periodBuy || 0;
 
-                    return (
-                      <>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-300 dark:border-neutral-800 shadow-sm flex flex-col justify-center">
-                            <p className="text-[10px] font-black uppercase text-neutral-500">
-                              {vendorDateFilter === 'all' ? 'कुल व्यापारी (Total Vendors)' : 'इस महीने एक्टिव व्यापारी (Active Vendors)'}
-                            </p>
-                            <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white">
-                              {activePeriodVendors.length} {vendorDateFilter !== 'all' && <span className="text-xs text-neutral-400 font-bold">/ {vendorsList.length} कुल</span>}
-                            </p>
-                          </div>
-
-                          <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-200 dark:border-blue-800/50 shadow-sm flex flex-col justify-center">
-                            <p className="text-[10px] font-black uppercase text-blue-600">
-                              {vendorDateFilter === 'this_month' ? 'इस महीने का कुल माल (This Month Purchased)' :
-                               vendorDateFilter === 'last_month' ? 'पिछले महीने का कुल माल (Last Month Purchased)' :
-                               vendorDateFilter === 'custom' ? 'चुनी तारीख का कुल माल' : 'अब तक कुल खरीदा माल'}
-                            </p>
-                            <p className="text-2xl font-black font-mono text-blue-600">
-                              ₹{(vendorDateFilter === 'all' 
-                                  ? vendorsList.reduce((acc, v) => acc + (Number(v.totalPurchased) || 0), 0)
-                                  : vendorPeriodStats.totalPeriodPurchased
-                               ).toFixed(2)}
-                            </p>
-                          </div>
-
-                          <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-2xl border border-red-200 dark:border-red-800/50 shadow-sm flex flex-col justify-center">
-                            <p className="text-[10px] font-black uppercase text-red-600">
-                              {vendorDateFilter === 'all' ? 'कुल उधारी बाकी है (Total Due)' : 'एक्टिव वेंडरों की उधारी (Pending Due)'}
-                            </p>
-                            <p className="text-2xl font-black font-mono text-red-600">
-                              ₹{activePeriodVendors.reduce((acc, v) => acc + (Number(v.totalDue) || 0), 0).toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Vendor List */}
-                        <div className="flex flex-col gap-2 pb-10">
-                          <div className="hidden lg:flex justify-between items-center px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-[10px] font-black uppercase text-neutral-500 shadow-sm">
-                            <div className="w-1/3">Vendor Name & Phone (व्यापारी व फ़ोन)</div>
-                            <div className="w-1/5 text-center">Period Buy / Total</div>
-                            <div className="w-1/5 text-center">Amount Due (उधार)</div>
-                            <div className="w-1/4 text-right">Actions</div>
-                          </div>
-
-                          {activePeriodVendors.length === 0 ? (
-                            <div className="text-center py-12 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800">
-                              <p className="text-neutral-500 font-bold text-xs">
-                                {vendorDateFilter === 'this_month' 
-                                  ? 'इस महीने किसी नए व्यापारी से माल नहीं खरीदा गया है।' 
-                                  : 'इस फ़िल्टर में कोई व्यापारी नहीं मिला।'}
-                              </p>
-                              <button 
-                                onClick={() => setVendorDateFilter('all')} 
-                                className="mt-2 text-xs font-black uppercase text-orange-600 hover:underline"
-                              >
-                                सारे 9 व्यापारी देखने के लिए यहाँ क्लिक करें (View All)
-                              </button>
-                            </div>
-                          ) : (
-                            activePeriodVendors.map(vendor => {
-                              const vKey = normalizeName(vendor.name);
-                              const periodBuy = vendorPeriodStats.stats[vKey]?.periodBuy || 0;
-
-                          return (
-                            <div key={vendor.id} className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm hover:border-orange-500 transition-all gap-3 lg:gap-0">
+                        return (
+                          <div key={vendor.id} className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm hover:border-orange-500 transition-all gap-3 lg:gap-0">
+                            
+                            {/* Vendor Name & Phone */}
+                            <div className="w-full lg:w-1/3 flex flex-col">
+                              <p className="font-black text-sm text-neutral-900 dark:text-neutral-100 uppercase">{vendor.name}</p>
                               
-                              {/* Vendor Name & Phone */}
-                              <div className="w-full lg:w-1/3 flex flex-col">
-                                <p className="font-black text-sm text-neutral-900 dark:text-neutral-100 uppercase">{vendor.name}</p>
-                                
-                                <div className="flex items-center gap-2 mt-1">
-                                  {vendor.phone ? (
-                                    <span className="text-xs font-mono font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-md border border-green-200 dark:border-green-800/40 flex items-center gap-1">
-                                      📞 {vendor.phone}
-                                    </span>
-                                  ) : (
-                                    <button 
-                                      onClick={() => {
-                                        setEditingVendorPhoneObj(vendor);
-                                        setVendorPhoneInput('');
-                                      }}
-                                      className="text-[10px] font-black uppercase text-blue-600 hover:underline"
-                                    >
-                                      + फ़ोन नंबर जोड़ें
-                                    </button>
-                                  )}
-                                  <span className="text-[10px] text-neutral-400 font-bold">• Last Buy: {vendor.lastPurchaseDate || '--'}</span>
-                                </div>
-                              </div>
-                              
-                              {/* Total Buy (Period vs Lifetime) */}
-                              <div className="w-full lg:w-1/5 flex lg:justify-center items-center">
-                                <div className="text-center">
-                                  <p className="text-[9px] font-black uppercase text-neutral-400">
-                                    {vendorDateFilter === 'all' ? 'Total Buy' : 'Period Buy'}
-                                  </p>
-                                  <p className="text-sm font-black font-mono text-neutral-900 dark:text-neutral-100">
-                                    ₹{(vendorDateFilter === 'all' ? Number(vendor.totalPurchased || 0) : periodBuy).toFixed(2)}
-                                  </p>
-                                  {vendorDateFilter !== 'all' && (
-                                    <p className="text-[9px] text-neutral-400 font-mono mt-0.5">
-                                      (कुल: ₹{Number(vendor.totalPurchased || 0).toFixed(2)})
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              {/* Pending Due */}
-                              <div className="w-full lg:w-1/5 flex lg:justify-center items-center">
-                                <div className={`text-center px-3 py-1.5 rounded-xl border ${
-                                  Number(vendor.totalDue || 0) > 0 
-                                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50' 
-                                    : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50'
-                                }`}>
-                                  <p className={`text-[9px] font-black uppercase ${Number(vendor.totalDue || 0) > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                    {Number(vendor.totalDue || 0) > 0 ? 'Pending Due' : 'Paid in Full'}
-                                  </p>
-                                  <p className={`text-sm font-black font-mono ${Number(vendor.totalDue || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    ₹{Number(vendor.totalDue || 0).toFixed(2)}
-                                  </p>
-                                </div>
-                              </div>
-                              
-                              {/* Actions */}
-                              <div className="w-full lg:w-1/4 flex lg:justify-end gap-1.5 flex-wrap">
-                                {vendor.phone && (
+                              <div className="flex items-center gap-2 mt-1">
+                                {vendor.phone ? (
+                                  <span className="text-xs font-mono font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-md border border-green-200 dark:border-green-800/40 flex items-center gap-1">
+                                    📞 {vendor.phone}
+                                  </span>
+                                ) : (
                                   <button 
-                                    onClick={() => handleSendVendorStatement(vendor)}
-                                    className="p-2 bg-green-500/10 hover:bg-green-500/20 text-green-600 border border-green-500/30 rounded-xl text-xs font-black"
-                                    title="WhatsApp पर हिसाब भेजें"
+                                    onClick={() => {
+                                      setEditingVendorPhoneObj(vendor);
+                                      setVendorPhoneInput('');
+                                    }}
+                                    className="text-[10px] font-black uppercase text-blue-600 hover:underline"
                                   >
-                                    <SafeShare2 size={13} />
+                                    + फ़ोन नंबर जोड़ें
                                   </button>
                                 )}
-
-                                <button 
-                                  onClick={() => {
-                                    setEditingVendorPhoneObj(vendor);
-                                    setVendorPhoneInput(vendor.phone || '');
-                                  }}
-                                  className="px-2.5 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 rounded-xl text-[10px] font-black uppercase"
-                                  title="फ़ोन नंबर बदलें"
-                                >
-                                  ✏️ Phone
-                                </button>
-
-                                <button 
-                                  onClick={() => {
-                                    if ((vendor.totalDue || 0) <= 0) return toast.error("इनका कोई उधार बाकी नहीं है!");
-                                    setPayVendorObj(vendor);
-                                    setVendorPayAmount(vendor.totalDue || '');
-                                    setVendorPayMethod('cash');
-                                  }} 
-                                  disabled={(vendor.totalDue || 0) <= 0}
-                                  className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm transition-all ${
-                                    (vendor.totalDue || 0) > 0 
-                                      ? 'bg-green-600 hover:bg-green-500 text-white' 
-                                      : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed opacity-50'
-                                  }`}
-                                >
-                                  ₹ Pay Due
-                                </button>
+                                <span className="text-[10px] text-neutral-400 font-bold">• Last Buy: {vendor.lastPurchaseDate || '--'}</span>
                               </div>
                             </div>
-                          );
-                        })
+                            
+                            {/* Total Buy (Period vs Lifetime) */}
+                            <div className="w-full lg:w-1/5 flex lg:justify-center items-center">
+                              <div className="text-center">
+                                <p className="text-[9px] font-black uppercase text-neutral-400">
+                                  {vendorDateFilter === 'all' ? 'Total Buy' : 'Period Buy'}
+                                </p>
+                                <p className="text-sm font-black font-mono text-neutral-900 dark:text-neutral-100">
+                                  ₹{(vendorDateFilter === 'all' ? Number(vendor.totalPurchased || 0) : periodBuy).toFixed(2)}
+                                </p>
+                                {vendorDateFilter !== 'all' && (
+                                  <p className="text-[9px] text-neutral-400 font-mono mt-0.5">
+                                    (कुल: ₹{Number(vendor.totalPurchased || 0).toFixed(2)})
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Pending Due */}
+                            <div className="w-full lg:w-1/5 flex lg:justify-center items-center">
+                              <div className={`text-center px-3 py-1.5 rounded-xl border ${
+                                Number(vendor.totalDue || 0) > 0 
+                                  ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50' 
+                                  : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50'
+                              }`}>
+                                <p className={`text-[9px] font-black uppercase ${Number(vendor.totalDue || 0) > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                  {Number(vendor.totalDue || 0) > 0 ? 'Pending Due' : 'Paid in Full'}
+                                </p>
+                                <p className={`text-sm font-black font-mono ${Number(vendor.totalDue || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  ₹{Number(vendor.totalDue || 0).toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {/* Actions */}
+                            <div className="w-full lg:w-1/4 flex lg:justify-end gap-1.5 flex-wrap">
+                              {vendor.phone && (
+                                <button 
+                                  onClick={() => handleSendVendorStatement(vendor)}
+                                  className="p-2 bg-green-500/10 hover:bg-green-500/20 text-green-600 border border-green-500/30 rounded-xl text-xs font-black"
+                                  title="WhatsApp पर हिसाब भेजें"
+                                >
+                                  <SafeShare2 size={13} />
+                                </button>
+                              )}
+
+                              <button 
+                                onClick={() => {
+                                  setEditingVendorPhoneObj(vendor);
+                                  setVendorPhoneInput(vendor.phone || '');
+                                }}
+                                className="px-2.5 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 rounded-xl text-[10px] font-black uppercase"
+                                title="फ़ोन नंबर बदलें"
+                              >
+                                ✏️ Phone
+                              </button>
+
+                              <button 
+                                onClick={() => {
+                                  if ((vendor.totalDue || 0) <= 0) return toast.error("इनका कोई उधार बाकी नहीं है!");
+                                  setPayVendorObj(vendor);
+                                  setVendorPayAmount(vendor.totalDue || '');
+                                  setVendorPayMethod('cash');
+                                }} 
+                                disabled={(vendor.totalDue || 0) <= 0}
+                                className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm transition-all ${
+                                  (vendor.totalDue || 0) > 0 
+                                    ? 'bg-green-600 hover:bg-green-500 text-white' 
+                                    : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed opacity-50'
+                                }`}
+                              >
+                                ₹ Pay Due
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
-              )}              </div>
-            )}
+              )}
+            </div>
+          )}
 
             {/* TAB 3: PAST RECEIPTS */}
             {activeTab === 'receipts' && (
