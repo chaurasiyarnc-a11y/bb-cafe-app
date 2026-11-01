@@ -5850,69 +5850,152 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   })}
                 </div>
                 </>
-             ) : inventorySubTab === 'raw' ? (
-               /* 👉 NEW: RAW MATERIALS DASHBOARD & UI */
+            ) : inventorySubTab === 'raw' ? (
+               /* 👉 UPGRADED: RAW MATERIALS DASHBOARD WITH RATE ALERTS & FILTERS */
                 <div className="space-y-4">
                   
-                  {/* 👉 NEW: Raw Material Search Bar */}
-                  <div className="relative">
-                    <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" size={16} />
-                    <input 
-                      type="text" 
-                      placeholder="कच्चा माल ढूँढें (Search by name)..." 
-                      value={rawSearchQuery}
-                      onChange={e => setRawSearchQuery(e.target.value)}
-                      className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold outline-none"
-                    />
+                  {/* Search Bar + 1-Click Filter Buttons */}
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <div className="relative flex-1 w-full">
+                      <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" size={16} />
+                      <input 
+                        type="text" 
+                        placeholder="कच्चा माल ढूँढें (Search by name)..." 
+                        value={rawSearchQuery}
+                        onChange={e => setRawSearchQuery(e.target.value)}
+                        className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold outline-none"
+                      />
+                    </div>
+
+                    {/* Quick Filters (सब / बिना रेट वाले / लो स्टॉक) */}
+                    <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl shadow-inner shrink-0">
+                      <button 
+                        type="button"
+                        onClick={() => setRawRateFilter('all')} 
+                        className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${
+                          rawRateFilter === 'all' ? 'bg-orange-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        सब माल ({rawMaterials.length})
+                      </button>
+
+                      <button 
+                        type="button"
+                        onClick={() => setRawRateFilter('missing_rate')} 
+                        className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all flex items-center gap-1 ${
+                          rawRateFilter === 'missing_rate' 
+                            ? 'bg-red-600 text-white shadow' 
+                            : 'text-red-600 dark:text-red-400 font-bold hover:bg-red-500/10'
+                        }`}
+                      >
+                        <span>⚠️ बिना रेट वाले</span>
+                        <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">
+                          {rawMaterials.filter(r => (Number(r.lastRate) || 0) <= 0).length}
+                        </span>
+                      </button>
+
+                      <button 
+                        type="button"
+                        onClick={() => setRawRateFilter('low_stock')} 
+                        className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${
+                          rawRateFilter === 'low_stock' ? 'bg-amber-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        कम स्टॉक ({rawMaterials.filter(r => Number(r.stock) <= Number(r.lowAlert)).length})
+                      </button>
+                    </div>
                   </div>
 
-                  {/* डैशबोर्ड समरी (Dashboard Summary) */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-300 dark:border-neutral-800 shadow-sm flex flex-col justify-center">
-                       <p className="text-[10px] font-black uppercase text-neutral-500">कुल प्रकार के कच्चे माल (Total Items)</p>
-                       <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white">{rawMaterials.length}</p>
+                  {/* 4 डैशबोर्ड समरी कार्ड्स */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="bg-white dark:bg-neutral-900 p-3.5 rounded-2xl border border-neutral-300 dark:border-neutral-800 shadow-sm flex flex-col justify-center">
+                       <p className="text-[10px] font-black uppercase text-neutral-500">कुल कच्चे माल (Total Items)</p>
+                       <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white mt-0.5">{rawMaterials.length}</p>
                     </div>
-                    <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-2xl border border-red-200 dark:border-red-800/50 shadow-sm flex flex-col justify-center">
-                       <p className="text-[10px] font-black uppercase text-red-600">खत्म होने वाले माल (Low Stock Alerts)</p>
-                       <p className="text-2xl font-black font-mono text-red-600">{rawMaterials.filter(r => Number(r.stock) <= Number(r.lowAlert)).length}</p>
+
+                    {/* 👉 नया कार्ड: बिना भाव वाले माल (Clickable) */}
+                    <div 
+                      onClick={() => setRawRateFilter(rawRateFilter === 'missing_rate' ? 'all' : 'missing_rate')}
+                      className={`p-3.5 rounded-2xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all hover:scale-[1.02] ${
+                        rawRateFilter === 'missing_rate' 
+                          ? 'bg-red-600 text-white border-red-600 ring-2 ring-red-400' 
+                          : 'bg-red-50 dark:bg-red-950/20 border-red-300 dark:border-red-800/50 hover:border-red-500'
+                      }`}
+                    >
+                       <p className={`text-[10px] font-black uppercase ${rawRateFilter === 'missing_rate' ? 'text-white' : 'text-red-600 dark:text-red-400'}`}>
+                         ⚠️ बिना रेट वाले माल (Click to View)
+                       </p>
+                       <div className="flex justify-between items-baseline mt-0.5">
+                         <p className={`text-2xl font-black font-mono ${rawRateFilter === 'missing_rate' ? 'text-white' : 'text-red-600 dark:text-red-400'}`}>
+                           {rawMaterials.filter(r => (Number(r.lastRate) || 0) <= 0).length}
+                         </p>
+                         <span className="text-[9px] font-bold underline opacity-80">
+                           {rawRateFilter === 'missing_rate' ? 'सब दिखाएं' : 'फ़िल्टर करें'}
+                         </span>
+                       </div>
                     </div>
-                    <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-2xl border border-green-200 dark:border-green-800/50 shadow-sm flex flex-col justify-center">
-                       <p className="text-[10px] font-black uppercase text-green-600">सबसे ज़्यादा इस्तेमाल (Top Consumed)</p>
-                       {rawMaterials.length > 0 ? (() => {
-                          const top = [...rawMaterials].sort((a,b) => (b.totalConsumed || 0) - (a.totalConsumed || 0))[0];
-                          return top && (top.totalConsumed > 0) ? (
-                             <div>
-                                <p className="text-lg font-black text-green-700 dark:text-green-400 truncate mt-0.5">{top.name}</p>
-                                <p className="text-[11px] font-bold text-green-600 dark:text-green-500">कुल {top.totalConsumed} {top.unit} इस्तेमाल हुआ</p>
-                             </div>
-                          ) : <p className="text-xs text-neutral-500 mt-1 font-bold">अभी तक कुछ इस्तेमाल नहीं हुआ</p>
-                       })() : <p className="text-xs text-neutral-500 mt-1">कोई माल नहीं है</p>}
+
+                    <div className="bg-amber-50 dark:bg-amber-900/10 p-3.5 rounded-2xl border border-amber-200 dark:border-amber-800/50 shadow-sm flex flex-col justify-center">
+                       <p className="text-[10px] font-black uppercase text-amber-600">खत्म होने वाले माल (Low Alerts)</p>
+                       <p className="text-2xl font-black font-mono text-amber-600 mt-0.5">{rawMaterials.filter(r => Number(r.stock) <= Number(r.lowAlert)).length}</p>
+                    </div>
+
+                    <div className="bg-green-50 dark:bg-green-900/10 p-3.5 rounded-2xl border border-green-200 dark:border-green-800/50 shadow-sm flex flex-col justify-center">
+                       <p className="text-[10px] font-black uppercase text-green-600">कुल स्टॉक कीमत (Valuation)</p>
+                       <p className="text-xl font-black font-mono text-green-700 dark:text-green-400 mt-0.5">
+                         ₹{rawMaterials.reduce((sum, r) => sum + ((Number(r.stock) || 0) * (Number(r.lastRate) || 0)), 0).toFixed(2)}
+                       </p>
                     </div>
                   </div>
 
- {/* कच्चे माल की लिस्ट (List View) */}
+                  {/* कच्चे माल की लिस्ट (List View) */}
                   <div className="flex flex-col gap-2 pb-10">
-                    {/* List Header */}
                     <div className="hidden lg:flex justify-between items-center px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-[10px] font-black uppercase text-neutral-500 shadow-sm">
-                       <div className="w-1/3">Material Name (कच्चा माल)</div>
+                       <div className="w-1/3">Material Name & Rate (कच्चा माल व भाव)</div>
                        <div className="w-1/5 text-left">Current Stock</div>
                        <div className="w-1/4 text-center">In / Out Stats</div>
                        <div className="w-1/5 text-right">Actions</div>
                     </div>
 
                     {filteredRawMaterials.length === 0 ? (
-                      <p className="text-center text-neutral-500 font-bold py-10 text-xs">कोई भी कच्चा माल (Raw Material) नहीं मिला।</p>
+                      <div className="text-center py-12 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                        <p className="text-neutral-500 font-bold text-xs">
+                          {rawRateFilter === 'missing_rate' 
+                            ? '🎉 बधाई हो! सभी सामानों में भाव (Rate) अपडेट हो चुका है।' 
+                            : 'कोई भी कच्चा माल नहीं मिला।'}
+                        </p>
+                        {rawRateFilter !== 'all' && (
+                          <button onClick={() => setRawRateFilter('all')} className="mt-2 text-xs font-black uppercase text-orange-600 hover:underline">
+                            सारे सामान देखने के लिए यहाँ क्लिक करें
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       filteredRawMaterials.map(raw => {
                         const isLow = Number(raw.stock) <= Number(raw.lowAlert);
+                        const rate = Number(raw.lastRate) || 0;
+                        const hasNoRate = rate <= 0;
+
                         return (
-                          <div key={raw.id} className={`flex flex-col lg:flex-row justify-between items-start lg:items-center p-3 rounded-xl border shadow-sm transition-all hover:shadow-md gap-3 lg:gap-0 ${isLow ? 'border-red-400 bg-red-50 dark:bg-red-900/10' : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800'}`}>
+                          <div key={raw.id} className={`flex flex-col lg:flex-row justify-between items-start lg:items-center p-3 rounded-xl border shadow-sm transition-all hover:shadow-md gap-3 lg:gap-0 ${hasNoRate ? 'border-red-300 dark:border-red-800/80 bg-red-50/40 dark:bg-red-950/10' : isLow ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/10' : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800'}`}>
                             
-                            {/* Material Name & Alert */}
+                            {/* Material Name & Rate Warning Tag */}
                             <div className="w-full lg:w-1/3 flex flex-col">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <p className="font-bold text-sm text-neutral-900 dark:text-neutral-100">{raw.name}</p>
-                                {isLow && <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black uppercase animate-pulse shadow-sm">Low Stock</span>}
+                                
+                                {isLow && <span className="bg-amber-500 text-black text-[9px] px-1.5 py-0.5 rounded font-black uppercase shadow-sm">Low Stock</span>}
+
+                                {/* 👉 रेट अलर्ट बैज */}
+                                {hasNoRate ? (
+                                  <span className="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-md font-black uppercase shadow-sm animate-pulse flex items-center gap-1">
+                                    ⚠️ रेट नहीं डाला (₹0)
+                                  </span>
+                                ) : (
+                                  <span className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 text-[10px] font-mono font-black px-2 py-0.5 rounded-md">
+                                    ₹{rate}/{raw.unit}
+                                  </span>
+                                )}
                               </div>
                               <p className="text-[10px] text-neutral-500 font-bold mt-0.5">Alert below: {raw.lowAlert} {raw.unit}</p>
                             </div>
