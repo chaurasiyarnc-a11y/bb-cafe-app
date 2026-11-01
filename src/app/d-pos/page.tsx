@@ -549,19 +549,28 @@ export default function BbCafeDesktopPos() {
   const [purchaseSearchTerm, setPurchaseSearchTerm] = useState(''); // 👉 NEW: Search state
   const [showPurchaseDropdown, setShowPurchaseDropdown] = useState(false); // 👉 NEW: Dropdown visibility
   const [purchaseItemList, setPurchaseItemList] = useState<any[]>([]); // 👉 NEW: Bulk लिस्ट के लिए
-  // 👉 NEW: Purchase History States & Function (माल का खाता)
-   const [purchaseVendorName, setPurchaseVendorName] = useState('');
+  // 👉 NEW: Purchase History States & Function (माल का खाता + डेट फ़िल्टर)
+  const [purchaseVendorName, setPurchaseVendorName] = useState('');
   const [purchasePaidAmount, setPurchasePaidAmount] = useState<number | ''>('');
   const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(false);
   const [purchaseHistoryList, setPurchaseHistoryList] = useState<any[]>([]);
   const [isPurchaseHistoryLoading, setIsPurchaseHistoryLoading] = useState(false);
+  const [purchaseHistoryFilter, setPurchaseHistoryFilter] = useState<'this_month' | 'last_month' | 'all' | 'custom'>('this_month');
+  const [purchaseHistoryStartDate, setPurchaseHistoryStartDate] = useState(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+  );
+  const [purchaseHistoryEndDate, setPurchaseHistoryEndDate] = useState(
+    () => new Date().toISOString().split('T')[0]
+  );
+  const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
 
   const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
+    setPurchaseHistoryFilter('this_month'); // हमेशा चालू महीने से शुरू होगा
+    setPurchaseHistorySearch('');
     try {
-      // फायरबेस से सारा खरीदा हुआ माल मंगा रहे हैं (सबसे नया पहले)
-      const q = query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(200));
+      const q = query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(500));
       const snap = await getDocs(q);
       setPurchaseHistoryList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
@@ -570,6 +579,47 @@ export default function BbCafeDesktopPos() {
       setIsPurchaseHistoryLoading(false);
     }
   };
+
+  // 👉 डेट के अनुसार माल को फ़िल्टर करने का ऑटो लॉजिक
+  const filteredPurchaseHistory = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    const thisMonthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+    const thisMonthEnd = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+
+    const lastMonthStart = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
+    const lastMonthEnd = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+
+    return purchaseHistoryList.filter(item => {
+      let itemDateStr = item.date;
+      if (!itemDateStr && item.timestamp) {
+        const d = item.timestamp?.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
+        itemDateStr = d.toISOString().split('T')[0];
+      }
+
+      if (itemDateStr) {
+        if (purchaseHistoryFilter === 'this_month') {
+          if (itemDateStr < thisMonthStart || itemDateStr > thisMonthEnd) return false;
+        } else if (purchaseHistoryFilter === 'last_month') {
+          if (itemDateStr < lastMonthStart || itemDateStr > lastMonthEnd) return false;
+        } else if (purchaseHistoryFilter === 'custom') {
+          if (purchaseHistoryStartDate && itemDateStr < purchaseHistoryStartDate) return false;
+          if (purchaseHistoryEndDate && itemDateStr > purchaseHistoryEndDate) return false;
+        }
+      }
+
+      if (purchaseHistorySearch.trim()) {
+        const q = purchaseHistorySearch.toLowerCase().trim();
+        const matchName = String(item.name || '').toLowerCase().includes(q);
+        const matchVendor = String(item.vendorName || '').toLowerCase().includes(q);
+        if (!matchName && !matchVendor) return false;
+      }
+
+      return true;
+    });
+  }, [purchaseHistoryList, purchaseHistoryFilter, purchaseHistoryStartDate, purchaseHistoryEndDate, purchaseHistorySearch]);
  // 👉 NEW: Stock Audit (माहवारी स्टॉक गिनती) States & Functions
   const [isStockAuditModalOpen, setIsStockAuditModalOpen] = useState(false);
   const [auditDate, setAuditDate] = useState(new Date().toISOString().split('T')[0]);
