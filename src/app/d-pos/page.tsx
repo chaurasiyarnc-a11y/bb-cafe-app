@@ -9842,8 +9842,16 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                               </tr>
                               
                               {rawMaterials.map((r) => {
-                                // 👉 आपका ऑडिट में गिना हुआ स्टॉक अब प्रारंभिक स्टॉक (Opening) बनेगा!
-                                const opening = Number(r.openingStock !== undefined ? r.openingStock : r.stock) || 0;
+                                // जिस महीने की रिपोर्ट देखी जा रही है (जैसे: "2026-10" या "2026-11")
+                                const viewingMonthKey = stockStartDate ? stockStartDate.slice(0, 7) : new Date().toISOString().slice(0, 7);
+
+                                // 👉 चक्र लॉजिक: अगर इस महीने का अलग से ओपनिंग है तो वो उठाएगा, नहीं तो पिछला क्लोजिंग उठाएगा
+                                const opening = Number(
+                                  r.monthlyOpenings?.[viewingMonthKey] !== undefined 
+                                    ? r.monthlyOpenings[viewingMonthKey] 
+                                    : (r.openingStock !== undefined ? r.openingStock : r.stock)
+                                ) || 0;
+
                                 const newBuy = periodPurchasesMap[r.id] || 0;
                                 const totalAvail = opening + newBuy;
                                 const actual = Number(r.stock) || 0;
@@ -9856,7 +9864,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                                   <tr key={r.id} className="bg-white dark:bg-neutral-900 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                                     <td className="py-3 px-3 font-bold text-neutral-900 dark:text-neutral-100 border-r border-neutral-100 dark:border-neutral-800">{r.name}</td>
                                     
-                                    {/* प्रारंभिक स्टॉक (Opening) */}
+                                    {/* प्रारंभिक स्टॉक (Opening) - महीने के अनुसार ऑटो रोलओवर */}
                                     <td className="py-3 px-3 text-center font-mono font-black text-indigo-600 bg-indigo-50/30 border-r border-neutral-100 dark:border-neutral-800">
                                       {opening.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
                                     </td>
