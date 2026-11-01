@@ -546,11 +546,12 @@ export default function BbCafeDesktopPos() {
   const [vendorPhoneInput, setVendorPhoneInput] = useState('');
   const [purchaseVendorPhone, setPurchaseVendorPhone] = useState('');
 
-  const [isRawModalOpen, setIsRawModalOpen] = useState(false);
+ const [isRawModalOpen, setIsRawModalOpen] = useState(false);
   const [rawFormName, setRawFormName] = useState('');
   const [rawFormUnit, setRawFormUnit] = useState('Kg');
   const [rawFormStock, setRawFormStock] = useState<number | ''>('');
   const [rawFormLowAlert, setRawFormLowAlert] = useState<number | ''>(5);
+  const [rawFormRate, setRawFormRate] = useState<number | ''>(''); // 👉 नया: भाव (Rate) स्टेट
   const [editRawId, setEditRawId] = useState<string | null>(null);
   
   // 👉 NEW: Purchase Entry (माल चढ़ाने के लिए)
