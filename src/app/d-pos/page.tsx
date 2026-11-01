@@ -5515,6 +5515,10 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             <button onClick={() => setIsStockReportModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow">
                               <SafeBarChart3 size={16} /> Stock Report
                             </button>
+                            {/* 👉 NEW: Stock Audit Entry Button */}
+                            <button onClick={handleOpenStockAudit} className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow">
+                              <Check size={16} /> Stock Audit (स्टॉक गिनती)
+                            </button>
                             <button onClick={() => { setEditRawId(null); setRawFormName(''); setRawFormStock(''); setRawFormUnit('Kg'); setRawFormLowAlert(5); setRawActionType('add'); setRawActionQty(''); setRawTotalReceived(0); setRawTotalConsumed(0); setIsRawModalOpen(true); }} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow">
                               <SafePackagePlus size={16} /> + New Material
                             </button>
