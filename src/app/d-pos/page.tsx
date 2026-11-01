@@ -9856,10 +9856,117 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 <button onClick={() => { setIsReceiptModalOpen(false); handlePrintReceiptDirect(selectedReceipt, true); }} className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] rounded-xl shadow-lg transition-colors flex items-center justify-center gap-1">
                    <SafePrinter size={14}/> Print KOT
                 </button>
-                <button onClick={() => { setIsReceiptModalOpen(false); handlePrintReceiptDirect(selectedReceipt, false); }} className="flex-1 py-2.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase text-[10px] rounded-xl shadow border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors flex items-center justify-center gap-1">
+               <button onClick={() => { setIsReceiptModalOpen(false); handlePrintReceiptDirect(selectedReceipt, false); }} className="flex-1 py-2.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase text-[10px] rounded-xl shadow border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors flex items-center justify-center gap-1">
                    <SafePrinter size={14}/> Print Bill
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 👉 POPUP: PAY VENDOR DUE MODAL */}
+      <AnimatePresence>
+        {payVendorObj && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-green-600 flex items-center gap-2">
+                  💵 Pay Vendor Due (उधार चुकाएं)
+                </h3>
+                <button onClick={() => setPayVendorObj(null)} className="text-neutral-500 hover:text-black dark:hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 space-y-1">
+                <p className="text-[10px] font-black uppercase text-neutral-500">व्यापारी का नाम:</p>
+                <p className="text-sm font-black text-neutral-900 dark:text-white uppercase">{payVendorObj.name}</p>
+                <p className="text-xs font-bold text-red-600">कुल बाकी उधारी: ₹{Number(payVendorObj.totalDue || 0).toFixed(2)}</p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-neutral-500 block mb-1">भुगतान राशि (₹) *</label>
+                  <input 
+                    type="number" 
+                    min={1} 
+                    max={payVendorObj.totalDue} 
+                    value={vendorPayAmount} 
+                    onChange={e => setVendorPayAmount(e.target.value === '' ? '' : Number(e.target.value))} 
+                    className="w-full bg-white dark:bg-neutral-950 border-2 border-green-500/40 focus:border-green-500 rounded-xl px-3 py-2 text-base font-mono font-black outline-none" 
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase text-neutral-500 block mb-1">पेमेंट माध्यम (Payment Method)</label>
+                  <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                    <button 
+                      type="button" 
+                      onClick={() => setVendorPayMethod('cash')} 
+                      className={`flex-1 py-2 text-xs font-black uppercase rounded-lg transition-colors ${
+                        vendorPayMethod === 'cash' ? 'bg-green-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'
+                      }`}
+                    >
+                      💵 Cash (गल्ले से)
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setVendorPayMethod('upi')} 
+                      className={`flex-1 py-2 text-xs font-black uppercase rounded-lg transition-colors ${
+                        vendorPayMethod === 'upi' ? 'bg-blue-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'
+                      }`}
+                    >
+                      📱 UPI / Online
+                    </button>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handlePayVendorDue} 
+                  className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all"
+                >
+                  Confirm Payment (भुगतान दर्ज करें)
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 👉 POPUP: EDIT VENDOR PHONE NUMBER */}
+      <AnimatePresence>
+        {editingVendorPhoneObj && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
+                  📞 Vendor Mobile Number
+                </h3>
+                <button onClick={() => setEditingVendorPhoneObj(null)} className="text-neutral-500 hover:text-black dark:hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div>
+                <p className="text-xs font-bold text-neutral-500 uppercase">{editingVendorPhoneObj.name}</p>
+                <input 
+                  type="tel" 
+                  maxLength={10} 
+                  autoFocus
+                  placeholder="10 अंकों का मोबाइल नंबर..." 
+                  value={vendorPhoneInput} 
+                  onChange={e => setVendorPhoneInput(e.target.value.replace(/\D/g, ''))} 
+                  className="w-full mt-2 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm font-mono font-black outline-none focus:border-blue-500" 
+                />
+              </div>
+
+              <button 
+                onClick={handleSaveVendorPhone} 
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all"
+              >
+                Save Phone Number
+              </button>
             </motion.div>
           </div>
         )}
