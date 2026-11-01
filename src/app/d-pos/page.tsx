@@ -527,8 +527,9 @@ export default function BbCafeDesktopPos() {
 
  // 👉 NEW: Raw Material States (कच्चे माल के लिए)
   const [rawMaterials, setRawMaterials] = useState<any[]>([]);
-  const [rawSearchQuery, setRawSearchQuery] = useState(''); // 👉 NEW: Raw Search
- const [inventorySubTab, setInventorySubTab] = useState<'menu' | 'raw' | 'vendors'>('menu');
+  const [rawSearchQuery, setRawSearchQuery] = useState('');
+  const [rawRateFilter, setRawRateFilter] = useState<'all' | 'missing_rate' | 'low_stock'>('all'); // 👉 नया: बिना रेट वाले छांटने का फ़िल्टर
+  const [inventorySubTab, setInventorySubTab] = useState<'menu' | 'raw' | 'vendors'>('menu');
   // 👉 NEW: Vendors Khata States
   const [vendorsList, setVendorsList] = useState<any[]>([]);
   const [payVendorObj, setPayVendorObj] = useState<any>(null);
