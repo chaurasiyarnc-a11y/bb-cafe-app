@@ -4306,17 +4306,16 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   // 👉 NEW: EXCEL (CSV) IMPORT & EXPORT LOGIC
   // ==========================================
 
-  // 1. Raw Materials Export / Template
+ // 1. Raw Materials Export / Template (With Rate)
   const handleExportRawCSV = () => {
-    const headers = ["Name", "Unit", "CurrentStock", "LowStockAlert"];
+    const headers = ["Name", "Unit", "CurrentStock", "LowStockAlert", "Rate"];
     let csv = headers.join(",") + "\n";
     
     if (rawMaterials.length === 0) {
-      // अगर डाटा नहीं है, तो टेम्पलेट के लिए 2 डमी रो (Dummy rows) दें
-      csv += "Milk,Ltr,10,2\nPizza Base,Pcs,50,10\nCheese,Kg,5,1\n";
+      csv += "Milk,Ltr,10,2,60\nPizza Base,Pcs,50,10,15\nCheese,Kg,5,1,450\n";
     } else {
       rawMaterials.forEach(r => {
-        csv += `"${r.name}","${r.unit}",${r.stock},${r.lowAlert}\n`;
+        csv += `"${r.name}","${r.unit}",${r.stock},${r.lowAlert},${Number(r.lastRate) || 0}\n`;
       });
     }
 
@@ -4324,17 +4323,17 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Raw_Materials_Template_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `Raw_Materials_With_Rates_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    toast.success("Excel Template Downloaded! 📥");
+    toast.success("Excel फ़ाइल डाउनलोड हो गई! इसमें भाव (Rate) भरकर वापस Import करें 📥");
   };
 
-  // 2. Raw Materials Import
+  // 2. Raw Materials Import (With Rate)
   const handleImportRawCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsRawExcelProcessing(true);
-    const toastId = toast.loading("कच्चा माल अपलोड हो रहा है...");
+    const toastId = toast.loading("कच्चा माल व भाव अपडेट हो रहे हैं...");
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -4356,23 +4355,23 @@ const handleSendUdhariReminder = (targetOrder: any) => {
           const unit = cols[1] || 'Kg';
           const stock = Number(cols[2]) || 0;
           const lowAlert = Number(cols[3]) || 5;
+          const rate = Number(cols[4]) || 0; // 👉 Excel से भाव पढ़ेगा
 
-          // चेक करें कि क्या यह नाम पहले से मौजूद है?
           const existing = rawMaterials.find(r => r.name.toLowerCase() === name.toLowerCase());
           
           if (existing) {
-            batch.update(doc(db, "raw_materials", existing.id), { stock, unit, lowAlert });
+            batch.update(doc(db, "raw_materials", existing.id), { stock, unit, lowAlert, lastRate: rate });
             updatedCount++;
           } else {
             const newRef = doc(collection(db, "raw_materials"));
-            batch.set(newRef, { name, unit, stock, lowAlert, totalReceived: stock, totalConsumed: 0 });
+            batch.set(newRef, { name, unit, stock, lowAlert, lastRate: rate, totalReceived: stock, totalConsumed: 0 });
             addedCount++;
           }
         }
 
         await batch.commit();
         toast.dismiss(toastId);
-        toast.success(`${addedCount} नए जुड़े और ${updatedCount} अपडेट हुए! 🎉`);
+        toast.success(`सफलतापूर्वक ${updatedCount} सामानों के भाव और स्टॉक अपडेट हो गए! 🎉`);
       } catch (err) {
         toast.dismiss(toastId);
         toast.error("अपलोड फेल हो गया। कृपया सही फॉर्मेट चेक करें!");
@@ -4381,9 +4380,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset input
+    e.target.value = '';
   };
-
   // 3. Menu Items Export / Template
   const handleExportMenuCSV = () => {
     const headers = ["ItemCode", "ItemName", "Category", "Price", "IsAvailable"];
