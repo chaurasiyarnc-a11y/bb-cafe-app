@@ -4296,13 +4296,26 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     });
   }, [products, inventorySearchQuery]);
 
-  // 👉 NEW: Filtered Raw Materials for Search
+ // 👉 NEW: Filtered Raw Materials (Search + बिना रेट वाले सामान छांटना)
   const filteredRawMaterials = useMemo(() => {
     const queryStr = rawSearchQuery.toLowerCase().trim();
-    if (!queryStr) return rawMaterials;
-    return rawMaterials.filter(r => (r.name || '').toLowerCase().includes(queryStr));
-  }, [rawMaterials, rawSearchQuery]);
-
+    return rawMaterials.filter(r => {
+      // 1. सर्च फ़िल्टर
+      if (queryStr && !(r.name || '').toLowerCase().includes(queryStr)) {
+        return false;
+      }
+      // 2. सिर्फ बिना रेट वाले सामान
+      if (rawRateFilter === 'missing_rate') {
+        const rate = Number(r.lastRate) || 0;
+        if (rate > 0) return false;
+      }
+      // 3. सिर्फ कम स्टॉक वाले सामान
+      if (rawRateFilter === 'low_stock') {
+        if (Number(r.stock) > Number(r.lowAlert)) return false;
+      }
+      return true;
+    });
+  }, [rawMaterials, rawSearchQuery, rawRateFilter]);
  // ==========================================
   // 👉 NEW: EXCEL (CSV) IMPORT & EXPORT LOGIC
   // ==========================================
