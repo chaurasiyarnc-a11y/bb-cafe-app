@@ -800,16 +800,27 @@ export default function BbCafeDesktopPos() {
     setIsStockAuditModalOpen(true);
   };
 
+  // 👉 नया: माहवारी क्लोजिंग व अगले महीने के लिए रोल-फ़ॉरवर्ड चक्र
   const handleSaveStockAudit = async () => {
     if (rawMaterials.length === 0) return toast.error("कोई कच्चा माल नहीं है!");
     setIsSavingAudit(true);
-    const toastId = toast.loading("माहवारी स्टॉक अपडेट हो रहा है...");
+    const toastId = toast.loading("महीना क्लोज हो रहा है व नया महीना शुरू हो रहा है...");
 
     try {
       const batch = writeBatch(db);
       const shortages: any[] = [];
       const reorderList: any[] = [];
       let totalShortageValue = 0;
+
+      // जिस महीने का ऑडिट हो रहा है (जैसे: "2026-10")
+      const currentAuditMonth = auditDate.slice(0, 7);
+      
+      // अगला महीना निकालना (जैसे: "2026-11")
+      const [y, m] = currentAuditMonth.split('-').map(Number);
+      const nextMonthDate = new Date(y, m, 1);
+      const nextMonthKey = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+      const monthlySnapshotItems: { [id: string]: any } = {};
 
       rawMaterials.forEach((rm) => {
         const physicalVal = auditCounts[rm.id] !== '' && auditCounts[rm.id] !== undefined 
@@ -842,34 +853,53 @@ export default function BbCafeDesktopPos() {
           });
         }
 
+        // इस महीने के क्लोजिंग रिकॉर्ड में सेव करें
+        monthlySnapshotItems[rm.id] = {
+          name: rm.name,
+          unit: rm.unit,
+          opening: Number(rm.monthlyOpenings?.[currentAuditMonth] !== undefined ? rm.monthlyOpenings[currentAuditMonth] : rm.openingStock || rm.stock),
+          closing: physicalVal,
+          rate: rate
+        };
+
+        // डेटाबेस अपडेट:
+        // 1. Current stock = physicalVal
+        // 2. अगले महीने (nextMonthKey) का Opening Stock = इस महीने का Closing (physicalVal)!
         const rawRef = doc(db, "raw_materials", rm.id);
         batch.update(rawRef, {
           stock: physicalVal,
           lastAuditDate: auditDate,
+          [`monthlyOpenings.${nextMonthKey}`]: physicalVal, // अगले महीने का Opening बन गया!
           openingStock: physicalVal
         });
       });
 
-      const auditLogRef = doc(collection(db, "stock_audits"));
-      batch.set(auditLogRef, {
-        date: auditDate,
-        timestamp: new Date(),
-        auditedBy: currentUser?.name || 'Admin',
+      // इस महीने का स्नैपशॉट लॉक कर दें
+      const snapshotRef = doc(db, "monthly_stock_snapshots", currentAuditMonth);
+      batch.set(snapshotRef, {
+        month: currentAuditMonth,
+        closedAt: new Date(),
+        closedBy: currentUser?.name || 'Admin',
         totalItems: rawMaterials.length,
-        shortageItemsCount: shortages.length,
-        totalShortageValue: totalShortageValue,
-        shortages: shortages
-      });
+        items: monthlySnapshotItems,
+        totalShortageValue: totalShortageValue
+      }, { merge: true });
 
       await batch.commit();
 
+      // लोकल स्टेट अपडेट करें
       setRawMaterials(prev => prev.map(rm => ({
         ...rm,
-        stock: auditCounts[rm.id] !== '' ? Number(auditCounts[rm.id]) : rm.stock
+        stock: auditCounts[rm.id] !== '' ? Number(auditCounts[rm.id]) : rm.stock,
+        openingStock: auditCounts[rm.id] !== '' ? Number(auditCounts[rm.id]) : rm.stock,
+        monthlyOpenings: {
+          ...(rm.monthlyOpenings || {}),
+          [nextMonthKey]: auditCounts[rm.id] !== '' ? Number(auditCounts[rm.id]) : rm.stock
+        }
       })));
 
       toast.dismiss(toastId);
-      toast.success("स्टॉक सफलतापूर्वक अपडेट हो गया! 🎉");
+      toast.success(`${currentAuditMonth} क्लोज हो गया! अंतिम स्टॉक ${nextMonthKey} का प्रारंभिक स्टॉक बन गया। 🎉`);
 
       setAuditSummaryResult({
         shortages,
@@ -885,7 +915,6 @@ export default function BbCafeDesktopPos() {
       setIsSavingAudit(false);
     }
   };
-
   const handleSendReorderWhatsApp = () => {
     if (!auditSummaryResult || auditSummaryResult.reorderList.length === 0) {
       return toast.error("कोई माल खत्म नहीं है!");
