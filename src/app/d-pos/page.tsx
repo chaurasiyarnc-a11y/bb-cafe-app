@@ -8998,63 +8998,145 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
           </div>
         )}
       </AnimatePresence>
-      {/* 👉 NEW POPUP: PURCHASE HISTORY MODAL (माल का खाता) */}
+      {/* 👉 NEW POPUP: PURCHASE HISTORY MODAL (माल का खाता + स्मार्ट डेट फ़िल्टर) */}
       <AnimatePresence>
         {isPurchaseHistoryModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-3xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-4xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col">
               
               <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
                 <div>
                   <h3 className="font-black text-sm uppercase text-indigo-600 flex items-center gap-2">
-                    <History size={18} /> Raw Material Purchase History
+                    <History size={18} /> Raw Material Purchase History (खरीदा हुआ माल)
                   </h3>
-                  <p className="text-[10px] text-neutral-500 font-bold mt-1">अब तक खरीदे गए माल का पूरा हिसाब</p>
+                  <p className="text-[10px] text-neutral-500 font-bold mt-1">
+                    महीने के अनुसार फ़िल्टर करें और केवल उसी महीने का टोटल व लिस्ट देखें
+                  </p>
                 </div>
                 <button onClick={() => setIsPurchaseHistoryModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
               </div>
+
+              {/* 👉 DATE FILTERS & SEARCH BAR */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 shrink-0">
+                
+                {/* Quick Month Filter Buttons */}
+                <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl shadow-inner">
+                  <button 
+                    onClick={() => setPurchaseHistoryFilter('this_month')} 
+                    className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${
+                      purchaseHistoryFilter === 'this_month' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    This Month (इस महीने)
+                  </button>
+                  <button 
+                    onClick={() => setPurchaseHistoryFilter('last_month')} 
+                    className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${
+                      purchaseHistoryFilter === 'last_month' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    Last Month (पिछला महीना)
+                  </button>
+                  <button 
+                    onClick={() => setPurchaseHistoryFilter('all')} 
+                    className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${
+                      purchaseHistoryFilter === 'all' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    All Time (सब)
+                  </button>
+                  <button 
+                    onClick={() => setPurchaseHistoryFilter('custom')} 
+                    className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all flex items-center gap-1 ${
+                      purchaseHistoryFilter === 'custom' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    📅 Custom
+                  </button>
+                </div>
+
+                {/* Search Item or Vendor */}
+                <div className="w-full md:w-60 relative">
+                  <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
+                  <input 
+                    type="text" 
+                    placeholder="माल या वेंडर खोजें..." 
+                    value={purchaseHistorySearch} 
+                    onChange={e => setPurchaseHistorySearch(e.target.value)} 
+                    className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl pl-8 pr-3 py-1.5 text-xs font-bold outline-none" 
+                  />
+                </div>
+              </div>
+
+              {/* Custom Date Pickers (अगर Custom चुना हो) */}
+              {purchaseHistoryFilter === 'custom' && (
+                <div className="flex items-center gap-3 bg-indigo-50/50 dark:bg-indigo-900/10 p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800/40 shrink-0">
+                  <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">तारीख से:</span>
+                  <input 
+                    type="date" 
+                    value={purchaseHistoryStartDate} 
+                    onChange={e => setPurchaseHistoryStartDate(e.target.value)} 
+                    className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs font-bold outline-none cursor-pointer" 
+                  />
+                  <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">तक:</span>
+                  <input 
+                    type="date" 
+                    value={purchaseHistoryEndDate} 
+                    onChange={e => setPurchaseHistoryEndDate(e.target.value)} 
+                    className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs font-bold outline-none cursor-pointer" 
+                  />
+                </div>
+              )}
 
               {isPurchaseHistoryLoading ? (
                 <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>
               ) : (
                 <>
-                  {/* SUMMARY BOX: यहाँ दिखेगा कि कुल कितने का माल आया है */}
+                  {/* SUMMARY BOX: चुनी गई तारीख का कुल माल */}
                   <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 p-4 rounded-2xl shrink-0 flex justify-between items-center shadow-sm">
                     <div>
-                      <p className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">Total Purchase Amount (कुल खरीदा हुआ माल)</p>
-                      <p className="text-2xl font-black font-mono text-indigo-700 dark:text-indigo-300 mt-1">
-                        ₹{purchaseHistoryList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2)}
+                      <p className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">
+                        {purchaseHistoryFilter === 'this_month' ? 'इस महीने खरीदा गया माल (This Month Total)' : 
+                         purchaseHistoryFilter === 'last_month' ? 'पिछले महीने खरीदा गया माल (Last Month Total)' : 
+                         purchaseHistoryFilter === 'custom' ? 'चुनी गई तारीख का कुल माल' : 'अब तक खरीदा गया कुल माल'}
+                      </p>
+                      <p className="text-3xl font-black font-mono text-indigo-700 dark:text-indigo-300 mt-1">
+                        ₹{filteredPurchaseHistory.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2)}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-black uppercase text-neutral-500">Total Entries</p>
-                      <p className="text-lg font-black text-neutral-800 dark:text-neutral-200">{purchaseHistoryList.length}</p>
+                      <p className="text-[10px] font-black uppercase text-neutral-500">Entries Found</p>
+                      <p className="text-xl font-black font-mono text-neutral-800 dark:text-neutral-200">{filteredPurchaseHistory.length}</p>
                     </div>
                   </div>
 
-                  {/* TABLE: यहाँ लिस्ट दिखेगी कि कौन सा माल, कब, कितना और कितने का आया */}
-                  <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0">
+                  {/* TABLE: फ़िल्टर किया हुआ डेटा */}
+                  <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0 z-10">
                         <tr>
                           <th className="py-2.5 px-3 font-black">Date (तारीख)</th>
                           <th className="py-2.5 px-3 font-black">Item Name</th>
+                          <th className="py-2.5 px-3 font-black">Vendor (व्यापारी)</th>
                           <th className="py-2.5 px-3 font-black text-center">Qty (मात्रा)</th>
                           <th className="py-2.5 px-3 font-black text-right">Rate (भाव)</th>
                           <th className="py-2.5 px-3 font-black text-right">Total (₹)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
-                        {purchaseHistoryList.length === 0 ? (
+                        {filteredPurchaseHistory.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">कोई भी पुरानी एंट्री नहीं मिली।</td>
+                            <td colSpan={6} className="py-12 text-center text-neutral-400 font-bold">
+                              इस फ़िल्टर में कोई खरीद एंट्री नहीं मिली।
+                            </td>
                           </tr>
                         ) : (
-                          purchaseHistoryList.map((item) => (
+                          filteredPurchaseHistory.map((item) => (
                             <tr key={item.id} className="bg-white dark:bg-neutral-900 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
                               <td className="py-2.5 px-3 font-bold text-neutral-700 dark:text-neutral-300">{item.date}</td>
-                              <td className="py-2.5 px-3 font-bold">{item.name}</td>
-                              <td className="py-2.5 px-3 text-center font-mono">{item.qty} <span className="text-[9px] text-neutral-500">{item.unit}</span></td>
+                              <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-white">{item.name}</td>
+                              <td className="py-2.5 px-3 font-bold text-neutral-500">{item.vendorName || '--'}</td>
+                              <td className="py-2.5 px-3 text-center font-mono font-bold">{item.qty} <span className="text-[9px] text-neutral-500">{item.unit}</span></td>
                               <td className="py-2.5 px-3 text-right font-mono text-neutral-500">₹{item.rate}</td>
                               <td className="py-2.5 px-3 text-right font-mono font-black text-indigo-600 dark:text-indigo-400">₹{item.amount?.toFixed(2)}</td>
                             </tr>
