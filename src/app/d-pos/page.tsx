@@ -905,22 +905,39 @@ export default function BbCafeDesktopPos() {
  const handleDownloadStockReport = () => {
     let csv = `Stock Report From: ${stockStartDate} To: ${stockEndDate}\n\n`;
     csv += "Item Name (माल का नाम),Opening Stock (प्रारंभिक),Received/Purchase (नई खरीद),Total Available (कुल उपलब्ध),Consumed/Used (खपत),Closing Stock (अंतिम स्टॉक),Physical Stock (असली गोदाम स्टॉक),Rate (भाव),Total Amount (कुल कीमत)\n";
+    
+    // चुनी हुई तारीख के बीच खरीदे गए माल का हिसाब
+    const periodPurchases: { [rawId: string]: number } = {};
+    purchaseHistoryList.forEach(p => {
+      let pDate = p.date;
+      if (!pDate && p.timestamp) {
+        const d = p.timestamp?.toDate ? p.timestamp.toDate() : new Date(p.timestamp);
+        pDate = d.toISOString().split('T')[0];
+      }
+      if (pDate && pDate >= stockStartDate && pDate <= stockEndDate && p.rawId) {
+        periodPurchases[p.rawId] = (periodPurchases[p.rawId] || 0) + (Number(p.qty) || 0);
+      }
+    });
+
     rawMaterials.forEach(r => {
-      const totalIn = Number(r.totalReceived) || 0;
-      const totalOut = Number(r.totalConsumed) || 0;
-      const expected = totalIn - totalOut;
+      const opening = Number(r.openingStock !== undefined ? r.openingStock : r.stock) || 0;
+      const newBuy = periodPurchases[r.id] || 0;
+      const totalAvail = opening + newBuy;
       const actual = Number(r.stock) || 0;
+      const consumed = Math.max(0, totalAvail - actual);
+      const expected = totalAvail - consumed;
       const rate = Number(r.lastRate) || 0;
       const amount = actual * rate;
       
-      csv += `"${r.name}","0 ${r.unit}",${totalIn} ${r.unit},${totalIn} ${r.unit},${totalOut} ${r.unit},${expected} ${r.unit},${actual} ${r.unit},Rs.${rate},Rs.${amount.toFixed(2)}\n`;
+      csv += `"${r.name}","${opening} ${r.unit}","+ ${newBuy} ${r.unit}","${totalAvail} ${r.unit}","- ${consumed.toFixed(2)} ${r.unit}","${expected.toFixed(2)} ${r.unit}","${actual.toFixed(2)} ${r.unit}","Rs.${rate}","Rs.${amount.toFixed(2)}"\n`;
     });
+    
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `Stock_Report_${stockStartDate}_to_${stockEndDate}.csv`;
     link.click();
-    toast.success("कस्टम डेट के साथ स्टॉक रिपोर्ट डाउनलोड हो गई! 📥");
+    toast.success("कस्टम डेट व ओपनिंग स्टॉक के साथ रिपोर्ट डाउनलोड हो गई! 📥");
   };
   // 👉 NEW: Raw Material History & Stock Actions
   const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
