@@ -9337,26 +9337,105 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
          {/* BOTTOM: Grand Total, Vendor Due & Save */}
               <div className="flex flex-col gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800 shrink-0">
                 
-                {/* 👉 NEW: VENDOR & PARTIAL PAYMENT SECTION */}
-                <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-xl border border-blue-200 dark:border-blue-800/50">
-                   <div className="flex-1">
-                     <label className="text-[10px] font-black uppercase text-blue-600">वेंडर / दुकानदार का नाम *</label>
-                     <input type="text" value={purchaseVendorName} onChange={e => setPurchaseVendorName(e.target.value)} placeholder="जैसे: गुप्ता डेयरी..." className="w-full bg-white dark:bg-neutral-900 border border-blue-200 dark:border-blue-700/50 rounded-lg px-2 py-1.5 text-xs font-bold outline-none focus:border-blue-500" />
+                {/* 👉 NEW: VENDOR & PARTIAL PAYMENT SECTION WITH AUTO-DROPDOWN */}
+                <div className="flex items-end gap-3 bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-xl border border-blue-200 dark:border-blue-800/50 relative">
+                   
+                   {/* 🔍 Smart Vendor Dropdown Box */}
+                   <div className="flex-1 relative">
+                     <div className="flex justify-between items-center mb-1">
+                       <label className="text-[10px] font-black uppercase text-blue-600">
+                         वेंडर / दुकानदार का नाम *
+                       </label>
+                       {purchaseVendorPhone && (
+                         <span className="text-[9px] font-mono font-bold text-green-600 bg-green-100 dark:bg-green-900/30 px-1.5 rounded">
+                           📞 {purchaseVendorPhone} (Linked)
+                         </span>
+                       )}
+                     </div>
+
+                     <input 
+                       type="text" 
+                       value={purchaseVendorName} 
+                       onChange={e => {
+                         setPurchaseVendorName(e.target.value);
+                         setShowVendorDropdown(true);
+                       }} 
+                       onFocus={() => setShowVendorDropdown(true)}
+                       onBlur={() => setTimeout(() => setShowVendorDropdown(false), 250)}
+                       placeholder="🔍 नाम लिखें या लिस्ट से चुनें..." 
+                       className="w-full bg-white dark:bg-neutral-900 border border-blue-200 dark:border-blue-700/50 rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none focus:border-blue-500" 
+                     />
+
+                     {/* लटकती हुई (Floating) ड्रॉपडाउन लिस्ट */}
+                     {showVendorDropdown && vendorsList.length > 0 && (
+                       <div className="absolute z-50 bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl shadow-2xl">
+                         <div className="px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 text-[9px] font-black uppercase text-neutral-500 sticky top-0">
+                           📋 पुराने व्यापारी (क्लिक करके चुनें)
+                         </div>
+
+                         {vendorsList
+                           .filter(v => {
+                             if (!purchaseVendorName.trim()) return true;
+                             const q = purchaseVendorName.toLowerCase().trim();
+                             return v.name.toLowerCase().includes(q) || String(v.phone || '').includes(q);
+                           })
+                           .slice(0, 10)
+                           .map(v => (
+                             <div 
+                               key={v.id} 
+                               onMouseDown={() => {
+                                 setPurchaseVendorName(v.name);
+                                 setPurchaseVendorPhone(v.phone || '');
+                                 setShowVendorDropdown(false);
+                               }}
+                               className="p-2.5 text-xs border-b border-neutral-100 dark:border-neutral-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer flex justify-between items-center transition-colors"
+                             >
+                               <div>
+                                 <p className="font-bold text-neutral-900 dark:text-white uppercase">{v.name}</p>
+                                 {v.phone ? (
+                                   <p className="text-[10px] text-green-600 font-mono mt-0.5">📞 {v.phone}</p>
+                                 ) : (
+                                   <p className="text-[9px] text-neutral-400 italic mt-0.5">नंबर सेव नहीं है</p>
+                                 )}
+                               </div>
+
+                               {Number(v.totalDue) > 0 ? (
+                                 <span className="text-[9px] bg-red-100 dark:bg-red-900/40 text-red-600 font-bold px-2 py-0.5 rounded border border-red-200 dark:border-red-800">
+                                   उधार: ₹{Number(v.totalDue).toFixed(2)}
+                                 </span>
+                               ) : (
+                                 <span className="text-[9px] bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded">
+                                   चुकता ✓
+                                 </span>
+                               )}
+                             </div>
+                           ))}
+
+                         {vendorsList.filter(v => {
+                           if (!purchaseVendorName.trim()) return true;
+                           const q = purchaseVendorName.toLowerCase().trim();
+                           return v.name.toLowerCase().includes(q) || String(v.phone || '').includes(q);
+                         }).length === 0 && (
+                           <div className="p-3 text-xs text-neutral-500 text-center">
+                             नया वेंडर! यही नाम सेव हो जाएगा।
+                           </div>
+                         )}
+                       </div>
+                     )}
                    </div>
                    
                    <div className="w-1/4">
-                     <label className="text-[10px] font-black uppercase text-green-600">कितने पैसे दिए (Paid)</label>
+                     <label className="text-[10px] font-black uppercase text-green-600 block mb-1">कितने पैसे दिए (PAID)</label>
                      <input type="number" value={purchasePaidAmount} onChange={e => setPurchasePaidAmount(e.target.value === '' ? '' : Number(e.target.value))} placeholder="₹" className="w-full bg-white dark:bg-neutral-900 border border-green-200 dark:border-green-700/50 rounded-lg px-2 py-1.5 text-xs font-mono font-bold outline-none focus:border-green-500 text-green-700" />
                    </div>
                    
                    <div className="w-1/4">
-                     <label className="text-[10px] font-black uppercase text-red-500">कितने बाकी हैं (Due)</label>
+                     <label className="text-[10px] font-black uppercase text-red-500 block mb-1">कितने बाकी हैं (DUE)</label>
                      <div className="w-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg px-2 py-1.5 text-xs font-mono font-black text-red-600 text-right">
                        ₹{Math.max(0, purchaseItemList.reduce((sum, item) => sum + item.amount, 0) - (Number(purchasePaidAmount) || 0)).toFixed(2)}
                      </div>
                    </div>
                 </div>
-
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-[10px] font-black uppercase text-neutral-500">Grand Total ({purchaseItemList.length} Items)</p>
