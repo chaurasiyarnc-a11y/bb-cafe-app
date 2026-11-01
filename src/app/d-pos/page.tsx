@@ -8964,19 +8964,19 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
           </div>
         )}
       </AnimatePresence>
-{/* 👉 NEW POPUP: RAW MATERIAL MODAL */}
+{/* 👉 NEW POPUP: RAW MATERIAL MODAL (WITH RATE FIELD) */}
       <AnimatePresence>
         {isRawModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
                 <h3 className="font-black text-sm uppercase text-green-600 flex items-center gap-2">
-                  <SafePackagePlus size={18} /> {editRawId ? 'Update Stock' : 'Add Raw Material'}
+                  <SafePackagePlus size={18} /> {editRawId ? 'Update Stock & Rate' : 'Add Raw Material'}
                 </h3>
                 <button onClick={() => setIsRawModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
               </div>
               
-           <form onSubmit={async (e) => {
+              <form onSubmit={async (e) => {
                 e.preventDefault();
                 
                 const trimmedName = rawFormName.trim();
@@ -8992,7 +8992,8 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   let payload: any = { 
                     name: trimmedName, 
                     unit: rawFormUnit, 
-                    lowAlert: Number(rawFormLowAlert) || 0
+                    lowAlert: Number(rawFormLowAlert) || 0,
+                    lastRate: Number(rawFormRate) || 0 // 👉 भाव (Rate) सेव होगा
                   };
 
                   if (editRawId) {
@@ -9001,7 +9002,6 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                     let finalCons = Number(rawTotalConsumed) || 0;
                     let actQty = Number(rawActionQty);
 
-                    // 👉 FIX: यहाँ चेक किया गया है कि Qty सही से अपडेट हो
                     if (!isNaN(actQty) && rawActionQty !== '') {
                       if (rawActionType === 'add') {
                          finalStock += actQty;
@@ -9021,28 +9021,29 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                     await updateDoc(doc(db, "raw_materials", editRawId), payload);
                   } else {
                     payload.stock = Number(rawFormStock) || 0;
+                    payload.openingStock = Number(rawFormStock) || 0;
                     payload.totalReceived = Number(rawFormStock) || 0;
                     payload.totalConsumed = 0;
                     await addDoc(collection(db, "raw_materials"), payload);
                   }
                   
                   toast.dismiss(toastId);
-                  toast.success("Raw Material Saved! ✅");
+                  toast.success("कच्चा माल व भाव सफलतापूर्वक सेव हो गया! ✅");
                   setIsRawModalOpen(false);
                 } catch (err) {
                   toast.dismiss(toastId);
                   toast.error("Failed to save!");
                 }
-              }} className="space-y-4">
+              }} className="space-y-3.5">
                 
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1 col-span-2">
-                    <label className="text-[10px] font-black uppercase text-neutral-500">Material Name</label>
-                    <input type="text" required value={rawFormName} onChange={e=>setRawFormName(e.target.value)} placeholder="e.g. Milk" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-green-500" />
+                    <label className="text-[10px] font-black uppercase text-neutral-500">Material Name *</label>
+                    <input type="text" required value={rawFormName} onChange={e=>setRawFormName(e.target.value)} placeholder="e.g. Nirma Powder" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-green-500" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-neutral-500">Unit (इकाई)</label>
-                    <select value={rawFormUnit} onChange={e=>setRawFormUnit(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none cursor-pointer focus:border-green-500">
+                    <select value={rawFormUnit} onChange={e=>setRawFormUnit(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-2 py-2 text-xs font-bold outline-none cursor-pointer focus:border-green-500">
                       <option value="Kg">Kg</option>
                       <option value="Gram">Gram</option>
                       <option value="Ltr">Litre</option>
@@ -9052,19 +9053,35 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   </div>
                 </div>
 
+                {/* 👉 यहाँ डालेंगे भाव (Rate) */}
+                <div className="space-y-1 bg-green-50 dark:bg-green-900/10 p-2.5 rounded-xl border border-green-200 dark:border-green-800/40">
+                  <label className="text-[10px] font-black uppercase text-green-700 dark:text-green-400 flex items-center justify-between">
+                    <span>खरीद भाव / Rate (₹ प्रति {rawFormUnit}) *</span>
+                    <span className="text-[9px] font-normal text-neutral-500">जैसे 1 {rawFormUnit} की कीमत</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    min={0}
+                    value={rawFormRate} 
+                    onChange={e => setRawFormRate(e.target.value === '' ? '' : Number(e.target.value))} 
+                    placeholder={`उदा: ₹45 प्रति ${rawFormUnit}`} 
+                    className="w-full bg-white dark:bg-neutral-950 border-2 border-green-500/50 focus:border-green-500 rounded-lg px-3 py-2 text-sm font-mono font-black outline-none" 
+                  />
+                </div>
+
                 {editRawId ? (
                   <div className="space-y-2 p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl border border-neutral-200 dark:border-neutral-700">
                     <div className="flex justify-between items-center mb-1 border-b border-neutral-200 dark:border-neutral-700 pb-2">
                       <p className="text-[10px] font-black uppercase text-neutral-500">अभी का स्टॉक (Current Stock):</p>
                       <p className="text-sm font-black font-mono text-neutral-900 dark:text-white">{rawFormStock} {rawFormUnit}</p>
                     </div>
-                    <label className="text-[10px] font-black uppercase text-neutral-500 block">स्टॉक अपडेट करें (Update Action):</label>
+                    <label className="text-[10px] font-black uppercase text-neutral-500 block">स्टॉक अपडेट करें (Action):</label>
                     <div className="flex gap-1 bg-white dark:bg-neutral-900 p-1 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                      <button type="button" onClick={() => setRawActionType('add')} className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded transition-colors ${rawActionType==='add' ? 'bg-green-600 text-white shadow' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>+ माल आया</button>
-                      <button type="button" onClick={() => setRawActionType('reduce')} className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded transition-colors ${rawActionType==='reduce' ? 'bg-orange-600 text-white shadow' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>- खराब हुआ</button>
-                      <button type="button" onClick={() => setRawActionType('set')} className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded transition-colors ${rawActionType==='set' ? 'bg-blue-600 text-white shadow' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>= सीधा लिखें</button>
+                      <button type="button" onClick={() => setRawActionType('add')} className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded transition-colors ${rawActionType==='add' ? 'bg-green-600 text-white shadow' : 'text-neutral-500'}`}>+ माल आया</button>
+                      <button type="button" onClick={() => setRawActionType('reduce')} className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded transition-colors ${rawActionType==='reduce' ? 'bg-orange-600 text-white shadow' : 'text-neutral-500'}`}>- खराब हुआ</button>
+                      <button type="button" onClick={() => setRawActionType('set')} className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded transition-colors ${rawActionType==='set' ? 'bg-blue-600 text-white shadow' : 'text-neutral-500'}`}>= सीधा लिखें</button>
                     </div>
-                    {/* 👉 FIX: 'as any' लगाया गया है ताकि TypeScript का एरर न आये */}
                     <input 
                       type="number" 
                       min={0} 
@@ -9072,31 +9089,29 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       value={rawActionQty} 
                       onChange={e=>setRawActionQty(e.target.value as any)} 
                       placeholder={rawActionType === 'add' ? `कितना ${rawFormUnit} नया आया?` : rawActionType === 'reduce' ? `कितना ${rawFormUnit} खराब/वेस्ट हुआ?` : 'नया स्टॉक बिलकुल सीधा लिखें...'} 
-                      className={`w-full bg-white dark:bg-neutral-950 border rounded-lg px-3 py-2.5 text-xs font-mono font-bold outline-none mt-2 transition-colors ${rawActionType === 'add' ? 'border-green-500' : rawActionType === 'reduce' ? 'border-orange-500' : 'border-blue-500'}`} 
+                      className="w-full bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg px-3 py-2 text-xs font-mono font-bold outline-none mt-1" 
                     />
                   </div>
                 ) : (
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-neutral-500">Initial Stock (शुरुआती स्टॉक)</label>
-                    <input type="number" required min={0} step="0.0001" value={rawFormStock} onChange={e=>setRawFormStock(e.target.value as any)} placeholder="0.00" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-green-500" />
+                    <input type="number" required min={0} step="0.0001" value={rawFormStock} onChange={e=>setRawFormStock(e.target.value as any)} placeholder="0.00" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-green-500" />
                   </div>
                 )}
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-neutral-500">Low Stock Alert Below:</label>
-                  <input type="number" required min={0} step="0.0001" value={rawFormLowAlert} onChange={e=>setRawFormLowAlert(e.target.value as any)} placeholder="e.g. 5" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-red-500" />
-                  <p className="text-[9px] text-neutral-400 mt-1">जब स्टॉक इससे कम होगा, तो सिस्टम आपको लाल रंग में वार्निंग देगा。</p>
+                  <input type="number" required min={0} step="0.0001" value={rawFormLowAlert} onChange={e=>setRawFormLowAlert(e.target.value as any)} placeholder="e.g. 5" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-red-500" />
                 </div>
                 
                 <button type="submit" className="w-full py-3 mt-2 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
-                  Save Material
+                  Save Material & Rate (सेव करें)
                 </button>
               </form>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-
     {/* 👉 NEW BULK POPUP: PURCHASE ENTRY (एक साथ सारा माल चढ़ाएं) */}
       <AnimatePresence>
         {isPurchaseModalOpen && (
