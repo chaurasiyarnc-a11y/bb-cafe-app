@@ -9518,7 +9518,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
                         {rawMaterials
                           .filter(rm => rm.name.toLowerCase().includes(auditSearchQuery.toLowerCase()))
-                          .map(rm => {
+                          .map((rm, idx) => {
                             const systemStock = Number(rm.stock) || 0;
                             const enteredCount = auditCounts[rm.id];
                             const physical = enteredCount !== '' && enteredCount !== undefined ? Number(enteredCount) : systemStock;
@@ -9538,20 +9538,39 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                                 <td className="py-2 px-3 text-center bg-amber-500/5">
                                   <div className="inline-flex items-center gap-1">
                                     <input 
+                                      id={`audit-input-${idx}`}
                                       type="number" 
                                       step="0.001" 
                                       min={0}
+                                      autoFocus={idx === 0}
                                       value={enteredCount !== undefined ? enteredCount : systemStock} 
+                                      onFocus={(e) => e.target.select()}
                                       onChange={e => {
                                         const val = e.target.value === '' ? '' : Number(e.target.value);
                                         setAuditCounts(prev => ({ ...prev, [rm.id]: val }));
                                       }}
-                                      className="w-24 bg-white dark:bg-neutral-950 border-2 border-amber-500/40 focus:border-amber-500 rounded-lg px-2 py-1 text-xs font-mono font-black text-center outline-none" 
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                                          e.preventDefault();
+                                          const nextInput = document.getElementById(`audit-input-${idx + 1}`) as HTMLInputElement;
+                                          if (nextInput) {
+                                            nextInput.focus();
+                                            nextInput.select();
+                                          }
+                                        } else if (e.key === 'ArrowUp') {
+                                          e.preventDefault();
+                                          const prevInput = document.getElementById(`audit-input-${idx - 1}`) as HTMLInputElement;
+                                          if (prevInput) {
+                                            prevInput.focus();
+                                            prevInput.select();
+                                          }
+                                        }
+                                      }}
+                                      className="w-24 bg-white dark:bg-neutral-950 border-2 border-amber-500/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 rounded-lg px-2 py-1 text-xs font-mono font-black text-center outline-none transition-all" 
                                     />
                                     <span className="text-[10px] font-bold text-neutral-400">{rm.unit}</span>
                                   </div>
                                 </td>
-
                                 <td className="py-2.5 px-3 text-center font-mono font-black">
                                   {diff === 0 ? (
                                     <span className="text-neutral-400 font-normal">0 (बराबर)</span>
