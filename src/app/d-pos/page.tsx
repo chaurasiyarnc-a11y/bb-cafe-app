@@ -554,9 +554,9 @@ export default function BbCafeDesktopPos() {
   const [rawFormLowAlert, setRawFormLowAlert] = useState<number | ''>(5);
   const [rawFormRate, setRawFormRate] = useState<number | ''>(''); // 👉 नया: भाव (Rate) स्टेट
   const [editRawId, setEditRawId] = useState<string | null>(null);
-  
-  // 👉 NEW: Purchase Entry (माल चढ़ाने के लिए)
+ // 👉 NEW: Purchase Entry (माल चढ़ाने के लिए)
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [isScanningBill, setIsScanningBill] = useState(false); // 👈 नया AI स्कैनर स्टेट
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
   const [purchaseItemId, setPurchaseItemId] = useState('');
   const [purchaseQty, setPurchaseQty] = useState<number | ''>('');
