@@ -580,10 +580,17 @@ export default function BbCafeDesktopPos() {
     () => new Date().toISOString().split('T')[0]
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
-// 📸 AI कैमरा बिल स्कैनर और ऑटो-फ़िल
+  
+// 📸 AI कैमरा बिल स्कैनर (Direct Client-Side / No 404 Error)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) {
+      toast.error("Vercel पर NEXT_PUBLIC_GEMINI_API_KEY नहीं मिली!");
+      return;
+    }
 
     setIsScanningBill(true);
     const toastId = toast.loading("AI बिल को स्कैन और पढ़ रहा है... 🔍");
@@ -593,31 +600,62 @@ export default function BbCafeDesktopPos() {
     reader.onload = async () => {
       try {
         const base64Data = reader.result as string;
+        const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
-        const res = await fetch('/api/scan-bill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: base64Data,
-            existingRawMaterials: rawMaterials,
-          }),
-        });
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-        // सर्वर एरर या 404/500 आने पर साफ़ एरर दिखाएं
-        if (!res.ok) {
-          const errText = await res.text();
-          try {
-            const errJson = JSON.parse(errText);
-            throw new Error(errJson.error || 'सर्वर एरर');
-          } catch {
-            throw new Error(`सर्वर से गलत रिस्पॉन्स मिला (${res.status})। Vercel पर GEMINI_API_KEY चेक करें।`);
+        const rawListSimplified = Array.isArray(rawMaterials)
+          ? rawMaterials.map((r: any) => ({ id: r.id, name: r.name, unit: r.unit }))
+          : [];
+
+        const prompt = `
+          You are an expert OCR invoice scanner assistant for Bum Bum Cafe inventory.
+          Analyze this purchase receipt/invoice photo (can be printed or handwritten in Hindi or English).
+          Extract:
+          1. Vendor/Shop name (दुकानदार का नाम)
+          2. Invoice Date (in YYYY-MM-DD format, fallback to current date if missing)
+          3. Items purchased with exact quantity, unit, unit rate and total amount.
+
+          Existing cafe raw materials in database for matching:
+          ${JSON.stringify(rawListSimplified)}
+
+          Rules:
+          - Match scanned item names to existing raw materials if similar (e.g. "Doodh" -> "Milk", "Pyaz" -> "Onion"). If matched, set "rawId" to that id, otherwise set "rawId" to "".
+          - Return ONLY a pure JSON object. NO markdown, NO \`\`\`json fences, NO explanation.
+
+          Required JSON Structure:
+          {
+            "vendorName": "Vendor Name",
+            "date": "YYYY-MM-DD",
+            "items": [
+              {
+                "rawId": "matched_id_or_empty",
+                "name": "Item Name",
+                "qty": 1,
+                "unit": "Kg",
+                "rate": 10,
+                "amount": 10
+              }
+            ]
           }
-        }
+        `;
 
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
+        const result = await model.generateContent([
+          prompt,
+          {
+            inlineData: {
+              data: cleanBase64,
+              mimeType: file.type || 'image/jpeg',
+            },
+          },
+        ]);
 
-        // वेंडर और तारीख सेट करें अगर AI को मिली हो
+        const responseText = result.response.text().trim();
+        const cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const data = JSON.parse(cleanJson);
+
+        // वेंडर और तारीख सेट करें
         if (data.vendorName && !purchaseVendorName) {
           setPurchaseVendorName(data.vendorName);
         }
@@ -651,13 +689,14 @@ export default function BbCafeDesktopPos() {
 
           setPurchaseItemList((prev) => [...prev, ...mappedItems]);
           toast.dismiss(toastId);
-          toast.success(`🎉 ${mappedItems.length} आइटम स्कैन हो गए! कृपया नीचे चेक (Verify) कर लें।`);
+          toast.success(`🎉 ${mappedItems.length} आइटम स्कैन हो गए! कृपया नीचे वेरिफाई कर लें।`);
           triggerBeep('success');
         } else {
           toast.dismiss(toastId);
           toast.error("बिल में कोई स्पष्ट आइटम नहीं दिखा!");
         }
       } catch (err: any) {
+        console.error(err);
         toast.dismiss(toastId);
         toast.error("स्कैनिंग विफल: " + (err.message || 'त्रुटि आई'));
       } finally {
