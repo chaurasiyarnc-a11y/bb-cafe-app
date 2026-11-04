@@ -599,7 +599,7 @@ export default function BbCafeDesktopPos() {
         // 🚀 बिना किसी प्राइवेट Key के मुफ़्त पब्लिक API का इस्तेमाल
         const formData = new FormData();
         formData.append('base64Image', base64Image);
-        formData.append('language', 'eng'); 
+        formData.append('language', 'hin'); 
         formData.append('isOverlayRequired', 'false');
 
         // OCR.space की फ्री सर्विस (इसमें helloworld नाम की पब्लिक की चलती है)
