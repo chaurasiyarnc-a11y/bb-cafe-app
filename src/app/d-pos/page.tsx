@@ -9325,9 +9325,37 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
                     <SafeFileText size={18} /> Bulk Purchase Entry (एक साथ सारा माल चढ़ाएं)
                   </h3>
-                  <p className="text-[10px] text-neutral-500 font-bold mt-1">आइटम चुनें, लिस्ट में जोड़ें और फिर एक साथ सेव करें।</p>
+                  <p className="text-[10px] text-neutral-500 font-bold mt-1">आइटम मैन्युअली जोड़ें या 📸 AI से बिल स्कैन करें</p>
                 </div>
-                <button onClick={() => setIsPurchaseModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
+                
+                <div className="flex items-center gap-2">
+                  {/* 📸 AI Camera Scan Button */}
+                  <label 
+                    className={`bg-purple-600 hover:bg-purple-500 text-white px-3.5 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow-md cursor-pointer transition-all ${
+                      isScanningBill ? 'opacity-50 pointer-events-none' : ''
+                    }`}
+                  >
+                    {isScanningBill ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Scanning...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>📸 Scan Bill (AI)</span>
+                      </>
+                    )}
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment" 
+                      className="hidden" 
+                      onChange={handleScanBillWithCamera} 
+                    />
+                  </label>
+
+                  <button onClick={() => setIsPurchaseModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
+                </div>
               </div>
               
               {/* TOP: Input Section */}
