@@ -580,7 +580,81 @@ export default function BbCafeDesktopPos() {
     () => new Date().toISOString().split('T')[0]
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
+// 📸 AI कैमरा बिल स्कैनर और ऑटो-फ़िल
+  const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
+    setIsScanningBill(true);
+    const toastId = toast.loading("AI बिल को स्कैन और पढ़ रहा है... 🔍");
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async () => {
+      try {
+        const base64Data = reader.result as string;
+
+        const res = await fetch('/api/scan-bill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64Data,
+            existingRawMaterials: rawMaterials,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        // वेंडर और तारीख सेट करें अगर AI को मिली हो
+        if (data.vendorName && !purchaseVendorName) {
+          setPurchaseVendorName(data.vendorName);
+        }
+        if (data.date) {
+          setPurchaseDate(data.date);
+        }
+
+        // स्कैन किए गए आइटम्स को टेबल में जोड़ें
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          const mappedItems = data.items.map((scannedItem: any) => {
+            const matchedRaw = rawMaterials.find(
+              (r) =>
+                r.id === scannedItem.rawId ||
+                r.name.toLowerCase().trim() === (scannedItem.name || '').toLowerCase().trim() ||
+                r.name.toLowerCase().includes((scannedItem.name || '').toLowerCase())
+            );
+
+            const qty = Number(scannedItem.qty) || 1;
+            const rate = Number(scannedItem.rate) || 0;
+            const amount = Number(scannedItem.amount) || qty * rate;
+
+            return {
+              rawId: matchedRaw ? matchedRaw.id : (rawMaterials[0]?.id || ''),
+              name: matchedRaw ? matchedRaw.name : scannedItem.name,
+              unit: matchedRaw ? matchedRaw.unit : (scannedItem.unit || 'Kg'),
+              qty: qty,
+              rate: rate,
+              amount: amount,
+            };
+          });
+
+          setPurchaseItemList((prev) => [...prev, ...mappedItems]);
+          toast.dismiss(toastId);
+          toast.success(`🎉 ${mappedItems.length} आइटम स्कैन हो गए! कृपया नीचे चेक (Verify) कर लें।`);
+          triggerBeep('success');
+        } else {
+          toast.dismiss(toastId);
+          toast.error("बिल में कोई स्पष्ट आइटम नहीं दिखा!");
+        }
+      } catch (err: any) {
+        toast.dismiss(toastId);
+        toast.error("स्कैनिंग विफल: " + (err.message || 'त्रुटि आई'));
+      } finally {
+        setIsScanningBill(false);
+        e.target.value = '';
+      }
+    };
+  };
   const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
