@@ -602,7 +602,27 @@ export default function BbCafeDesktopPos() {
             existingRawMaterials: rawMaterials,
           }),
         });
+const res = await fetch('/api/scan-bill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64Data,
+            existingRawMaterials: rawMaterials,
+          }),
+        });
 
+        // 👈 यह चेक जोड़ें
+        if (!res.ok) {
+          const errText = await res.text();
+          try {
+            const errJson = JSON.parse(errText);
+            throw new Error(errJson.error || 'सर्वर एरर');
+          } catch {
+            throw new Error(`सर्वर से गलत रिस्पॉन्स मिला (${res.status})। Vercel पर GEMINI_API_KEY चेक करें।`);
+          }
+        }
+
+        const data = await res.json();
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
