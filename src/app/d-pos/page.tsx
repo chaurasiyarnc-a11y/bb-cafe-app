@@ -582,7 +582,7 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 AI कैमरा बिल स्कैनर (2026 Super Multi-Model Fallback)
+// 📸 AI कैमरा बिल स्कैनर (Google's Latest 3.8 Flash Model)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -602,6 +602,10 @@ export default function BbCafeDesktopPos() {
       try {
         const base64Data = reader.result as string;
         const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+
+        // 👉 Google के नए SDK का इस्तेमाल और लेटेस्ट 3.8 Flash मॉडल सेट करना
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
         const rawListSimplified = Array.isArray(rawMaterials)
           ? rawMaterials.map((r: any) => ({ id: r.id, name: r.name, unit: r.unit }))
@@ -639,62 +643,20 @@ export default function BbCafeDesktopPos() {
           }
         `;
 
-        // 🔄 2026 के सबसे ताज़ा मॉडल्स की लिस्ट (कोई न कोई 100% काम करेगा)
-        const modelsToTry = [
-          'gemini-3.8-flash',
-          'gemini-3.5-flash',
-          'gemini-3.1-pro',
-          'gemini-3.1-pro-preview',
-          'gemini-2.5-flash'
-        ];
+        // 🚀 AI को रिक्वेस्ट भेजना
+        const result = await model.generateContent([
+          promptText,
+          {
+            inlineData: {
+              data: cleanBase64,
+              mimeType: file.type || 'image/jpeg',
+            },
+          },
+        ]);
 
-        let resultData: any = null;
-        let lastErrorMsg = '';
-
-        for (const modelName of modelsToTry) {
-          try {
-            // हम v1beta एंडपॉइंट इस्तेमाल कर रहे हैं
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-            const apiRes = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    parts: [
-                      { text: promptText },
-                      {
-                        inlineData: {
-                          mimeType: file.type || 'image/jpeg',
-                          data: cleanBase64
-                        }
-                      }
-                    ]
-                  }
-                ]
-              })
-            });
-
-            if (apiRes.ok) {
-              const resJson = await apiRes.json();
-              const rawAiText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              if (rawAiText) {
-                const cleanJson = rawAiText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                resultData = JSON.parse(cleanJson);
-                break; // मॉडल से सही जवाब मिल गया! लूप यहीं रुक जाएगा।
-              }
-            } else {
-              const errBody = await apiRes.json();
-              lastErrorMsg = errBody?.error?.message || apiRes.statusText;
-            }
-          } catch (e: any) {
-            lastErrorMsg = e.message;
-          }
-        }
-
-        if (!resultData) {
-          throw new Error(lastErrorMsg || "कोई भी AI मॉडल कनेक्ट नहीं हो पाया।");
-        }
+        const responseText = result.response.text().trim();
+        const cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const resultData = JSON.parse(cleanJson);
 
         // वेंडर और तारीख सेट करें
         if (resultData.vendorName && !purchaseVendorName) {
@@ -745,7 +707,8 @@ export default function BbCafeDesktopPos() {
         e.target.value = '';
       }
     };
-  };  const handleOpenPurchaseHistory = async () => {
+  };
+  const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     setPurchaseHistoryFilter('this_month');
