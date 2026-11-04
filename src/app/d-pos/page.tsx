@@ -587,7 +587,7 @@ export default function BbCafeDesktopPos() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "AIzaSyB34U7gZ7ZxJ78I0bd3kB8ekjquZhqpUdI";
     if (!apiKey) {
       toast.error("Vercel पर NEXT_PUBLIC_GEMINI_API_KEY नहीं मिली!");
       return;
