@@ -588,7 +588,7 @@ export default function BbCafeDesktopPos() {
     if (!file) return;
 
     // 🚀 Vercel का झंझट खत्म! यहाँ अपनी असली चाबी पेस्ट करें:
-    const apiKey = "AQ.Ab8RN6Jqpj4EN6eiNuNeoJ8W94eXIeSeHlv9x_6H-kSGskiUqA"; 
+    const apiKey = "AQ.Ab8RN6KMpk4cRkR-KhyCGJ1oEVlZ2nd28jDLIETaUgWZyjZyIQ"; 
     
     if (!apiKey || apiKey.includes("यहाँ_अपनी")) {
       toast.error("कोड में API Key डालना भूल गए!");
