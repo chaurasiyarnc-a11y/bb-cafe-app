@@ -9448,15 +9448,78 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                         <th className="py-2 px-3 font-black text-center">🗑️</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                   <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
                       {purchaseItemList.map((item, idx) => (
-                        <tr key={idx} className="bg-white dark:bg-neutral-900">
-                          <td className="py-2 px-3 font-bold">{item.name}</td>
-                          <td className="py-2 px-3 text-center font-mono">{item.qty} <span className="text-[10px] text-neutral-500">{item.unit}</span></td>
-                          <td className="py-2 px-3 text-right font-mono text-neutral-500">₹{item.rate}</td>
-                          <td className="py-2 px-3 text-right font-mono font-black text-blue-600 dark:text-blue-400">₹{item.amount.toFixed(2)}</td>
+                        <tr key={idx} className="bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                          <td className="py-2 px-3 font-bold">
+                            {/* आइटम का नाम एडिटेबल */}
+                            <input 
+                              type="text" 
+                              value={item.name} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setPurchaseItemList(prev => {
+                                  const next = [...prev];
+                                  next[idx].name = val;
+                                  return next;
+                                });
+                              }}
+                              className="bg-transparent border-b border-transparent hover:border-neutral-300 focus:border-blue-500 outline-none w-full font-bold text-xs"
+                            />
+                          </td>
                           <td className="py-2 px-3 text-center">
-                            <button onClick={() => setPurchaseItemList(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-100 p-1 rounded"><SafeTrash2 size={14}/></button>
+                            {/* मात्रा (Qty) एडिटेबल */}
+                            <div className="flex items-center justify-center gap-1">
+                              <input 
+                                type="number" 
+                                step="0.001" 
+                                value={item.qty} 
+                                onChange={(e) => {
+                                  const newQty = Number(e.target.value) || 0;
+                                  setPurchaseItemList(prev => {
+                                    const next = [...prev];
+                                    next[idx].qty = newQty;
+                                    next[idx].amount = newQty * next[idx].rate;
+                                    return next;
+                                  });
+                                }}
+                                className="w-16 bg-neutral-100 dark:bg-neutral-800 rounded px-1.5 py-0.5 text-center font-mono font-bold text-xs outline-none focus:border-blue-500 border border-neutral-300 dark:border-neutral-700"
+                              />
+                              <span className="text-[10px] text-neutral-500">{item.unit}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            {/* भाव (Rate) एडिटेबल */}
+                            <div className="flex items-center justify-end gap-1">
+                              <span className="text-neutral-400 text-xs">₹</span>
+                              <input 
+                                type="number" 
+                                step="0.01" 
+                                value={item.rate} 
+                                onChange={(e) => {
+                                  const newRate = Number(e.target.value) || 0;
+                                  setPurchaseItemList(prev => {
+                                    const next = [...prev];
+                                    next[idx].rate = newRate;
+                                    next[idx].amount = next[idx].qty * newRate;
+                                    return next;
+                                  });
+                                }}
+                                className="w-16 bg-neutral-100 dark:bg-neutral-800 rounded px-1.5 py-0.5 text-right font-mono font-bold text-xs outline-none focus:border-blue-500 border border-neutral-300 dark:border-neutral-700"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono font-black text-blue-600 dark:text-blue-400">
+                            ₹{item.amount.toFixed(2)}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <button 
+                              onClick={() => setPurchaseItemList(prev => prev.filter((_, i) => i !== idx))} 
+                              className="text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 p-1 rounded transition-colors"
+                              title="हटाएँ"
+                            >
+                              <SafeTrash2 size={14}/>
+                            </button>
                           </td>
                         </tr>
                       ))}
