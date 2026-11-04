@@ -631,10 +631,12 @@ export default function BbCafeDesktopPos() {
            const lowerLine = line.toLowerCase();
            
            // चेक करें कि क्या हमारे कैफे के कच्चे माल का नाम इस लाइन में है?
-           const matchedRaw = rawMaterials.find(r => {
-             const nameWords = r.name.toLowerCase().split(' ');
-             // अगर आइटम का नाम पर्ची की लाइन में मिल जाए
-             return nameWords.some(word => word.length > 2 && lowerLine.includes(word));
+           const matchedRaw = rawMaterials.find((r: any) => {
+             // 👉 TypeScript Fix: हमने बताया कि nameWords एक String का Array है
+             const nameWords: string[] = String(r.name || '').toLowerCase().split(' ');
+             
+             // 👉 TypeScript Fix: word के आगे (word: string) लगा दिया गया है
+             return nameWords.some((word: string) => word.length > 2 && lowerLine.includes(word));
            });
 
            if (matchedRaw) {
@@ -681,8 +683,7 @@ export default function BbCafeDesktopPos() {
         e.target.value = ''; // इनपुट रीसेट
       }
     };
-  };
-  const handleOpenPurchaseHistory = async () => {
+  };  const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     setPurchaseHistoryFilter('this_month');
