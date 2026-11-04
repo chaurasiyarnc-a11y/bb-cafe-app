@@ -1,49 +1,58 @@
+// app/api/scan-bill/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 export async function POST(req: NextRequest) {
   try {
-    const { imageBase64, existingRawMaterials } = await req.json();
-
-    if (!imageBase64) {
-      return NextResponse.json({ error: 'कृपया बिल की फ़ोटो प्रदान करें' }, { status: 400 });
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'Vercel Environment Variables में GEMINI_API_KEY नहीं मिली!' },
+        { status: 500 }
+      );
     }
 
-    // gemini-1.5-flash मॉडल फास्ट और विज़न के लिए बेस्ट है
+    const body = await req.json();
+    const { imageBase64, existingRawMaterials } = body;
+
+    if (!imageBase64) {
+      return NextResponse.json({ error: 'बिल की फोटो नहीं मिली।' }, { status: 400 });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const rawListSimplified = Array.isArray(existingRawMaterials) 
-      ? existingRawMaterials.map((r: any) => ({ id: r.id, name: r.name, unit: r.unit })) 
+    const rawListSimplified = Array.isArray(existingRawMaterials)
+      ? existingRawMaterials.map((r: any) => ({ id: r.id, name: r.name, unit: r.unit }))
       : [];
 
     const prompt = `
-      You are an expert OCR & invoice parsing assistant for a restaurant/cafe inventory system.
-      Read this receipt/invoice photo carefully (it can be printed or handwritten in Hindi/English).
-      Extract the store/vendor name, invoice date, and all line items with quantity and price/rate.
+      You are an expert OCR invoice scanner assistant for a cafe inventory.
+      Analyze this purchase receipt/invoice photo (can be printed or handwritten in Hindi or English).
+      Extract:
+      1. Vendor/Shop name (दुकानदार का नाम)
+      2. Invoice Date (in YYYY-MM-DD format, fallback to current date if missing)
+      3. Items purchased with exact quantity, unit, unit rate and total amount.
 
-      Current Raw Materials in our database for matching:
+      Existing cafe raw materials in database for matching:
       ${JSON.stringify(rawListSimplified)}
 
-      Instructions:
-      1. If an extracted item matches closely with any item in the database list, set "rawId" to that matched ID. If it is new, set "rawId" to "".
-      2. If date is not found or unclear, use today's date in YYYY-MM-DD format.
-      3. Quantity and rate must be valid numbers (no currency symbols).
-      4. Return ONLY a single raw JSON object without markdown fences, without backticks, without comments.
+      Rules:
+      - Match scanned item names to existing raw materials if similar (e.g. "Doodh" -> "Milk", "Pyaz" -> "Onion"). If matched, set "rawId" to that id, otherwise set "rawId" to "".
+      - Return ONLY a pure JSON object. NO markdown, NO \`\`\`json fences, NO explanation.
 
-      Exact JSON format required:
+      Required JSON Schema:
       {
-        "vendorName": "Vendor Name here or blank",
+        "vendorName": "Vendor Name",
         "date": "YYYY-MM-DD",
         "items": [
           {
             "rawId": "matched_id_or_empty",
-            "name": "Item name in English",
+            "name": "Item Name",
             "qty": 1,
-            "unit": "Kg/Ltr/Pcs/Gram/Box",
-            "rate": 0,
-            "amount": 0
+            "unit": "Kg",
+            "rate": 10,
+            "amount": 10
           }
         ]
       }
@@ -61,15 +70,15 @@ export async function POST(req: NextRequest) {
       },
     ]);
 
-    const rawText = result.response.text().trim();
-    const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsedData = JSON.parse(cleanJson);
+    const text = result.response.text().trim();
+    const cleanJson = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
 
-    return NextResponse.json(parsedData);
+    return NextResponse.json(parsed);
   } catch (error: any) {
-    console.error('Bill Scan Error:', error);
+    console.error('Scan Bill Error:', error);
     return NextResponse.json(
-      { error: error?.message || 'बिल स्कैन करने में समस्या आई' },
+      { error: error?.message || 'बिल पढ़ने में समस्या आई।' },
       { status: 500 }
     );
   }
