@@ -582,15 +582,16 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 AI कैमरा बिल स्कैनर (100% Secure & Stable Model)
+// 📸 AI कैमरा बिल स्कैनर (Direct Key Method - 100% Working)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // ⚠️ यहाँ सिर्फ Environment Variable यूज़ होगा, कोई असली Key नहीं लिखी जाएगी!
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) {
-      toast.error("Vercel पर NEXT_PUBLIC_GEMINI_API_KEY नहीं मिली!");
+    // 🚀 Vercel का झंझट खत्म! यहाँ अपनी असली चाबी पेस्ट करें:
+    const apiKey = "यहाँ_अपनी_AIzaSy_वाली_चाबी_पेस्ट_करें"; 
+    
+    if (!apiKey || apiKey.includes("यहाँ_अपनी")) {
+      toast.error("कोड में API Key डालना भूल गए!");
       return;
     }
 
@@ -603,11 +604,6 @@ export default function BbCafeDesktopPos() {
       try {
         const base64Data = reader.result as string;
         const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
-
-        // 👉 Google के नए SDK का इस्तेमाल
-        const genAI = new GoogleGenerativeAI(apiKey);
-        // सबसे स्टेबल और फास्ट मॉडल
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         const rawListSimplified = Array.isArray(rawMaterials)
           ? rawMaterials.map((r: any) => ({ id: r.id, name: r.name, unit: r.unit }))
@@ -645,30 +641,58 @@ export default function BbCafeDesktopPos() {
           }
         `;
 
-        // 🚀 AI को रिक्वेस्ट भेजना
-        const result = await model.generateContent([
-          promptText,
-          {
-            inlineData: {
-              data: cleanBase64,
-              mimeType: file.type || 'image/jpeg',
-            },
-          },
-        ]);
+        // 🔄 सबसे स्टेबल मॉडल इस्तेमाल कर रहे हैं
+        const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+        let resultData: any = null;
+        let lastErrorMsg = '';
 
-        const responseText = result.response.text().trim();
-        const cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const resultData = JSON.parse(cleanJson);
+        for (const modelName of modelsToTry) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            const apiRes = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      { text: promptText },
+                      {
+                        inlineData: {
+                          mimeType: file.type || 'image/jpeg',
+                          data: cleanBase64
+                        }
+                      }
+                    ]
+                  }
+                ]
+              })
+            });
 
-        // वेंडर और तारीख सेट करें
-        if (resultData.vendorName && !purchaseVendorName) {
-          setPurchaseVendorName(resultData.vendorName);
+            if (apiRes.ok) {
+              const resJson = await apiRes.json();
+              const rawAiText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              if (rawAiText) {
+                const cleanJson = rawAiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                resultData = JSON.parse(cleanJson);
+                break; // मॉडल से सही जवाब मिल गया!
+              }
+            } else {
+              const errBody = await apiRes.json();
+              lastErrorMsg = errBody?.error?.message || apiRes.statusText;
+            }
+          } catch (e: any) {
+            lastErrorMsg = e.message;
+          }
         }
-        if (resultData.date) {
-          setPurchaseDate(resultData.date);
+
+        if (!resultData) {
+          throw new Error(lastErrorMsg || "कोई भी AI मॉडल कनेक्ट नहीं हो पाया।");
         }
 
-        // स्कैन किए गए आइटम्स को टेबल में जोड़ें
+        if (resultData.vendorName && !purchaseVendorName) setPurchaseVendorName(resultData.vendorName);
+        if (resultData.date) setPurchaseDate(resultData.date);
+
         if (Array.isArray(resultData.items) && resultData.items.length > 0) {
           const mappedItems = resultData.items.map((scannedItem: any) => {
             const matchedRaw = rawMaterials.find(
@@ -709,8 +733,7 @@ export default function BbCafeDesktopPos() {
         e.target.value = '';
       }
     };
-  };
-  const handleOpenPurchaseHistory = async () => {
+  };  const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     setPurchaseHistoryFilter('this_month');
