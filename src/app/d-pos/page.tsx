@@ -582,7 +582,7 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 AI कैमरा बिल स्कैनर (Gemini 3.1 Pro Preview Model)
+// 📸 AI कैमरा बिल स्कैनर (2026 Super Multi-Model Fallback)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -639,13 +639,21 @@ export default function BbCafeDesktopPos() {
           }
         `;
 
-        // 🔄 यहाँ आपका नया मॉडल gemini-3.1-pro-preview डाल दिया गया है!
-        const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+        // 🔄 2026 के सबसे ताज़ा मॉडल्स की लिस्ट (कोई न कोई 100% काम करेगा)
+        const modelsToTry = [
+          'gemini-3.8-flash',
+          'gemini-3.5-flash',
+          'gemini-3.1-pro',
+          'gemini-3.1-pro-preview',
+          'gemini-2.5-flash'
+        ];
+
         let resultData: any = null;
         let lastErrorMsg = '';
 
         for (const modelName of modelsToTry) {
           try {
+            // हम v1beta एंडपॉइंट इस्तेमाल कर रहे हैं
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
             const apiRes = await fetch(url, {
               method: 'POST',
@@ -673,7 +681,7 @@ export default function BbCafeDesktopPos() {
               if (rawAiText) {
                 const cleanJson = rawAiText.replace(/```json/gi, '').replace(/```/g, '').trim();
                 resultData = JSON.parse(cleanJson);
-                break; // मॉडल से सही जवाब मिल गया!
+                break; // मॉडल से सही जवाब मिल गया! लूप यहीं रुक जाएगा।
               }
             } else {
               const errBody = await apiRes.json();
@@ -685,7 +693,7 @@ export default function BbCafeDesktopPos() {
         }
 
         if (!resultData) {
-          throw new Error(lastErrorMsg || "AI मॉडल से रिस्पॉन्स नहीं मिला।");
+          throw new Error(lastErrorMsg || "कोई भी AI मॉडल कनेक्ट नहीं हो पाया।");
         }
 
         // वेंडर और तारीख सेट करें
@@ -737,8 +745,7 @@ export default function BbCafeDesktopPos() {
         e.target.value = '';
       }
     };
-  };
-  const handleOpenPurchaseHistory = async () => {
+  };  const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     setPurchaseHistoryFilter('this_month');
