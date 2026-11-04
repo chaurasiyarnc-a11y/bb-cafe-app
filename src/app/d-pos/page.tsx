@@ -582,7 +582,7 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 AI कैमरा बिल स्कैनर (Direct REST API / 100% Tested Model)
+// 📸 AI कैमरा बिल स्कैनर (Gemini 3.1 Pro Preview Model)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -639,14 +639,8 @@ export default function BbCafeDesktopPos() {
           }
         `;
 
-        // 🔄 मॉडल की सही लिस्ट (Google के आधिकारिक नाम)
-        const modelsToTry = [
-          'gemini-1.5-flash',
-          'gemini-1.5-flash-8b',
-          'gemini-2.0-flash',
-          'gemini-1.5-pro'
-        ];
-
+        // 🔄 यहाँ आपका नया मॉडल gemini-3.1-pro-preview डाल दिया गया है!
+        const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash'];
         let resultData: any = null;
         let lastErrorMsg = '';
 
@@ -743,7 +737,7 @@ export default function BbCafeDesktopPos() {
         e.target.value = '';
       }
     };
-  }; 
+  };
   const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
