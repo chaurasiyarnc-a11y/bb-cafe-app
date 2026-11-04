@@ -582,29 +582,7 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 AI कैमरा बिल स्कैनर (Direct Client-Side / No 404 Error)
-  const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "AIzaSyB34U7gZ7ZxJ78I0bd3kB8ekjquZhqpUdI";
-    if (!apiKey) {
-      toast.error("Vercel पर NEXT_PUBLIC_GEMINI_API_KEY नहीं मिली!");
-      return;
-    }
-
-    setIsScanningBill(true);
-    const toastId = toast.loading("AI बिल को स्कैन और पढ़ रहा है... 🔍");
-
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = async () => {
-      try {
-        const base64Data = reader.result as string;
-        const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
-
-        const genAI = new GoogleGenerativeAI(apiKey);
-        // 📸 AI कैमरा बिल स्कैनर (Multi-Model Auto Fallback)
+// 📸 AI कैमरा बिल स्कैनर (Clean, Direct & Multi-Model Auto Fallback)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -663,15 +641,15 @@ export default function BbCafeDesktopPos() {
           }
         `;
 
-        // 🔄 ऑटो मॉडल सेलेक्टर (जो मॉडल एक्टिव होगा उससे तुरंत स्कैन हो जाएगा)
-        const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
-        let result = null;
-        let lastError = null;
+        // 🔄 मॉडल चयन: पहले 2.0-flash / 2.5-flash ट्राय करेगा, फिर 1.5
+        const candidateModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash-latest'];
+        let result: any = null;
+        let lastError: any = null;
 
         for (const modelName of candidateModels) {
           try {
-            const model = genAI.getGenerativeModel({ model: modelName });
-            result = await model.generateContent([
+            const currentModel = genAI.getGenerativeModel({ model: modelName });
+            result = await currentModel.generateContent([
               prompt,
               {
                 inlineData: {
@@ -680,15 +658,14 @@ export default function BbCafeDesktopPos() {
                 },
               },
             ]);
-            if (result) break; // स्कैन सफल हुआ
+            if (result) break;
           } catch (mErr: any) {
             lastError = mErr;
-            continue; // अगला मॉडल ट्राई करो
           }
         }
 
         if (!result) {
-          throw lastError || new Error("कोई भी AI मॉडल कनेक्ट नहीं हो पाया।");
+          throw lastError || new Error("AI मॉडल कनेक्ट नहीं हो पाया।");
         }
 
         const responseText = result.response.text().trim();
@@ -744,109 +721,7 @@ export default function BbCafeDesktopPos() {
         e.target.value = '';
       }
     };
-  };
-
-        const rawListSimplified = Array.isArray(rawMaterials)
-          ? rawMaterials.map((r: any) => ({ id: r.id, name: r.name, unit: r.unit }))
-          : [];
-
-        const prompt = `
-          You are an expert OCR invoice scanner assistant for Bum Bum Cafe inventory.
-          Analyze this purchase receipt/invoice photo (can be printed or handwritten in Hindi or English).
-          Extract:
-          1. Vendor/Shop name (दुकानदार का नाम)
-          2. Invoice Date (in YYYY-MM-DD format, fallback to current date if missing)
-          3. Items purchased with exact quantity, unit, unit rate and total amount.
-
-          Existing cafe raw materials in database for matching:
-          ${JSON.stringify(rawListSimplified)}
-
-          Rules:
-          - Match scanned item names to existing raw materials if similar (e.g. "Doodh" -> "Milk", "Pyaz" -> "Onion"). If matched, set "rawId" to that id, otherwise set "rawId" to "".
-          - Return ONLY a pure JSON object. NO markdown, NO \`\`\`json fences, NO explanation.
-
-          Required JSON Structure:
-          {
-            "vendorName": "Vendor Name",
-            "date": "YYYY-MM-DD",
-            "items": [
-              {
-                "rawId": "matched_id_or_empty",
-                "name": "Item Name",
-                "qty": 1,
-                "unit": "Kg",
-                "rate": 10,
-                "amount": 10
-              }
-            ]
-          }
-        `;
-
-        const result = await model.generateContent([
-          prompt,
-          {
-            inlineData: {
-              data: cleanBase64,
-              mimeType: file.type || 'image/jpeg',
-            },
-          },
-        ]);
-
-        const responseText = result.response.text().trim();
-        const cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const data = JSON.parse(cleanJson);
-
-        // वेंडर और तारीख सेट करें
-        if (data.vendorName && !purchaseVendorName) {
-          setPurchaseVendorName(data.vendorName);
-        }
-        if (data.date) {
-          setPurchaseDate(data.date);
-        }
-
-        // स्कैन किए गए आइटम्स को टेबल में जोड़ें
-        if (Array.isArray(data.items) && data.items.length > 0) {
-          const mappedItems = data.items.map((scannedItem: any) => {
-            const matchedRaw = rawMaterials.find(
-              (r) =>
-                r.id === scannedItem.rawId ||
-                r.name.toLowerCase().trim() === (scannedItem.name || '').toLowerCase().trim() ||
-                r.name.toLowerCase().includes((scannedItem.name || '').toLowerCase())
-            );
-
-            const qty = Number(scannedItem.qty) || 1;
-            const rate = Number(scannedItem.rate) || 0;
-            const amount = Number(scannedItem.amount) || qty * rate;
-
-            return {
-              rawId: matchedRaw ? matchedRaw.id : (rawMaterials[0]?.id || ''),
-              name: matchedRaw ? matchedRaw.name : scannedItem.name,
-              unit: matchedRaw ? matchedRaw.unit : (scannedItem.unit || 'Kg'),
-              qty: qty,
-              rate: rate,
-              amount: amount,
-            };
-          });
-
-          setPurchaseItemList((prev) => [...prev, ...mappedItems]);
-          toast.dismiss(toastId);
-          toast.success(`🎉 ${mappedItems.length} आइटम स्कैन हो गए! कृपया नीचे वेरिफाई कर लें।`);
-          triggerBeep('success');
-        } else {
-          toast.dismiss(toastId);
-          toast.error("बिल में कोई स्पष्ट आइटम नहीं दिखा!");
-        }
-      } catch (err: any) {
-        console.error(err);
-        toast.dismiss(toastId);
-        toast.error("स्कैनिंग विफल: " + (err.message || 'त्रुटि आई'));
-      } finally {
-        setIsScanningBill(false);
-        e.target.value = '';
-      }
-    };
-  };
-  const handleOpenPurchaseHistory = async () => {
+  };  const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     setPurchaseHistoryFilter('this_month');
