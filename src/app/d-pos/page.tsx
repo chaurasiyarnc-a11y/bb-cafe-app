@@ -582,158 +582,107 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 AI कैमरा बिल स्कैनर (Direct Key Method - 100% Working)
+// 📸 मुफ़्त स्कैनर (NO API KEY REQUIRED - 100% FREE)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 🚀 Vercel का झंझट खत्म! यहाँ अपनी असली चाबी पेस्ट करें:
-    const apiKey = "AQ.Ab8RN6KMpk4cRkR-KhyCGJ1oEVlZ2nd28jDLIETaUgWZyjZyIQ"; 
-    
-    if (!apiKey || apiKey.includes("यहाँ_अपनी")) {
-      toast.error("कोड में API Key डालना भूल गए!");
-      return;
-    }
-
     setIsScanningBill(true);
-    const toastId = toast.loading("AI बिल को स्कैन और पढ़ रहा है... 🔍");
+    const toastId = toast.loading("मुफ़्त स्कैनर से बिल पढ़ा जा रहा है... 🔍");
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
-        const base64Data = reader.result as string;
-        const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+        const base64Image = reader.result as string;
 
-        const rawListSimplified = Array.isArray(rawMaterials)
-          ? rawMaterials.map((r: any) => ({ id: r.id, name: r.name, unit: r.unit }))
-          : [];
+        // 🚀 बिना किसी प्राइवेट Key के मुफ़्त पब्लिक API का इस्तेमाल
+        const formData = new FormData();
+        formData.append('base64Image', base64Image);
+        formData.append('language', 'eng'); 
+        formData.append('isOverlayRequired', 'false');
 
-        const promptText = `
-          You are an expert OCR invoice scanner assistant for Bum Bum Cafe inventory.
-          Analyze this purchase receipt/invoice photo (can be printed or handwritten in Hindi or English).
-          Extract:
-          1. Vendor/Shop name (दुकानदार का नाम)
-          2. Invoice Date (in YYYY-MM-DD format, fallback to current date if missing)
-          3. Items purchased with exact quantity, unit, unit rate and total amount.
+        // OCR.space की फ्री सर्विस (इसमें helloworld नाम की पब्लिक की चलती है)
+        const response = await fetch('https://api.ocr.space/parse/image', {
+          method: 'POST',
+          headers: {
+            'apikey': 'helloworld', 
+          },
+          body: formData,
+        });
 
-          Existing cafe raw materials in database for matching:
-          ${JSON.stringify(rawListSimplified)}
-
-          Rules:
-          - Match scanned item names to existing raw materials if similar (e.g. "Doodh" -> "Milk", "Pyaz" -> "Onion"). If matched, set "rawId" to that id, otherwise set "rawId" to "".
-          - Return ONLY a pure JSON object. NO markdown, NO \`\`\`json fences, NO explanation.
-
-          Required JSON Structure:
-          {
-            "vendorName": "Vendor Name",
-            "date": "YYYY-MM-DD",
-            "items": [
-              {
-                "rawId": "matched_id_or_empty",
-                "name": "Item Name",
-                "qty": 1,
-                "unit": "Kg",
-                "rate": 10,
-                "amount": 10
-              }
-            ]
-          }
-        `;
-
-        // 🔄 सबसे स्टेबल मॉडल इस्तेमाल कर रहे हैं
-        const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash'];
-        let resultData: any = null;
-        let lastErrorMsg = '';
-
-        for (const modelName of modelsToTry) {
-          try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-            const apiRes = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    parts: [
-                      { text: promptText },
-                      {
-                        inlineData: {
-                          mimeType: file.type || 'image/jpeg',
-                          data: cleanBase64
-                        }
-                      }
-                    ]
-                  }
-                ]
-              })
-            });
-
-            if (apiRes.ok) {
-              const resJson = await apiRes.json();
-              const rawAiText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              if (rawAiText) {
-                const cleanJson = rawAiText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                resultData = JSON.parse(cleanJson);
-                break; // मॉडल से सही जवाब मिल गया!
-              }
-            } else {
-              const errBody = await apiRes.json();
-              lastErrorMsg = errBody?.error?.message || apiRes.statusText;
-            }
-          } catch (e: any) {
-            lastErrorMsg = e.message;
-          }
+        const ocrResult = await response.json();
+        
+        if (ocrResult.IsErroredOnProcessing) {
+           throw new Error("बिल साफ़ नहीं है या बहुत बड़ा है।");
         }
 
-        if (!resultData) {
-          throw new Error(lastErrorMsg || "कोई भी AI मॉडल कनेक्ट नहीं हो पाया।");
+        const parsedText = ocrResult.ParsedResults?.[0]?.ParsedText || "";
+
+        if (!parsedText) {
+           throw new Error("पर्ची में कोई टेक्स्ट नहीं मिला!");
         }
 
-        if (resultData.vendorName && !purchaseVendorName) setPurchaseVendorName(resultData.vendorName);
-        if (resultData.date) setPurchaseDate(resultData.date);
+        // 🧠 हमारा अपना स्मार्ट जुगाड़ (टेक्स्ट में से आइटम ढूँढना)
+        const lines = parsedText.split('\n');
+        const foundItems: any[] = [];
 
-        if (Array.isArray(resultData.items) && resultData.items.length > 0) {
-          const mappedItems = resultData.items.map((scannedItem: any) => {
-            const matchedRaw = rawMaterials.find(
-              (r) =>
-                r.id === scannedItem.rawId ||
-                r.name.toLowerCase().trim() === (scannedItem.name || '').toLowerCase().trim() ||
-                r.name.toLowerCase().includes((scannedItem.name || '').toLowerCase())
-            );
+        for (const line of lines) {
+           const lowerLine = line.toLowerCase();
+           
+           // चेक करें कि क्या हमारे कैफे के कच्चे माल का नाम इस लाइन में है?
+           const matchedRaw = rawMaterials.find(r => {
+             const nameWords = r.name.toLowerCase().split(' ');
+             // अगर आइटम का नाम पर्ची की लाइन में मिल जाए
+             return nameWords.some(word => word.length > 2 && lowerLine.includes(word));
+           });
 
-            const qty = Number(scannedItem.qty) || 1;
-            const rate = Number(scannedItem.rate) || 0;
-            const amount = Number(scannedItem.amount) || qty * rate;
+           if (matchedRaw) {
+             // लाइन में से नंबर (मात्रा और भाव) निकालने की कोशिश
+             const numbers = line.match(/\d+(\.\d+)?/g);
+             let qty = 1;
+             let rate = matchedRaw.lastRate || 0; // पुराना भाव उठा लेगा
 
-            return {
-              rawId: matchedRaw ? matchedRaw.id : (rawMaterials[0]?.id || ''),
-              name: matchedRaw ? matchedRaw.name : scannedItem.name,
-              unit: matchedRaw ? matchedRaw.unit : (scannedItem.unit || 'Kg'),
-              qty: qty,
-              rate: rate,
-              amount: amount,
-            };
-          });
+             // अगर पर्ची में 2 या 3 नंबर लिखे हैं, तो उन्हें मात्रा और भाव मान लेगा
+             if (numbers && numbers.length >= 1) {
+               qty = Number(numbers[0]);
+               if (numbers.length >= 2) {
+                  rate = Number(numbers[1]);
+               }
+             }
 
-          setPurchaseItemList((prev) => [...prev, ...mappedItems]);
-          toast.dismiss(toastId);
-          toast.success(`🎉 ${mappedItems.length} आइटम स्कैन हो गए! कृपया नीचे चेक (Verify) कर लें।`);
-          triggerBeep('success');
+             foundItems.push({
+               rawId: matchedRaw.id,
+               name: matchedRaw.name,
+               unit: matchedRaw.unit,
+               qty: qty,
+               rate: rate,
+               amount: qty * rate
+             });
+           }
+        }
+
+        if (foundItems.length > 0) {
+           setPurchaseItemList((prev) => [...prev, ...foundItems]);
+           toast.dismiss(toastId);
+           toast.success(`🎉 ${foundItems.length} आइटम मिल गए! (मुफ़्त स्कैनर द्वारा)`);
+           triggerBeep('success');
         } else {
-          toast.dismiss(toastId);
-          toast.error("बिल में कोई स्पष्ट आइटम नहीं दिखा!");
+           toast.dismiss(toastId);
+           toast.error("पर्ची में कोई ऐसा आइटम नहीं मिला जो आपके स्टॉक लिस्ट में हो!");
         }
+
       } catch (err: any) {
         console.error(err);
         toast.dismiss(toastId);
         toast.error("स्कैनिंग विफल: " + (err.message || 'त्रुटि आई'));
       } finally {
         setIsScanningBill(false);
-        e.target.value = '';
+        e.target.value = ''; // इनपुट रीसेट
       }
     };
-  };  const handleOpenPurchaseHistory = async () => {
+  };
+  const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     setPurchaseHistoryFilter('this_month');
