@@ -582,12 +582,13 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 AI कैमरा बिल स्कैनर (Google's Latest 3.8 Flash Model)
+// 📸 AI कैमरा बिल स्कैनर (100% Secure & Stable Model)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "AIzaSyB34U7gZ7ZxJ78I0bd3kB8ekjquZhqpUdI";
+    // ⚠️ यहाँ सिर्फ Environment Variable यूज़ होगा, कोई असली Key नहीं लिखी जाएगी!
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) {
       toast.error("Vercel पर NEXT_PUBLIC_GEMINI_API_KEY नहीं मिली!");
       return;
@@ -603,9 +604,10 @@ export default function BbCafeDesktopPos() {
         const base64Data = reader.result as string;
         const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
-        // 👉 Google के नए SDK का इस्तेमाल और लेटेस्ट 3.8 Flash मॉडल सेट करना
+        // 👉 Google के नए SDK का इस्तेमाल
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+        // सबसे स्टेबल और फास्ट मॉडल
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         const rawListSimplified = Array.isArray(rawMaterials)
           ? rawMaterials.map((r: any) => ({ id: r.id, name: r.name, unit: r.unit }))
