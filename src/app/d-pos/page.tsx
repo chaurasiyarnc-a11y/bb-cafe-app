@@ -582,7 +582,7 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 AI कैमरा बिल स्कैनर (Clean, Direct & Multi-Model Auto Fallback)
+// 📸 AI कैमरा बिल स्कैनर (Direct REST API / 100% Tested Model)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -603,13 +603,11 @@ export default function BbCafeDesktopPos() {
         const base64Data = reader.result as string;
         const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
-        const genAI = new GoogleGenerativeAI(apiKey);
-
         const rawListSimplified = Array.isArray(rawMaterials)
           ? rawMaterials.map((r: any) => ({ id: r.id, name: r.name, unit: r.unit }))
           : [];
 
-        const prompt = `
+        const promptText = `
           You are an expert OCR invoice scanner assistant for Bum Bum Cafe inventory.
           Analyze this purchase receipt/invoice photo (can be printed or handwritten in Hindi or English).
           Extract:
@@ -641,48 +639,72 @@ export default function BbCafeDesktopPos() {
           }
         `;
 
-        // 🔄 मॉडल चयन: पहले 2.0-flash / 2.5-flash ट्राय करेगा, फिर 1.5
-        const candidateModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash-latest'];
-        let result: any = null;
-        let lastError: any = null;
+        // 🔄 मॉडल की सही लिस्ट (Google के आधिकारिक नाम)
+        const modelsToTry = [
+          'gemini-1.5-flash',
+          'gemini-1.5-flash-8b',
+          'gemini-2.0-flash',
+          'gemini-1.5-pro'
+        ];
 
-        for (const modelName of candidateModels) {
+        let resultData: any = null;
+        let lastErrorMsg = '';
+
+        for (const modelName of modelsToTry) {
           try {
-            const currentModel = genAI.getGenerativeModel({ model: modelName });
-            result = await currentModel.generateContent([
-              prompt,
-              {
-                inlineData: {
-                  data: cleanBase64,
-                  mimeType: file.type || 'image/jpeg',
-                },
-              },
-            ]);
-            if (result) break;
-          } catch (mErr: any) {
-            lastError = mErr;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            const apiRes = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      { text: promptText },
+                      {
+                        inlineData: {
+                          mimeType: file.type || 'image/jpeg',
+                          data: cleanBase64
+                        }
+                      }
+                    ]
+                  }
+                ]
+              })
+            });
+
+            if (apiRes.ok) {
+              const resJson = await apiRes.json();
+              const rawAiText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              if (rawAiText) {
+                const cleanJson = rawAiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                resultData = JSON.parse(cleanJson);
+                break; // मॉडल से सही जवाब मिल गया!
+              }
+            } else {
+              const errBody = await apiRes.json();
+              lastErrorMsg = errBody?.error?.message || apiRes.statusText;
+            }
+          } catch (e: any) {
+            lastErrorMsg = e.message;
           }
         }
 
-        if (!result) {
-          throw lastError || new Error("AI मॉडल कनेक्ट नहीं हो पाया।");
+        if (!resultData) {
+          throw new Error(lastErrorMsg || "AI मॉडल से रिस्पॉन्स नहीं मिला।");
         }
-
-        const responseText = result.response.text().trim();
-        const cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const data = JSON.parse(cleanJson);
 
         // वेंडर और तारीख सेट करें
-        if (data.vendorName && !purchaseVendorName) {
-          setPurchaseVendorName(data.vendorName);
+        if (resultData.vendorName && !purchaseVendorName) {
+          setPurchaseVendorName(resultData.vendorName);
         }
-        if (data.date) {
-          setPurchaseDate(data.date);
+        if (resultData.date) {
+          setPurchaseDate(resultData.date);
         }
 
         // स्कैन किए गए आइटम्स को टेबल में जोड़ें
-        if (Array.isArray(data.items) && data.items.length > 0) {
-          const mappedItems = data.items.map((scannedItem: any) => {
+        if (Array.isArray(resultData.items) && resultData.items.length > 0) {
+          const mappedItems = resultData.items.map((scannedItem: any) => {
             const matchedRaw = rawMaterials.find(
               (r) =>
                 r.id === scannedItem.rawId ||
@@ -721,7 +743,8 @@ export default function BbCafeDesktopPos() {
         e.target.value = '';
       }
     };
-  };  const handleOpenPurchaseHistory = async () => {
+  }; 
+  const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     setPurchaseHistoryFilter('this_month');
