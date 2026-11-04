@@ -602,16 +602,8 @@ export default function BbCafeDesktopPos() {
             existingRawMaterials: rawMaterials,
           }),
         });
-const res = await fetch('/api/scan-bill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: base64Data,
-            existingRawMaterials: rawMaterials,
-          }),
-        });
 
-        // 👈 यह चेक जोड़ें
+        // सर्वर एरर या 404/500 आने पर साफ़ एरर दिखाएं
         if (!res.ok) {
           const errText = await res.text();
           try {
@@ -622,7 +614,6 @@ const res = await fetch('/api/scan-bill', {
           }
         }
 
-        const data = await res.json();
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
