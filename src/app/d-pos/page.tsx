@@ -589,7 +589,7 @@ export default function BbCafeDesktopPos() {
 
     // Gemini API Key (आपको इसे Google AI Studio से फ्री में बनाना होगा)
     // बेहतर होगा कि आप इसे .env.local फ़ाइल में NEXT_PUBLIC_GEMINI_API_KEY के नाम से रखें
-    const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "यहाँ_अपनी_API_KEY_डालें"; 
+    const GEMINI_API_KEY = AQ.Ab8RN6JxvAsmVeshnvkmnd5eqa7Uc_DjgPqIT9DhqzQaQgrWZg 
     
     if (!GEMINI_API_KEY || GEMINI_API_KEY === "यहाँ_अपनी_API_KEY_डालें") {
       return toast.error("कृपया पहले Google Gemini API Key सेट करें!");
