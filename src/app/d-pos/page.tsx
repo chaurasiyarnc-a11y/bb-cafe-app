@@ -624,7 +624,7 @@ export default function BbCafeDesktopPos() {
             "Authorization": `Bearer ${GROQ_API_KEY}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({model: "llama-3.2-11b-vision-preview", // Groq का लेटेस्ट विज़न मॉडल
+          body: JSON.stringify({model: "llama-3.2-90b-vision-instruct", // Groq का लेटेस्ट विज़न मॉडल
             messages: [
               {
                 role: "user",
