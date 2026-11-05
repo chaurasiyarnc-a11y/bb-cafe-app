@@ -582,26 +582,28 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 NEW AI SCANNER (USING GROQ - LLAMA 3 VISION) - 100% FREE & FAST
+// 📸 PRO AI SCANNER (GOOGLE GEMINI 1.5 FLASH - UPDATED FOR 'AQ.' KEYS)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 👇 आपकी असली Groq API Key यहाँ सेट कर दी गई है
-    const GROQ_API_KEY = "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"; 
+    // 👇 यहाँ अपनी Google AI Studio वाली Key पेस्ट करें (चाहे वो AQ. से शुरू हो या AIza से)
+    const GEMINI_API_KEY = "AQ.Ab8RN6LGg831BiSmzoHGgunjjfxDinL5C9dFe022jzWHFko8zg"; 
 
-    if (!GROQ_API_KEY || !GROQ_API_KEY.startsWith("gsk_")) {
-      return toast.error("❌ गलत API Key! आपकी Key 'gsk_' से शुरू होनी चाहिए।");
+    if (!GEMINI_API_KEY) {
+      return toast.error("❌ कृपया API Key डालें!");
     }
 
     setIsScanningBill(true);
-    const toastId = toast.loading("🤖 नया AI (Groq) आपकी पर्ची पढ़ रहा है...");
+    const toastId = toast.loading("🤖 Google AI आपकी पर्ची पढ़ रहा है (हैंडराइटिंग स्कैन चालू)...");
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         const base64Image = reader.result as string;
+        // Base64 स्ट्रिंग से "data:image/jpeg;base64," वाला हिस्सा हटाना
+        const base64Data = base64Image.split(',')[1]; 
 
         const prompt = `
           You are an expert AI assistant for a cafe inventory system.
@@ -617,35 +619,32 @@ export default function BbCafeDesktopPos() {
           2. If rate is missing, put 0.
         `;
 
-        // 🚀 डायरेक्ट Groq AI API को कॉल
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${GROQ_API_KEY}`,
-            "Content-Type": "application/json"
+        // 🚀 डायरेक्ट Google Gemini API को कॉल (नए 'x-goog-api-key' हैडर के साथ जो AQ. keys को सपोर्ट करता है)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-goog-api-key': GEMINI_API_KEY // 👈 यह नया तरीका हर Key को सपोर्ट करेगा
           },
-          body: JSON.stringify({model: "llama-3.2-90b-vision-instruct", // Groq का लेटेस्ट विज़न मॉडल
-            messages: [
-              {
-                role: "user",
-                content: [
-                  { type: "text", text: prompt },
-                  { type: "image_url", image_url: { url: base64Image } }
-                ]
-              }
-            ],
-            temperature: 0.1
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: prompt },
+                { inlineData: { mimeType: file.type, data: base64Data } }
+              ]
+            }]
           })
         });
 
         const result = await response.json();
-
-        // अगर Groq से कोई एरर आता है
+        
         if (result.error) {
-           throw new Error(result.error.message || "AI Error");
+           throw new Error(result.error.message || "Google API Error");
         }
 
-        const responseText = result.choices?.[0]?.message?.content || "";
+        const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
         
         // AI का आउटपुट JSON में साफ़ करना
         const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -668,7 +667,6 @@ export default function BbCafeDesktopPos() {
         for (const aiItem of extractedItems) {
            const aiName = String(aiItem.name || '').toLowerCase();
            
-           // चेक करें कि क्या AI का निकाला नाम आपके स्टॉक में मौजूद है
            const matchedRaw = rawMaterials.find((r: any) => {
              const rawName = String(r.name || '').toLowerCase();
              return rawName.includes(aiName) || aiName.includes(rawName);
