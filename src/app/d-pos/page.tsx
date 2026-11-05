@@ -582,26 +582,27 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 PRO AI SCANNER (DIRECT REST API - 100% WORKING)
+// 📸 NEW AI SCANNER (USING GROQ - LLAMA 3 VISION) - 100% FREE & FAST
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 👇 आपकी नई AQ. वाली Key एकदम सही है, हम डायरेक्ट API कॉल करेंगे!
-    const GEMINI_API_KEY = "AQ.Ab8RN6LGg831BiSmzoHGgunjjfxDinL5C9dFe022jzWHFko8zg"; 
+    // 👇 आपकी असली Groq API Key यहाँ सेट कर दी गई है
+    const GROQ_API_KEY = "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"; 
+
+    if (!GROQ_API_KEY || !GROQ_API_KEY.startsWith("gsk_")) {
+      return toast.error("❌ गलत API Key! आपकी Key 'gsk_' से शुरू होनी चाहिए।");
+    }
 
     setIsScanningBill(true);
-    const toastId = toast.loading("🤖 AI आपकी पर्ची पढ़ रहा है (हैंडराइटिंग स्कैन चालू)...");
+    const toastId = toast.loading("🤖 नया AI (Groq) आपकी पर्ची पढ़ रहा है...");
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         const base64Image = reader.result as string;
-        // Base64 स्ट्रिंग से "data:image/jpeg;base64," वाला हिस्सा हटाना ज़रूरी है
-        const base64Data = base64Image.split(',')[1]; 
 
-        // AI को कड़क निर्देश (Prompt)
         const prompt = `
           You are an expert AI assistant for a cafe inventory system.
           Look at this handwritten or printed raw material purchase bill (parchi). 
@@ -614,35 +615,40 @@ export default function BbCafeDesktopPos() {
           Rules:
           1. If quantity is missing, assume 1.
           2. If rate is missing, put 0.
-          3. Clean up the item names (translate Hindi names to English if possible, or keep as is).
         `;
 
-        // 🚀 बिना किसी SDK/Package के डायरेक्ट Google API को कॉल
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-        
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        // 🚀 डायरेक्ट Groq AI API को कॉल
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${GROQ_API_KEY}`,
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: prompt },
-                { inlineData: { mimeType: file.type, data: base64Data } }
-              ]
-            }]
+            model: "llama-3.2-90b-vision-preview", // Groq का लेटेस्ट विज़न मॉडल
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: prompt },
+                  { type: "image_url", image_url: { url: base64Image } }
+                ]
+              }
+            ],
+            temperature: 0.1
           })
         });
 
         const result = await response.json();
-        
-        // अगर Google से कोई एरर आता है
+
+        // अगर Groq से कोई एरर आता है
         if (result.error) {
-           throw new Error(result.error.message || "Google API Error");
+           throw new Error(result.error.message || "AI Error");
         }
 
-        const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const responseText = result.choices?.[0]?.message?.content || "";
         
-        // AI कभी-कभी आउटपुट के आगे-पीछे ```json और ``` लगा देता है, उसे साफ़ करें
+        // AI का आउटपुट JSON में साफ़ करना
         const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         
         let extractedItems = [];
@@ -671,7 +677,6 @@ export default function BbCafeDesktopPos() {
 
            if (matchedRaw) {
              const qty = Number(aiItem.qty) || 1;
-             // अगर पर्ची में भाव नहीं है, तो पुराना भाव (lastRate) ले लें
              const rate = Number(aiItem.rate) > 0 ? Number(aiItem.rate) : (matchedRaw.lastRate || 0);
 
              foundItems.push({
@@ -693,10 +698,9 @@ export default function BbCafeDesktopPos() {
            toast.success(`🎉 ${foundItems.length} आइटम मिल गए और लिस्ट में जुड़ गए!`);
            triggerBeep('success');
            
-           // अगर कुछ आइटम आपके सिस्टम में नहीं मिले, तो चेतावनी दे दें
            if (notFoundNames.length > 0) {
              setTimeout(() => {
-                toast(`पर्ची में ${notFoundNames.join(', ')} मिले, लेकिन आपके सिस्टम में ये आइटम ऐड नहीं हैं।`, { icon: '⚠️', duration: 5000 });
+                toast(`पर्ची में ${notFoundNames.join(', ')} मिले, लेकिन आपके सिस्टम में ऐड नहीं हैं।`, { icon: '⚠️', duration: 5000 });
              }, 1000);
            }
         } else {
