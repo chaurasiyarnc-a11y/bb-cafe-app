@@ -582,27 +582,26 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 PRO AI SCANNER (GOOGLE GEMINI 1.5 FLASH - UPDATED FOR 'AQ.' KEYS)
+// 📸 PRO AI SCANNER (GOOGLE GEMINI 1.5 FLASH - SECURE)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 👇 यहाँ अपनी Google AI Studio वाली Key पेस्ट करें (चाहे वो AQ. से शुरू हो या AIza से)
-    const GEMINI_API_KEY = "AQ.Ab8RN6LGg831BiSmzoHGgunjjfxDinL5C9dFe022jzWHFko8zg"; 
+    // 👇 GitHub एरर से बचने के लिए हमने Key को छिपा दिया है (Environment Variable)
+    const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY; 
 
     if (!GEMINI_API_KEY) {
-      return toast.error("❌ कृपया API Key डालें!");
+      return toast.error("❌ API Key सेट नहीं है! कृपया Vercel Settings में जाकर NEXT_PUBLIC_GEMINI_API_KEY डालें।");
     }
 
     setIsScanningBill(true);
-    const toastId = toast.loading("🤖 Google AI आपकी पर्ची पढ़ रहा है (हैंडराइटिंग स्कैन चालू)...");
+    const toastId = toast.loading("🤖 Google AI आपकी पर्ची पढ़ रहा है...");
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         const base64Image = reader.result as string;
-        // Base64 स्ट्रिंग से "data:image/jpeg;base64," वाला हिस्सा हटाना
         const base64Data = base64Image.split(',')[1]; 
 
         const prompt = `
@@ -619,14 +618,13 @@ export default function BbCafeDesktopPos() {
           2. If rate is missing, put 0.
         `;
 
-        // 🚀 डायरेक्ट Google Gemini API को कॉल (नए 'x-goog-api-key' हैडर के साथ जो AQ. keys को सपोर्ट करता है)
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
         
         const response = await fetch(url, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'x-goog-api-key': GEMINI_API_KEY // 👈 यह नया तरीका हर Key को सपोर्ट करेगा
+            'x-goog-api-key': GEMINI_API_KEY // 👈 यह .env वाली Key यहाँ जाएगी
           },
           body: JSON.stringify({
             contents: [{
@@ -646,7 +644,6 @@ export default function BbCafeDesktopPos() {
 
         const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
         
-        // AI का आउटपुट JSON में साफ़ करना
         const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         
         let extractedItems = [];
@@ -660,7 +657,6 @@ export default function BbCafeDesktopPos() {
            throw new Error("पर्ची में कोई सामान नहीं मिला!");
         }
 
-        // 🧠 स्मार्ट मैचिंग: AI के डेटा को आपके Raw Materials से मैच करना
         const foundItems: any[] = [];
         const notFoundNames: string[] = [];
 
@@ -711,7 +707,7 @@ export default function BbCafeDesktopPos() {
         toast.error("स्कैनिंग विफल: " + (err.message || 'फोटो साफ़ नहीं है'));
       } finally {
         setIsScanningBill(false);
-        e.target.value = ''; // इनपुट रीसेट
+        e.target.value = '';
       }
     };
   };
