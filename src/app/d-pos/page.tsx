@@ -587,12 +587,12 @@ export default function BbCafeDesktopPos() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Gemini API Key (आपको इसे Google AI Studio से फ्री में बनाना होगा)
-    // बेहतर होगा कि आप इसे .env.local फ़ाइल में NEXT_PUBLIC_GEMINI_API_KEY के नाम से रखें
-    const GEMINI_API_KEY = "AQ.Ab8RN6JxvAsmVeshnvkmnd5eqa7Uc_DjgPqIT9DhqzQaQgrWZg";
+    // 👇 यहाँ इन कोट्स " " के अंदर अपनी नई API Key पेस्ट करें (जो AIzaSy से शुरू होती है)
+    const GEMINI_API_KEY = "AQ.Ab8RN6JxvAsmVeshnvkmnd5eqa7Uc_DjgPqIT9DhqzQaQgrWZg"; 
     
-    if (!GEMINI_API_KEY || GEMINI_API_KEY === "AQ.Ab8RN6JxvAsmVeshnvkmnd5eqa7Uc_DjgPqIT9DhqzQaQgrWZg") {
-      return toast.error("कृपया पहले Google Gemini API Key सेट करें!");
+    // यह चेक करेगा कि आपकी Key सही है या नहीं
+    if (!GEMINI_API_KEY || !GEMINI_API_KEY.startsWith("AQ.Ab8RN6JxvAsmVeshnvkmnd5eqa7Uc_DjgPqIT9DhqzQaQgrWZg")) {
+      return toast.error("AQ.Ab8RN6JxvAsmVeshnvkmnd5eqa7Uc_DjgPqIT9DhqzQaQgrWZg");
     }
 
     setIsScanningBill(true);
@@ -664,7 +664,7 @@ export default function BbCafeDesktopPos() {
            // चेक करें कि क्या AI का निकाला नाम आपके स्टॉक में मौजूद है
            const matchedRaw = rawMaterials.find((r: any) => {
              const rawName = String(r.name || '').toLowerCase();
-             // आंशिक मिलान (Partial Match) - जैसे AI ने "Aloo" पढ़ा और आपका आइटम "Aloo (Potato)" है
+             // आंशिक मिलान (Partial Match)
              return rawName.includes(aiName) || aiName.includes(rawName);
            });
 
