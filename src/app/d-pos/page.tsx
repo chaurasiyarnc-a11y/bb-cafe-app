@@ -4923,7 +4923,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                     <button 
                       key={item.id} 
                       onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); }} 
-                      className={`w-full flex items-center justify-between px-3 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${isActive ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30" : "text-neutral-800 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800"}`}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${isActive ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30" : "text-neutral-800 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800"}`}
                     >
                       <div className="flex items-center gap-3 truncate">
                         <Icon size={16} className="shrink-0" />
