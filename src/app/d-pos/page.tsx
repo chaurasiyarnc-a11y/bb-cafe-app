@@ -582,76 +582,96 @@ export default function BbCafeDesktopPos() {
   );
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
   
-// 📸 मुफ़्त स्कैनर (NO API KEY REQUIRED - 100% FREE)
+// 📸 PRO AI SCANNER (USING GOOGLE GEMINI 1.5 FLASH)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Gemini API Key (आपको इसे Google AI Studio से फ्री में बनाना होगा)
+    // बेहतर होगा कि आप इसे .env.local फ़ाइल में NEXT_PUBLIC_GEMINI_API_KEY के नाम से रखें
+    const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "यहाँ_अपनी_API_KEY_डालें"; 
+    
+    if (!GEMINI_API_KEY || GEMINI_API_KEY === "यहाँ_अपनी_API_KEY_डालें") {
+      return toast.error("कृपया पहले Google Gemini API Key सेट करें!");
+    }
+
     setIsScanningBill(true);
-    const toastId = toast.loading("मुफ़्त स्कैनर से बिल पढ़ा जा रहा है... 🔍");
+    const toastId = toast.loading("🤖 AI आपकी पर्ची पढ़ रहा है (हैंडराइटिंग स्कैन चालू)...");
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         const base64Image = reader.result as string;
+        // Base64 स्ट्रिंग से "data:image/jpeg;base64," वाला हिस्सा हटाना ज़रूरी है
+        const base64Data = base64Image.split(',')[1]; 
 
-        // 🚀 बिना किसी प्राइवेट Key के मुफ़्त पब्लिक API का इस्तेमाल
-        const formData = new FormData();
-        formData.append('base64Image', base64Image);
-        formData.append('language', 'hin'); 
-        formData.append('isOverlayRequired', 'false');
+        // Gemini AI को चालू करें
+        const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+        // gemini-1.5-flash बहुत तेज़ है और इमेज+टेक्स्ट के लिए बेस्ट है
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); 
 
-        // OCR.space की फ्री सर्विस (इसमें helloworld नाम की पब्लिक की चलती है)
-        const response = await fetch('https://api.ocr.space/parse/image', {
-          method: 'POST',
-          headers: {
-            'apikey': 'helloworld', 
-          },
-          body: formData,
-        });
+        // AI को कड़क निर्देश (Prompt)
+        const prompt = `
+          You are an expert AI assistant for a cafe inventory system.
+          Look at this handwritten or printed raw material purchase bill (parchi). 
+          The text can be in Hindi, English, or a mix of both (Hinglish). Handwriting can be messy.
+          Extract the items purchased, their quantities, and their rate (price per unit).
+          
+          Return EXACTLY a JSON array of objects and nothing else. NO markdown formatting, NO backticks.
+          Format required: [{"name": "Item Name", "qty": 10, "rate": 50}]
+          
+          Rules:
+          1. If quantity is missing, assume 1.
+          2. If rate is missing, put 0.
+          3. Clean up the item names (translate Hindi names to English if possible, or keep as is).
+        `;
 
-        const ocrResult = await response.json();
+        const imageParts = [
+          {
+            inlineData: {
+              data: base64Data,
+              mimeType: file.type
+            }
+          }
+        ];
+
+        // AI से रिक्वेस्ट करें
+        const result = await model.generateContent([prompt, ...imageParts]);
+        const responseText = result.response.text();
         
-        if (ocrResult.IsErroredOnProcessing) {
-           throw new Error("बिल साफ़ नहीं है या बहुत बड़ा है।");
+        // AI कभी-कभी आउटपुट के आगे-पीछे ```json और ``` लगा देता है, उसे साफ़ करें
+        const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        let extractedItems = [];
+        try {
+          extractedItems = JSON.parse(cleanJsonStr);
+        } catch (parseError) {
+          throw new Error("AI पर्ची को सही से समझ नहीं पाया। कृपया साफ़ फोटो लें।");
         }
 
-        const parsedText = ocrResult.ParsedResults?.[0]?.ParsedText || "";
-
-        if (!parsedText) {
-           throw new Error("पर्ची में कोई टेक्स्ट नहीं मिला!");
+        if (extractedItems.length === 0) {
+           throw new Error("पर्ची में कोई सामान नहीं मिला!");
         }
 
-        // 🧠 हमारा अपना स्मार्ट जुगाड़ (टेक्स्ट में से आइटम ढूँढना)
-        const lines = parsedText.split('\n');
+        // 🧠 स्मार्ट मैचिंग: AI के डेटा को आपके Raw Materials से मैच करना
         const foundItems: any[] = [];
+        const notFoundNames: string[] = [];
 
-        for (const line of lines) {
-           const lowerLine = line.toLowerCase();
+        for (const aiItem of extractedItems) {
+           const aiName = String(aiItem.name || '').toLowerCase();
            
-           // चेक करें कि क्या हमारे कैफे के कच्चे माल का नाम इस लाइन में है?
+           // चेक करें कि क्या AI का निकाला नाम आपके स्टॉक में मौजूद है
            const matchedRaw = rawMaterials.find((r: any) => {
-             // 👉 TypeScript Fix: हमने बताया कि nameWords एक String का Array है
-             const nameWords: string[] = String(r.name || '').toLowerCase().split(' ');
-             
-             // 👉 TypeScript Fix: word के आगे (word: string) लगा दिया गया है
-             return nameWords.some((word: string) => word.length > 2 && lowerLine.includes(word));
+             const rawName = String(r.name || '').toLowerCase();
+             // आंशिक मिलान (Partial Match) - जैसे AI ने "Aloo" पढ़ा और आपका आइटम "Aloo (Potato)" है
+             return rawName.includes(aiName) || aiName.includes(rawName);
            });
 
            if (matchedRaw) {
-             // लाइन में से नंबर (मात्रा और भाव) निकालने की कोशिश
-             const numbers = line.match(/\d+(\.\d+)?/g);
-             let qty = 1;
-             let rate = matchedRaw.lastRate || 0; // पुराना भाव उठा लेगा
-
-             // अगर पर्ची में 2 या 3 नंबर लिखे हैं, तो उन्हें मात्रा और भाव मान लेगा
-             if (numbers && numbers.length >= 1) {
-               qty = Number(numbers[0]);
-               if (numbers.length >= 2) {
-                  rate = Number(numbers[1]);
-               }
-             }
+             const qty = Number(aiItem.qty) || 1;
+             // अगर पर्ची में भाव नहीं है, तो पुराना भाव (lastRate) ले लें
+             const rate = Number(aiItem.rate) > 0 ? Number(aiItem.rate) : (matchedRaw.lastRate || 0);
 
              foundItems.push({
                rawId: matchedRaw.id,
@@ -661,29 +681,39 @@ export default function BbCafeDesktopPos() {
                rate: rate,
                amount: qty * rate
              });
+           } else {
+             notFoundNames.push(aiItem.name);
            }
         }
 
         if (foundItems.length > 0) {
            setPurchaseItemList((prev) => [...prev, ...foundItems]);
            toast.dismiss(toastId);
-           toast.success(`🎉 ${foundItems.length} आइटम मिल गए! (मुफ़्त स्कैनर द्वारा)`);
+           toast.success(`🎉 ${foundItems.length} आइटम मिल गए और लिस्ट में जुड़ गए!`);
            triggerBeep('success');
+           
+           // अगर कुछ आइटम आपके सिस्टम में नहीं मिले, तो चेतावनी दे दें
+           if (notFoundNames.length > 0) {
+             setTimeout(() => {
+                toast(`पर्ची में ${notFoundNames.join(', ')} मिले, लेकिन आपके सिस्टम में ये आइटम ऐड नहीं हैं।`, { icon: '⚠️', duration: 5000 });
+             }, 1000);
+           }
         } else {
            toast.dismiss(toastId);
-           toast.error("पर्ची में कोई ऐसा आइटम नहीं मिला जो आपके स्टॉक लिस्ट में हो!");
+           toast.error("पर्ची स्कैन हो गई, लेकिन कोई भी आइटम आपके 'कच्चा माल' लिस्ट से मैच नहीं हुआ!");
         }
 
       } catch (err: any) {
-        console.error(err);
+        console.error("AI Scan Error:", err);
         toast.dismiss(toastId);
-        toast.error("स्कैनिंग विफल: " + (err.message || 'त्रुटि आई'));
+        toast.error("स्कैनिंग विफल: " + (err.message || 'फोटो साफ़ नहीं है'));
       } finally {
         setIsScanningBill(false);
         e.target.value = ''; // इनपुट रीसेट
       }
     };
-  };  const handleOpenPurchaseHistory = async () => {
+  };
+  const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     setPurchaseHistoryFilter('this_month');
