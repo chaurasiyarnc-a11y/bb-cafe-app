@@ -444,7 +444,18 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-500 dark:text-gray-400 uppercase">Write Promotional Message</label>
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-bold text-neutral-500 dark:text-gray-400 uppercase">Write Promotional Message</label>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(broadcastMessage);
+                    toast.success("Message copied to clipboard!");
+                  }}
+                  className="text-[10px] text-blue-600 dark:text-blue-400 font-black uppercase underline hover:text-blue-800 transition-colors"
+                >
+                  Copy Message
+                </button>
+              </div>
               <textarea 
                 value={broadcastMessage} 
                 onChange={(e) => setBroadcastMessage(e.target.value)} 
@@ -453,25 +464,47 @@ export default function CustomersTab({ loyaltyUsers, orders, onExportCSV }: Cust
               />
             </div>
 
+            {/* 🚀 NEW BULK ACTION BUTTONS 🚀 */}
             <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 p-4 rounded-2xl space-y-3 text-center">
-              <p className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase tracking-wide">⚡ One-Click Queue Sender Assistant</p>
-              <div className="flex gap-2">
+              <p className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase tracking-wide">⚡ Bulk Sending Options</p>
+              
+              <div className="flex flex-col gap-2">
+                {/* Option 1: Copy All Numbers for Chrome Extensions */}
                 <button 
-                  onClick={handleSendNextUnsentBroadcast}
+                  onClick={() => {
+                    if(broadcastTargetedCustomers.length === 0) return toast.error("No customers found!");
+                    const numbers = broadcastTargetedCustomers.map(c => c.phone).join(',');
+                    navigator.clipboard.writeText(numbers);
+                    toast.success(`${broadcastTargetedCustomers.length} Numbers Copied! Paste in WA Sender Extension.`);
+                  }}
                   type="button"
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white dark:text-black font-black text-xs uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md animate-none"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md"
                 >
-                  💬 Send Next (Unsent Queue)
+                  📋 Copy All Numbers (For WA Extension)
                 </button>
-                <button 
-                  onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
-                  title="Reset session"
-                  type="button"
-                  className="bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:text-neutral-900 dark:hover:text-white p-3 rounded-xl transition-all active:scale-95"
-                >
-                  <RefreshCw size={16} />
-                </button>
+
+                {/* Option 2: Old Manual Queue Sender */}
+                <div className="flex gap-2">
+                  <button 
+                    onClick={handleSendNextUnsentBroadcast}
+                    type="button"
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white dark:text-black font-black text-[10px] uppercase py-3 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  >
+                    💬 Send One-by-One (Manual)
+                  </button>
+                  <button 
+                    onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
+                    title="Reset session"
+                    type="button"
+                    className="bg-neutral-200 dark:bg-white/5 text-neutral-600 dark:text-gray-400 hover:text-neutral-900 dark:hover:text-white p-3 rounded-xl transition-all active:scale-95"
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
               </div>
+              <p className="text-[8.5px] text-neutral-500 dark:text-gray-500 font-bold mt-2 leading-tight text-center">
+                * For 1-click bulk sending, click "Copy All Numbers" and paste them into any Free Chrome Extension like WA Web Plus.
+              </p>
             </div>
 
             {/* कस्टमर ब्रॉडकास्ट स्टेटस लिस्ट */}
