@@ -3700,6 +3700,11 @@ const handleSendUdhariReminder = (targetOrder: any) => {
 
  // Quick Settle Action (From Daily Bills Tab)
   const handleQuickSettleOrder = async (orderId: string, pMethod: 'cash' | 'upi' | 'due' | 'split') => {
+    
+    // 👉 FIX 3: डबल-क्लिक रोकने का लॉजिक
+    const checkOrder = liveOrders.find(o => o.id === orderId);
+    if (checkOrder && checkOrder.paymentSettled) return toast.error("यह बिल पहले ही सेटल हो चुका है!");
+
     triggerBeep('tap');
     const toastId = toast.loading(`Settling bill via ${pMethod.toUpperCase()}...`);
     try {
@@ -3775,7 +3780,6 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       toast.error("सेटलमेंट विफल रहा");
     }
   };
-
  // 🟢 WhatsApp Bill Sender (With Customer Feedback Links)
   const handleSendWhatsAppBill = (targetOrder: any = null) => {
     const ord = targetOrder || { customerPhone, customerName, fulfillmentType, items: cart, total: getTotalBillPrice() };
