@@ -5440,7 +5440,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             <span>Table: {tableNumber}</span>
                           </div>
                           <div className="grid grid-cols-6 gap-1">
-                          {dynamicTables.map(`(tName, idx) => {
+                          {dynamicTables.map((tName, idx) => {
                             const isTableOccupied = activeTableOrders.some(o => o.tableNumber === tName);
                             return (
                               <button 
