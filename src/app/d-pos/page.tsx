@@ -196,7 +196,10 @@ export default function BbCafeDesktopPos() {
     }
   }, [themeMode, isSystemDark]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
+const [tableCount, setTableCount] = useState(6);
+  const dynamicTables = useMemo(() => {
+    return Array.from({ length: tableCount }, (_, i) => `Table ${i + 1}`);
+  }, [tableCount]);
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
   const [upiIdConfig, setUpiIdConfig] = useState<string>('Q991347275@ybl');
  const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919714293759');
@@ -2126,6 +2129,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   // Load Saved Settings
   useEffect(() => {
     const savedHeld = localStorage.getItem("bb_pos_held_carts");
+    const savedTableCount = localStorage.getItem("bb_pos_table_count_pc");
+    if (savedTableCount) setTableCount(Number(savedTableCount));
     if (savedHeld) {
       try { setHeldCarts(JSON.parse(savedHeld)); } catch (e) {}
     }
@@ -5435,7 +5440,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             <span>Table: {tableNumber}</span>
                           </div>
                           <div className="grid grid-cols-6 gap-1">
-                          {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName, idx) => {
+                          {dynamicTables.map(`(tName, idx) => {
                             const isTableOccupied = activeTableOrders.some(o => o.tableNumber === tName);
                             return (
                               <button 
@@ -6608,7 +6613,9 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   <p className="text-xs text-neutral-500">Click any running table to modify items or settle the bill directly.</p>
                 </div>
                 <div className="grid grid-cols-3 xl:grid-cols-4 gap-4">
-                  {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName) => {
+                  {dynamicTables.map(`
+                
+                (tName) => {
                     const order = activeTableOrders.find(o => o.tableNumber === tName);
                     return (
                       <div key={tName} className={`border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-all ${order ? 'bg-white dark:bg-neutral-900 border-amber-500 ring-2 ring-amber-400/50' : 'bg-neutral-100 dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 opacity-60'}`}>
@@ -9148,7 +9155,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 <div>
                   <p className="text-[10px] font-black uppercase text-neutral-500 mb-2">Select New Table (नयी खाली टेबल चुनें):</p>
                   <div className="grid grid-cols-3 gap-2">
-                    {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map(tName => {
+                    {dynamicTables.map(`tName => {
                       const isOccupied = activeTableOrders.some(o => o.tableNumber === tName);
                       const isCurrent = tName === tableTransferSourceOrder.tableNumber;
                       
