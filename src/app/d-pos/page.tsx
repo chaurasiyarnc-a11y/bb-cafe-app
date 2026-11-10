@@ -6609,8 +6609,39 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
             {activeTab === 'tables' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-sm font-black uppercase text-amber-600 dark:text-amber-500">Active Dine-In Tables ({activeTableOrders.length})</h2>
-                  <p className="text-xs text-neutral-500">Click any running table to modify items or settle the bill directly.</p>
+                  <div>
+                    <h2 className="text-sm font-black uppercase text-amber-600 dark:text-amber-500">Active Dine-In Tables ({activeTableOrders.length})</h2>
+                    <p className="text-xs text-neutral-500">Click any running table to modify items.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        if (tableCount <= 1) return toast.error("कम से कम 1 टेबल होना जरूरी है!");
+                        const lastTableName = `Table ${tableCount}`;
+                        if (activeTableOrders.some(o => o.tableNumber === lastTableName)) {
+                          return toast.error(`⚠️ ${lastTableName} पर अभी बिल चल रहा है! पहले उसे क्लियर करें।`);
+                        }
+                        const newCount = tableCount - 1;
+                        setTableCount(newCount);
+                        localStorage.setItem("bb_pos_table_count_pc", String(newCount));
+                        toast.success(`टेबल कम कर दी गई! अब ${newCount} टेबल्स हैं।`);
+                      }}
+                      className="px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl text-[10px] font-black uppercase shadow-sm border border-red-200 dark:border-red-800"
+                    >
+                      - Remove
+                    </button>
+                    <button 
+                      onClick={() => {
+                        const newCount = tableCount + 1;
+                        setTableCount(newCount);
+                        localStorage.setItem("bb_pos_table_count_pc", String(newCount));
+                        toast.success(`नयी टेबल जोड़ दी गई! 🪑 अब कुल ${newCount} टेबल्स हैं।`);
+                      }}
+                      className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase shadow-sm"
+                    >
+                      + Add Table
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 xl:grid-cols-4 gap-4">
                   {dynamicTables.map(`
