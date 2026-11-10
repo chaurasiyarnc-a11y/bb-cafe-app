@@ -6644,9 +6644,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   </div>
                 </div>
                 <div className="grid grid-cols-3 xl:grid-cols-4 gap-4">
-                  {dynamicTables.map(`
-                
-                (tName) => {
+                 {dynamicTables.map((tName) => {
                     const order = activeTableOrders.find(o => o.tableNumber === tName);
                     return (
                       <div key={tName} className={`border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-all ${order ? 'bg-white dark:bg-neutral-900 border-amber-500 ring-2 ring-amber-400/50' : 'bg-neutral-100 dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 opacity-60'}`}>
