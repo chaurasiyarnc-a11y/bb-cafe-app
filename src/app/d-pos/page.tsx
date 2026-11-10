@@ -3631,6 +3631,23 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     setTableNumber(order.tableNumber || 'Table 1');
     setPaymentMethod(order.paymentMethod || 'cash');
 
+    // 👉 FIX 1: Packing & Delivery Charge Restore Logic
+    if (order.packingCharge > 0) {
+      setApplyPackingCharge(true);
+      setPackingCharge(order.packingCharge);
+    } else {
+      setApplyPackingCharge(false);
+      setPackingCharge(10);
+    }
+
+    if (order.deliveryFee > 0) {
+      setApplyDeliveryFee(true);
+      setCustomDeliveryFee(order.deliveryFee);
+    } else {
+      setApplyDeliveryFee(false);
+      setCustomDeliveryFee(20);
+    }
+
     if (order.discountValue && order.discountValue > 0) {
       setDiscountValue(order.discountValue);
       setDiscountType(order.discountType || 'amount');
@@ -3644,7 +3661,6 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     toast.success(`Bill #${order.billNumber} एडिट मोड में खुल गया है! 🛒`);
     setTimeout(() => searchInputRef.current?.focus(), 80);
   };
-
   // 👉 NEW: Auto-deduct Raw Material Inventory (जब बिल चुकता होता है तो स्टॉक काटें)
  // 👉 UPDATE: अब स्टॉक Variant (Half/Full) के हिसाब से कटेगा
   const deductInventoryForItems = async (itemsToDeduct: any[], orderFulfillmentType?: string) => {
