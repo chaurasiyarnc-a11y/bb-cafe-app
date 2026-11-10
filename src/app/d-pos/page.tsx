@@ -9184,7 +9184,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 <div>
                   <p className="text-[10px] font-black uppercase text-neutral-500 mb-2">Select New Table (नयी खाली टेबल चुनें):</p>
                   <div className="grid grid-cols-3 gap-2">
-                    {dynamicTables.map(`tName => {
+                    {dynamicTables.map((tName) => {
                       const isOccupied = activeTableOrders.some(o => o.tableNumber === tName);
                       const isCurrent = tName === tableTransferSourceOrder.tableNumber;
                       
