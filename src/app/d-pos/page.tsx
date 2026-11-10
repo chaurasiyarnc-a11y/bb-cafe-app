@@ -3382,11 +3382,11 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     const finalTotal = getTotalBillPrice();
     const discountAmt = getCalculatedDiscountAmount();
     const token = getDailyTokenNumber();
-    let earned = Math.floor(finalTotal / 100); // 👈 (यहाँ const की जगह let कर दिया)
+    let earned = Math.floor(finalTotal / 100);
     const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
     const cleanPhone = getSanitizedPhone(customerPhone);
 
-   try {
+    try {
       let billNumber: number = activeEditingBillNumber || getNextBillNumber(); 
 
       // 👉 Offline के लिए लॉजिक
@@ -3399,19 +3399,19 @@ const handleSendUdhariReminder = (targetOrder: any) => {
         const userRef = doc(db, "customer_points", cleanPhone);
         const userDoc = await getDoc(userRef);
         let prevPoints = 0;
-        let prevGamePoints = 0; // 👉 NEW
+        let prevGamePoints = 0; 
         let prevSpent = 0;
         let prevVisits = 0;
         
         if (userDoc.exists()) {
           const data = userDoc.data();
           prevPoints = Number(data.points) || 0;
-          prevGamePoints = Number(data.gamePoints) || 0; // 👉 NEW
+          prevGamePoints = Number(data.gamePoints) || 0; 
           prevSpent = Number(data.totalSpent) || 0;
           prevVisits = Number(data.totalVisits) || 0;
         }
 
-       // 🛡️ चेक करें कि क्या यह पुराना कम्प्लीट बिल एडिट हो रहा है?
+        // 🛡️ चेक करें कि क्या यह पुराना कम्प्लीट बिल एडिट हो रहा है?
         const isReEditingCompletedBill = 
           activeEditingPreviousOrder && 
           (activeEditingPreviousOrder.pointsEarned !== undefined || 
@@ -3421,7 +3421,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
         let newSpent = prevSpent + finalTotal;
         let newVisits = prevVisits + 1;
 
-       if (isReEditingCompletedBill) {
+        if (isReEditingCompletedBill) {
+          // 👉 FIX 2: पुराने बिल का अमाउंट और पॉइंट्स पहले माइनस (Rollback) करें
           const oldTotal = Number(activeEditingPreviousOrder.total) || 0;
           const oldEarned = Number(activeEditingPreviousOrder.pointsEarned) || 0;
           const oldRedeemed = Number(activeEditingPreviousOrder.pointsRedeemed) || 0;
@@ -3430,28 +3431,26 @@ const handleSendUdhariReminder = (targetOrder: any) => {
           newSpent = spentBeforeOldBill + finalTotal;
           earned = Math.floor(newSpent / 100) - Math.floor(spentBeforeOldBill / 100);
 
-          // 👉 SMART REDEMPTION LOGIC: पहले गेम पॉइंट्स काटें
           let gamePtsDeducted = Math.min(redeemed, prevGamePoints);
           let loyPtsDeducted = redeemed - gamePtsDeducted;
 
           const rolledBackPoints = prevPoints - oldEarned + oldRedeemed;
           remainingPts = Math.max(0, rolledBackPoints - loyPtsDeducted) + Math.max(0, earned);
-          remainingGamePts = prevGamePoints - gamePtsDeducted; // 👉 NEW
+          remainingGamePts = prevGamePoints - gamePtsDeducted; 
           newVisits = prevVisits; 
         } else {
           newSpent = prevSpent + finalTotal;
           earned = Math.floor(newSpent / 100) - Math.floor(prevSpent / 100);
           
-          // 👉 SMART REDEMPTION LOGIC: पहले गेम पॉइंट्स काटें
           let gamePtsDeducted = Math.min(redeemed, prevGamePoints);
           let loyPtsDeducted = redeemed - gamePtsDeducted;
 
           remainingPts = Math.max(0, prevPoints - loyPtsDeducted) + Math.max(0, earned);
-          remainingGamePts = prevGamePoints - gamePtsDeducted; // 👉 NEW
+          remainingGamePts = prevGamePoints - gamePtsDeducted; 
           newVisits = prevVisits + 1;
         }
 
-       // 🚀 OFFLINE POINTS SAVE LOGIC
+        // 🚀 OFFLINE POINTS SAVE LOGIC
         const updatedCustomerData = { 
           name: customerName || "Walk-in Guest", 
           phone: cleanPhone, 
@@ -3508,8 +3507,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
         pointsDiscount: redeemed,
         remainingPoints: remainingPts,
         customerPoints: remainingPts,
-       upiId: upiIdConfig,
-       promoCodeUsed: appliedPromoName || null,
+        upiId: upiIdConfig,
+        promoCodeUsed: appliedPromoName || null,
         pointsProcessed: true,
         stockProcessed: false,
         guests: {
@@ -3553,15 +3552,13 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       // Print Customer Bill 
       await handlePrintReceiptDirect(orderObj, false);
 
-      // 👉 NEW: KOT Print Logic for Pickup & Delivery
       if (kotEnabled && (fulfillmentType === 'pickup' || fulfillmentType === 'delivery')) {
         toast.success(`Kitchen KOT प्रिंट हो रही है... 🖨️`);
         await handlePrintReceiptDirect(orderObj, true);
       }
 
-    fetchAllCustomers(); // 👉 NEW: पॉइंट्स जुड़ते ही तुरंत UI अपडेट करें
+      fetchAllCustomers(); 
       
-      // 👉 NEW: Popup Trigger - सिर्फ तभी आएगा जब Settings से स्विच ON हो
       const tenderedAmt = Number(cashTendered) || 0;
       if (cashTenderEnabled && paymentMethod === 'cash' && tenderedAmt > finalTotal) {
          setCompletedOrderChange({ 
@@ -3580,7 +3577,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       setGuestKids('');
       setCustomerName(''); 
       setCartCustSearchInput(''); 
-      setCustomerGamePoints(0); // 👉 NEW
+      setCustomerGamePoints(0); 
       setAddress('');
       setCustomerPoints(0); 
       setDiscountValue(0); 
@@ -3598,7 +3595,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       setActiveEditingOrderId(null);
       setActiveEditingBillNumber(null);
       setActiveEditingOriginalItems([]);
-      setActiveEditingPreviousOrder(null); // 👈 री-एडिट रीसेट
+      setActiveEditingPreviousOrder(null); 
       localStorage.removeItem("bb_pos_saved_cart_pc");
       setTimeout(() => searchInputRef.current?.focus(), 80);
     } catch (err) {
@@ -3607,7 +3604,6 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       setIsSubmittingOrder(false);
     }
   };
-
   // Past Bill Re-Edit Logic
   const handleReEditOrder = (order: any) => {
     triggerBeep('tap');
