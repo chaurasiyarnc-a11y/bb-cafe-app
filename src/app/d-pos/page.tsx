@@ -3125,7 +3125,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     const subtotal = getCartSubtotal();
     const finalTotal = getTotalBillPrice();
     const discountAmt = getCalculatedDiscountAmount();
-    const token = getDailyTokenNumber();
+    const token = activeEditingPreviousOrder?.tokenNumber || getDailyTokenNumber();
 
     try {
       let billNumber: number;
