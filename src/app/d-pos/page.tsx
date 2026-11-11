@@ -3379,18 +3379,21 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   };
 
   // Final Checkout & Bill Print: Saved as 'unsettled' until settled in Daily Bills tab!
-  const handleFinalCheckoutAndPrintBill = async () => {
+const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
 
     const subtotal = getCartSubtotal();
     const finalTotal = getTotalBillPrice();
     const discountAmt = getCalculatedDiscountAmount();
-    // 👉 FIX: पुराना टोकन नंबर सुरक्षित रखें
-    const token = activeEditingPreviousOrder?.tokenNumber || getDailyTokenNumber();
-    let earned = Math.floor(finalTotal / 100);
-    const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
     const cleanPhone = getSanitizedPhone(customerPhone);
+    
+    // 👉 FIX 1: पुराना टोकन नंबर सुरक्षित रखें
+    const token = activeEditingPreviousOrder?.tokenNumber || getDailyTokenNumber();
+    
+    // 👉 FIX 2: 10 अंकों का नंबर होने पर ही पॉइंट्स दें
+    let earned = cleanPhone.length === 10 ? Math.floor(finalTotal / 100) : 0;
+    const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
 
     try {
       let billNumber: number = activeEditingBillNumber || getNextBillNumber(); 
