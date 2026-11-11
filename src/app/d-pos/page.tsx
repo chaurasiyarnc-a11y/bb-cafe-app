@@ -7806,50 +7806,57 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                     let newCustomers7Days = 0;
                     
                    const fomoCustomers: any[] = [];
-                    const acqTrend = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 };
-                    
-                    // ✅ FIX: सही कैलेंडर दिन (Midnight) से समय गिनना
-                    const todayMidnight = new Date();
-                    todayMidnight.setHours(0, 0, 0, 0);
+                                const acqTrend = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 };
+                                const retTrend = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 }; // 👉 NEW: Regular/Returning Trend
+                                
+                                // ✅ FIX: सही कैलेंडर दिन (Midnight) से समय गिनना
+                                const todayMidnight = new Date();
+                                todayMidnight.setHours(0, 0, 0, 0);
 
-                    allCustomers.forEach(c => {
-                      const lastActDate = c.lastActive?.toDate ? c.lastActive.toDate() : new Date(c.lastActive || 0);
-                      const lastActMidnight = new Date(lastActDate);
-                      lastActMidnight.setHours(0, 0, 0, 0);
-                      
-                      const daysSince = Math.round((todayMidnight.getTime() - lastActMidnight.getTime()) / (1000 * 3600 * 24));
-                      
-                      const visits = c.totalVisits || 0;
-                      const spent = c.totalSpent || 0;
+                                allCustomers.forEach(c => {
+                                  const lastActDate = c.lastActive?.toDate ? c.lastActive.toDate() : new Date(c.lastActive || 0);
+                                  const lastActMidnight = new Date(lastActDate);
+                                  lastActMidnight.setHours(0, 0, 0, 0);
+                                  
+                                  const daysSince = Math.round((todayMidnight.getTime() - lastActMidnight.getTime()) / (1000 * 3600 * 24));
+                                  
+                                  const visits = c.totalVisits || 0;
+                                  const spent = c.totalSpent || 0;
 
-                      totalAOV_Revenue += spent;
-                      totalAOV_Visits += visits;
+                                  totalAOV_Revenue += spent;
+                                  totalAOV_Visits += visits;
 
-                      const isGamer = c.lastPrizeWon || c.lastCatchGameScore !== undefined || (c.gamePoints && c.gamePoints > 0);
-                      if (isGamer) {
-                        gamersCount++;
-                        totalGamerRevenue += spent;
-                        if (visits > 1) returningGamersCount++;
-                      }
+                                  const isGamer = c.lastPrizeWon || c.lastCatchGameScore !== undefined || (c.gamePoints && c.gamePoints > 0);
+                                  if (isGamer) {
+                                    gamersCount++;
+                                    totalGamerRevenue += spent;
+                                    if (visits > 1) returningGamersCount++;
+                                  }
 
-                      const isVip = spent >= 5000 || visits >= 10;
-                      if (isVip) vipList.push(c);
-                      else if (daysSince > 30) sleepingList.push(c);
-                      else if (daysSince >= 15 && daysSince <= 30) atRiskList.push(c);
-                      else regularList.push(c);
-                      
-                      // ✅ FIX: Loyverse से इम्पोर्ट हुए ग्राहकों को झूठा (Fake) "New Customer" बनने से रोकना
-                      const isRealNewCustomer = !c.isImported || (c.isImported && c.lastBillNumber);
-                      
-                      if (visits === 1 && isRealNewCustomer && daysSince >= 0 && daysSince <= 6) {
-                        newCustomers7Days++;
-                        acqTrend[daysSince as keyof typeof acqTrend]++;
-                      }
+                                  const isVip = spent >= 5000 || visits >= 10;
+                                  if (isVip) vipList.push(c);
+                                  else if (daysSince > 30) sleepingList.push(c);
+                                  else if (daysSince >= 15 && daysSince <= 30) atRiskList.push(c);
+                                  else regularList.push(c);
+                                  
+                                  // ✅ FIX: Loyverse से इम्पोर्ट हुए ग्राहकों को झूठा (Fake) "New Customer" बनने से रोकना
+                                  const isRealNewCustomer = !c.isImported || (c.isImported && c.lastBillNumber);
+                                  
+                                  // 👉 FIX: ग्राफ़ के लिए New और Regular दोनों को गिनें
+                                  if (daysSince >= 0 && daysSince <= 6) {
+                                    if (visits === 1 && isRealNewCustomer) {
+                                      newCustomers7Days++;
+                                      acqTrend[daysSince as keyof typeof acqTrend]++;
+                                    } else if (visits > 1) {
+                                      retTrend[daysSince as keyof typeof retTrend]++;
+                                    }
+                                  }
 
-                      if ((c.points > 40 || c.gamePoints > 40) && daysSince >= 15) {
-                        fomoCustomers.push({ ...c, daysSince });
-                      }
-                    });
+                                  if ((c.points > 40 || c.gamePoints > 40) && daysSince >= 15) {
+                                    fomoCustomers.push({ ...c, daysSince });
+                                  }
+                                });
+
 
                     const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
                     const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
