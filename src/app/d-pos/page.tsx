@@ -7987,30 +7987,55 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             </div>
                           </div>
 
-                          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
-                            <h3 className="text-xs font-black uppercase text-neutral-600 dark:text-neutral-400 mb-2 border-b border-neutral-100 dark:border-neutral-800 pb-2">📈 New Customer Acquisition</h3>
-                            <p className="text-[10px] font-bold text-neutral-500 mb-6">कैफे में प्रतिदिन जुड़ने वाले नए ग्राहकों का ग्राफ़ (पिछले 7 दिन)</p>
-                            <div className="flex items-end justify-between h-40 mt-4 border-b border-neutral-200 dark:border-neutral-800 pb-2 relative">
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h3 className="text-xs font-black uppercase text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">📈 Daily Footfall Trend</h3>
+                                <p className="text-[10px] font-bold text-neutral-500 mt-1">पिछले 7 दिन: नए vs रेगुलर ग्राहक</p>
+                              </div>
+                              <div className="flex flex-col gap-1 items-end">
+                                <span className="text-[9px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded flex items-center gap-1"><div className="w-2 h-2 bg-blue-500 rounded-full"></div> Regular</span>
+                                <span className="text-[9px] font-black text-pink-600 bg-pink-100 dark:bg-pink-900/30 px-2 py-0.5 rounded flex items-center gap-1"><div className="w-2 h-2 bg-pink-500 rounded-full"></div> New</span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-end justify-between h-40 mt-auto border-b border-neutral-200 dark:border-neutral-800 pb-2 relative">
                               <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 dark:opacity-10">
                                 <div className="border-b border-neutral-400 w-full h-0"></div><div className="border-b border-neutral-400 w-full h-0"></div><div className="border-b border-neutral-400 w-full h-0"></div>
                               </div>
                               {[6,5,4,3,2,1,0].map(dayOffset => {
-                                const count = acqTrend[dayOffset as keyof typeof acqTrend];
-                                const maxCount = Math.max(...Object.values(acqTrend)) || 1;
-                                const heightPct = (count / maxCount) * 100;
+                                const newCount = acqTrend[dayOffset as keyof typeof acqTrend];
+                                const retCount = retTrend[dayOffset as keyof typeof retTrend];
+                                
+                                const maxNew = Math.max(...Object.values(acqTrend));
+                                const maxRet = Math.max(...Object.values(retTrend));
+                                const maxCount = Math.max(maxNew, maxRet) || 1;
+                                
+                                const newHeightPct = (newCount / maxCount) * 100;
+                                const retHeightPct = (retCount / maxCount) * 100;
                                 const dLabel = dayOffset === 0 ? 'Today' : `${dayOffset}d ago`;
+                                
                                 return (
-                                  <div key={dayOffset} className="flex flex-col items-center gap-2 group w-8 sm:w-12 h-full justify-end relative z-10">
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-black dark:bg-white text-white dark:text-black text-[10px] font-black px-2 py-1 rounded shadow-lg whitespace-nowrap pointer-events-none">
-                                      {count} New
+                                  <div key={dayOffset} className="flex flex-col items-center gap-2 group w-10 sm:w-14 h-full justify-end relative z-10">
+                                    {/* Tooltip (Hover करने पर दोनों डेटा दिखाएगा) */}
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 bg-black dark:bg-white text-white dark:text-black text-[10px] font-black px-2 py-1.5 rounded-lg shadow-lg whitespace-nowrap pointer-events-none flex flex-col gap-0.5 items-center z-20">
+                                      <span className="text-pink-400 dark:text-pink-600">{newCount} New</span>
+                                      <span className="text-blue-400 dark:text-blue-600">{retCount} Regular</span>
                                     </div>
-                                    <div className={`w-full rounded-t-lg transition-all duration-700 relative overflow-hidden ${dayOffset === 0 ? 'bg-gradient-to-t from-emerald-600 to-green-400' : 'bg-gradient-to-t from-purple-600 to-pink-400'}`} style={{ height: `${Math.max(heightPct, 5)}%` }}></div>
+                                    
+                                    {/* Double Bars (पास-पास 2 खंभे) */}
+                                    <div className="flex items-end gap-0.5 w-full h-full justify-center">
+                                      <div className="w-1/2 rounded-t-sm transition-all duration-700 bg-gradient-to-t from-blue-700 to-blue-400 shadow-sm" style={{ height: `${Math.max(retHeightPct, 4)}%` }}></div>
+                                      <div className={`w-1/2 rounded-t-sm transition-all duration-700 shadow-sm ${dayOffset === 0 ? 'bg-gradient-to-t from-emerald-600 to-green-400' : 'bg-gradient-to-t from-purple-600 to-pink-400'}`} style={{ height: `${Math.max(newHeightPct, 4)}%` }}></div>
+                                    </div>
+                                    
                                     <p className={`text-[9px] font-bold ${dayOffset===0 ? 'text-green-600 font-black' : 'text-neutral-500'} truncate w-full text-center`}>{dLabel}</p>
                                   </div>
                                 );
                               })}
                             </div>
                           </div>
+>>>>
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
