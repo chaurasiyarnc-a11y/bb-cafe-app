@@ -3386,7 +3386,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     const subtotal = getCartSubtotal();
     const finalTotal = getTotalBillPrice();
     const discountAmt = getCalculatedDiscountAmount();
-    const token = getDailyTokenNumber();
+    // 👉 FIX: पुराना टोकन नंबर सुरक्षित रखें
+    const token = activeEditingPreviousOrder?.tokenNumber || getDailyTokenNumber();
     let earned = Math.floor(finalTotal / 100);
     const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
     const cleanPhone = getSanitizedPhone(customerPhone);
