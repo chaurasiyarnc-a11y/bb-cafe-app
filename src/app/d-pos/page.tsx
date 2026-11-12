@@ -1356,7 +1356,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   const [custFormName, setCustFormName] = useState('');
   const [custFormPhone, setCustFormPhone] = useState('');
   const [custFormAddress, setCustFormAddress] = useState('');
-  const [custFormPoints, setCustFormPoints] = useState<number | ''>(0);
+ const [custFormPoints, setCustFormPoints] = useState<number | ''>(0);
+  const [custFormWalletBalance, setCustFormWalletBalance] = useState<number | ''>(0); // 👉 NEW: Wallet Balance
   // 👉 NEW CRM STATES (नोट्स और फॅमिली डेट्स के लिए)
   const [custFormNote, setCustFormNote] = useState('');
   const [custFormSpecialDates, setCustFormSpecialDates] = useState<{type: string, date: string, name: string}[]>([]);
