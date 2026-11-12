@@ -2197,31 +2197,49 @@ export default function BbCafeHome() {
         </footer>
       </main>
 
-     {/* STICKY FLOATING CART BUTTON */}
-      <div className="fixed bottom-[85px] inset-x-0 z-[80] flex justify-center pointer-events-none font-sans font-bold">
-        <div className="flex gap-4 pointer-events-auto">
-          {cart.length > 0 && (
-            <motion.button
-              initial={{ scale: 0, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0, y: 50 }}
-              onClick={() => { triggerHaptic(); setIsCartOpen(true); }}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-orange-500/30"
-            >
-              <div className="relative">
-                <ShoppingBag size={18} />
-                <span className="absolute -top-2.5 -right-2.5 bg-yellow-400 text-black text-[9px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-orange-600 font-mono">
-                  {cart.reduce((sum: number, item: any) => sum + item.quantity, 0)}
-                </span>
-              </div>
-              <div className="text-left leading-none">
-                <p className="text-[8px] uppercase tracking-wider text-orange-200">{isHindi ? "कर्ट देखें" : "View Cart"}</p>
-                <p className="text-xs font-black font-mono">₹{getTotalBillPrice()}</p>
-              </div>
-              <ChevronRight size={16} />
-            </motion.button>
-          )}
-        </div>
+     {/* 👉 NEW: MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0a0a0a] border-t border-neutral-200 dark:border-white/10 z-[90] flex justify-around items-center py-2 px-2 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.05)] font-sans">
+        
+        {/* 1. Home */}
+        <button onClick={scrollToMenu} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500 dark:text-gray-400 dark:hover:text-orange-500 transition-colors">
+          <Home size={20} />
+          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "होम" : "Home"}</span>
+        </button>
+        
+        {/* 2. Wallet */}
+        <button onClick={() => { setIsWalletOpen(true); triggerHaptic(); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-green-500 dark:text-gray-400 dark:hover:text-green-500 transition-colors relative">
+          <Wallet size={20} />
+          {walletBalance > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-green-500 rounded-full animate-ping"></span>}
+          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "वॉलेट" : "Wallet"}</span>
+        </button>
+        
+        {/* 3. Call */}
+        <a href={`tel:+${whatsappNumber}`} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-500 transition-colors">
+          <Phone size={20} />
+          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "कॉल" : "Call"}</span>
+        </a>
+
+        {/* 4. Cart (अब यह नीचे Profile के बगल में है) */}
+        <button onClick={() => { triggerHaptic(); setIsCartOpen(true); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500 dark:text-gray-400 dark:hover:text-orange-500 transition-colors relative">
+          <div className="relative">
+            <ShoppingBag size={20} className={cart.length > 0 ? "text-orange-500" : ""} />
+            {cart.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-black h-4 w-4 rounded-full flex items-center justify-center border-2 border-white dark:border-[#0a0a0a] font-mono shadow-sm">
+                {cart.reduce((sum: number, item: any) => sum + item.quantity, 0)}
+              </span>
+            )}
+          </div>
+          <span className={`text-[8px] font-black uppercase tracking-wider ${cart.length > 0 ? 'text-orange-500' : ''}`}>
+            {isHindi ? "कार्ट" : "Cart"}
+          </span>
+        </button>
+
+        {/* 5. Profile */}
+        <button onClick={() => { triggerHaptic(); setIsProfileOpen(true); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500 dark:text-gray-400 dark:hover:text-orange-500 transition-colors">
+          <User size={20} />
+          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "प्रोफाइल" : "Profile"}</span>
+        </button>
+        
       </div>
 
      {/* 👉 NEW: MOBILE BOTTOM NAVIGATION BAR */}
