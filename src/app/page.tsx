@@ -135,7 +135,7 @@ export default function BbCafeHome() {
   // Fulfillment and payment
   const [fulfillmentType, setFulfillmentType] = useState<"delivery" | "pickup" | "table">("delivery");
   const [tableNumber, setTableNumber] = useState("Table 1"); 
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi" | "wallet">("cod");
 
   const [isHindi, setIsHindi] = useState(false);
   const [customerPoints, setCustomerPoints] = useState<number>(0);
