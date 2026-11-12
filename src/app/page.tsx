@@ -1055,10 +1055,17 @@ export default function BbCafeHome() {
 
           const newSpent = prevSpent + finalTotal;
           const remainingPts = Math.max(0, prevPoints - totalPointsCost) + pointsEarned;
+          
+          // 👉 FIX: अगर वॉलेट से पेमेंट हुआ है, तो बैलेंस माइनस करें
+          let newWalletBalance = data.walletBalance || 0;
+          if (paymentMethod === "wallet") {
+            newWalletBalance = Math.max(0, newWalletBalance - finalTotal);
+          }
 
           await setDoc(userRef, {
             name: customerDetails.name || "Walk-in Guest",
             points: remainingPts,
+            walletBalance: newWalletBalance, // 👈 अपडेटेड वॉलेट बैलेंस
             totalSpent: newSpent,
             totalVisits: prevVisits + 1,
             lastBillNumber: billNumber,
@@ -1067,6 +1074,7 @@ export default function BbCafeHome() {
           }, { merge: true });
         }
       } catch(dbError) {
+
         console.error("DB Save Error:", dbError);
         toast.error(isHindi ? "ऑर्डर सेव करने में समस्या आई! (Network Error)" : "Failed to save order to database!");
         setIsSubmittingOrder(false);
