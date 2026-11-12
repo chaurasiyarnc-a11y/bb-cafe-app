@@ -2,6 +2,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { X, MapPin, Loader2, ChevronRight, ShoppingBag } from 'lucide-react';
+import toast from 'react-hot-toast';
+
 
 interface CartItem {
   id: string;
