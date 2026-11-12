@@ -1685,8 +1685,9 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     setCustFormPhone('');
     setCustFormAddress('');
     setCustFormPoints(0);
-    setCustFormNote(''); // 👉 NEW
-    setCustFormSpecialDates([]); // 👉 NEW
+    setCustFormWalletBalance(0); // 👉 NEW
+    setCustFormNote(''); 
+    setCustFormSpecialDates([]); 
     setIsAddEditCustModalOpen(true);
   };
 
@@ -1696,10 +1697,12 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     setCustFormPhone(cust.phone || cust.id || '');
     setCustFormAddress(cust.address || '');
     setCustFormPoints(cust.points || 0);
-    setCustFormNote(cust.note || ''); // 👉 NEW
-    setCustFormSpecialDates(cust.specialDates || []); // 👉 NEW
+    setCustFormWalletBalance(cust.walletBalance || 0); // 👉 NEW
+    setCustFormNote(cust.note || ''); 
+    setCustFormSpecialDates(cust.specialDates || []); 
     setIsAddEditCustModalOpen(true);
   };
+
   // ---------------------------------------------
   
   // Cart & Order States
