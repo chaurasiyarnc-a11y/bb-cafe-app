@@ -2215,7 +2215,103 @@ export default function BbCafeHome() {
         </div>
       </div>
 
+     {/* 👉 NEW: MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0a0a0a] border-t border-neutral-200 dark:border-white/10 z-[90] flex justify-around items-center py-2 px-2 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.05)] font-sans">
+        <button onClick={scrollToMenu} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500 dark:text-gray-400 dark:hover:text-orange-500 transition-colors">
+          <Home size={20} />
+          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "होम" : "Home"}</span>
+        </button>
+        <button onClick={() => { setIsWalletOpen(true); triggerHaptic(); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-green-500 dark:text-gray-400 dark:hover:text-green-500 transition-colors relative">
+          <Wallet size={20} />
+          {walletBalance > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-green-500 rounded-full animate-ping"></span>}
+          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "वॉलेट" : "Wallet"}</span>
+        </button>
+        <a href={`tel:+${whatsappNumber}`} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-500 transition-colors">
+          <Phone size={20} />
+          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "कॉल" : "Call"}</span>
+        </a>
+        <button onClick={() => { triggerHaptic(); setIsProfileOpen(true); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500 dark:text-gray-400 dark:hover:text-orange-500 transition-colors">
+          <User size={20} />
+          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "प्रोफाइल" : "Profile"}</span>
+        </button>
+      </div>
+
+      {/* 👉 NEW: WALLET (PREPAID PASS) MODAL */}
+      <AnimatePresence>
+        {isWalletOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-end font-sans">
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-neutral-200 max-w-lg mx-auto shadow-2xl transition-colors duration-200 h-[85vh] flex flex-col">
+              <div className="w-12 h-1 bg-neutral-300 dark:bg-white/15 rounded-full mx-auto mb-4 shrink-0" />
+              <div className="flex justify-between items-center mb-6 shrink-0">
+                <h3 className="text-xl font-black text-neutral-900 dark:text-white flex items-center gap-2"><Wallet className="text-green-500"/> {isHindi ? "कैफ़े वॉलेट" : "Cafe Wallet"}</h3>
+                <button onClick={() => setIsWalletOpen(false)} className="p-2 bg-neutral-100 dark:bg-white/10 rounded-full text-neutral-500 dark:text-white"><X size={18}/></button>
+              </div>
+
+              {!customerDetails ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center space-y-3">
+                  <User size={40} className="text-orange-500 opacity-50" />
+                  <p className="text-xs font-bold text-neutral-500">{isHindi ? "वॉलेट का उपयोग करने के लिए पहले अपनी प्रोफाइल बनाएं!" : "Create your profile to use the Cafe Wallet!"}</p>
+                  <button onClick={() => { setIsWalletOpen(false); setIsProfileOpen(true); }} className="bg-orange-500 text-white px-6 py-3 rounded-xl font-black text-xs uppercase shadow">Create Profile</button>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto pr-1 space-y-6 pb-10">
+                  {/* Current Balance Card */}
+                  <div className="bg-gradient-to-br from-green-500 to-emerald-700 p-5 rounded-2xl text-white shadow-lg relative overflow-hidden">
+                    <div className="absolute -right-4 -bottom-4 opacity-20"><Wallet size={100}/></div>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{isHindi ? "कुल बैलेंस" : "Current Balance"}</p>
+                    <h2 className="text-4xl font-black font-mono mt-1">₹{walletBalance}</h2>
+                    <p className="text-[9px] mt-2 font-semibold bg-black/20 px-2 py-1 rounded inline-block">
+                      {isHindi ? "कैफे में आर्डर करते समय इससे पेमेंट करें।" : "Use this balance to pay for orders at the cafe."}
+                    </p>
+                  </div>
+
+                  {/* Recharge Offers */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-black uppercase text-neutral-800 dark:text-gray-300 flex items-center gap-1.5"><Sparkles className="text-yellow-500" size={14}/> {isHindi ? "रिचार्ज ऑफर्स (बोनस पाएं)" : "Recharge Offers (Get Bonus)"}</h4>
+                    
+                    {[
+                      { pay: 500, get: 550, tag: "Extra ₹50" },
+                      { pay: 1000, get: 1200, tag: "Extra ₹200 🔥" },
+                      { pay: 2000, get: 2500, tag: "Extra ₹500 👑" }
+                    ].map((pkg, idx) => (
+                      <div key={idx} className="bg-white dark:bg-neutral-800 border dark:border-neutral-700 border-neutral-200 p-4 rounded-2xl flex justify-between items-center shadow-sm">
+                        <div>
+                          <span className="text-[9px] font-black uppercase bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 px-2 py-0.5 rounded border border-yellow-200 dark:border-yellow-500/30">
+                            {pkg.tag}
+                          </span>
+                          <p className="text-sm font-black text-neutral-900 dark:text-white mt-1">Pay ₹{pkg.pay}</p>
+                          <p className="text-[10px] text-green-600 font-bold">{isHindi ? `वॉलेट में ₹${pkg.get} मिलेंगे` : `Get ₹${pkg.get} in Wallet`}</p>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            triggerHaptic();
+                            const upiLink = `upi://pay?pa=${upiId}&pn=BumBumCafe&am=${pkg.pay}&cu=INR&tn=WalletRecharge_${customerDetails.phone.replace('+91','')}`;
+                            const msg = `*WALLET RECHARGE REQUEST* 💳\n\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Paid:* ₹${pkg.pay}\n*Expected Wallet Balance:* ₹${pkg.get}\n\n_मैंने UPI से ₹${pkg.pay} भेज दिए हैं। कृपया चेक करके मेरे कैफे वॉलेट में ₹${pkg.get} क्रेडिट कर दें!_`;
+                            
+                            toast.success(isHindi ? "UPI ऐप खुल रहा है..." : "Opening UPI App...");
+                            setTimeout(() => {
+                              window.location.href = upiLink;
+                              setTimeout(() => {
+                                window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                              }, 2000);
+                            }, 500);
+                          }}
+                          className="bg-green-600 hover:bg-green-500 text-white px-4 py-3 rounded-xl font-black text-[10px] uppercase shadow-md transition-colors"
+                        >
+                          {isHindi ? "खरीदें" : "Buy Pass"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* MINI FLOATING TRACKER BUTTON (जब ग्राहक मैप को छिपा दे) */}
+
       <AnimatePresence>
         {liveOrder && !isTrackerExpanded && (
           <motion.button
