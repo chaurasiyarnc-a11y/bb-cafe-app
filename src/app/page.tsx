@@ -2242,27 +2242,7 @@ export default function BbCafeHome() {
         
       </div>
 
-     {/* 👉 NEW: MOBILE BOTTOM NAVIGATION BAR */}
-      <div className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0a0a0a] border-t border-neutral-200 dark:border-white/10 z-[90] flex justify-around items-center py-2 px-2 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.05)] font-sans">
-        <button onClick={scrollToMenu} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500 dark:text-gray-400 dark:hover:text-orange-500 transition-colors">
-          <Home size={20} />
-          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "होम" : "Home"}</span>
-        </button>
-        <button onClick={() => { setIsWalletOpen(true); triggerHaptic(); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-green-500 dark:text-gray-400 dark:hover:text-green-500 transition-colors relative">
-          <Wallet size={20} />
-          {walletBalance > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-green-500 rounded-full animate-ping"></span>}
-          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "वॉलेट" : "Wallet"}</span>
-        </button>
-        <a href={`tel:+${whatsappNumber}`} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-500 transition-colors">
-          <Phone size={20} />
-          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "कॉल" : "Call"}</span>
-        </a>
-        <button onClick={() => { triggerHaptic(); setIsProfileOpen(true); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500 dark:text-gray-400 dark:hover:text-orange-500 transition-colors">
-          <User size={20} />
-          <span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "प्रोफाइल" : "Profile"}</span>
-        </button>
-      </div>
-
+     
       {/* 👉 NEW: WALLET (PREPAID PASS) MODAL */}
       <AnimatePresence>
         {isWalletOpen && (
