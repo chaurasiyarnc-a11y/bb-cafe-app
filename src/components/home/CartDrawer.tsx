@@ -77,7 +77,8 @@ export default function CartDrawer({
   noCutlery, setNoCutlery, enteredCoupon, setEnteredCoupon, appliedCoupon, handleApplyCoupon,
   paymentMethod, setPaymentMethod, setIsUpiPopupOpen, handleCheckoutClick, isSubmittingOrder,
   getCartSubtotal, getCartAddonsPrice, getDeliveryCharge, getFreeDeliveryProgressPercent,
-  getTotalBillPrice, getDisplayPrice, triggerHaptic, showAddonsSection
+ getTotalBillPrice, getDisplayPrice, triggerHaptic, showAddonsSection,
+  customerDetails, walletBalance
 }: CartDrawerProps) {
   if (!isCartOpen) return null;
 
