@@ -418,7 +418,7 @@ export default function CartDrawer({
               </span>
             </button>
           </div>
->>>>
+
 
           <button 
             onClick={handleCheckoutClick} 
