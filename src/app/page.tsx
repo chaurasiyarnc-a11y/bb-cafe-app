@@ -2795,6 +2795,8 @@ export default function BbCafeHome() {
             getDisplayPrice={getDisplayPrice}
             triggerHaptic={triggerHaptic}
             showAddonsSection={showAddonsSection}
+            customerDetails={customerDetails}
+            walletBalance={walletBalance}
           />
         )}
       </AnimatePresence>
