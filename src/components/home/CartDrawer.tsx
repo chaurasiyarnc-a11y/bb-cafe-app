@@ -64,6 +64,8 @@ paymentMethod: any;
   getTotalBillPrice: () => number;
   getDisplayPrice: (item: any) => string;
   triggerHaptic: (ms?: number) => void; 
+  customerDetails: any;
+  walletBalance: number;
   showAddonsSection: boolean;
 }
 
