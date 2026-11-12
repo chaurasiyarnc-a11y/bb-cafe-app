@@ -2188,8 +2188,8 @@ export default function BbCafeHome() {
         </footer>
       </main>
 
-      {/* STICKY FLOATING CART BUTTON */}
-      <div className="fixed bottom-6 inset-x-0 z-[80] flex justify-center pointer-events-none font-sans font-bold">
+     {/* STICKY FLOATING CART BUTTON */}
+      <div className="fixed bottom-[85px] inset-x-0 z-[80] flex justify-center pointer-events-none font-sans font-bold">
         <div className="flex gap-4 pointer-events-auto">
           {cart.length > 0 && (
             <motion.button
