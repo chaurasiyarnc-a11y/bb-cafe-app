@@ -2780,10 +2780,10 @@ export default function BbCafeHome() {
             setNoCutlery={setNoCutlery}
             enteredCoupon={enteredCoupon}
             setEnteredCoupon={setEnteredCoupon}
-            appliedCoupon={appliedCoupon}
+           appliedCoupon={appliedCoupon}
             handleApplyCoupon={handleApplyCoupon}
-            paymentMethod={paymentMethod}
-            setPaymentMethod={setPaymentMethod}
+            paymentMethod={paymentMethod as any}
+            setPaymentMethod={setPaymentMethod as any}
             setIsUpiPopupOpen={setIsUpiPopupOpen}
             handleCheckoutClick={handleCheckoutClick}
             isSubmittingOrder={isSubmittingOrder}
