@@ -1516,8 +1516,9 @@ const handleSendUdhariReminder = (targetOrder: any) => {
      const payload = {
         name: custFormName.trim(),
         phone: cleanPhone,
-        address: custFormAddress.trim(),
+       address: custFormAddress.trim(),
         points: Number(custFormPoints) || 0,
+        walletBalance: Number(custFormWalletBalance) || 0, // 👉 NEW: Save Wallet Balance
         note: custFormNote.trim(), // 👉 NEW: कस्टमर की पसंद का नोट
         specialDates: custFormSpecialDates, // 👉 NEW: बच्चों या फॅमिली के बर्थडे
         lastActive: editingCustProfile ? editingCustProfile.lastActive : new Date()
