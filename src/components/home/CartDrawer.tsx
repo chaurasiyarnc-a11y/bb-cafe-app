@@ -52,8 +52,8 @@ interface CartDrawerProps {
   setEnteredCoupon: (code: string) => void;
   appliedCoupon: any;
   handleApplyCoupon: () => void;
-  paymentMethod: "cod" | "upi";
-  setPaymentMethod: (method: "cod" | "upi") => void;
+paymentMethod: any;
+  setPaymentMethod: (method: any) => void;
   setIsUpiPopupOpen: (open: boolean) => void;
   handleCheckoutClick: () => void;
   isSubmittingOrder: boolean;
