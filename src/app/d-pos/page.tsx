@@ -8640,6 +8640,12 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 </div>
 
                 <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-green-600">💳 Wallet Balance (₹)</label>
+                   <input type="number" min={0} placeholder="e.g. 1200" value={custFormWalletBalance} onChange={e => setCustFormWalletBalance(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-green-50 dark:bg-green-900/10 border border-green-300 dark:border-green-800 rounded-xl p-2.5 font-mono font-black outline-none focus:border-green-500 text-xs text-green-700 dark:text-green-400" />
+                </div>
+
+
+                <div className="space-y-1">
                    <label className="text-[10px] font-black uppercase text-neutral-500">Address (Optional)</label>
                    <textarea rows={2} placeholder="Full Delivery Address..." value={custFormAddress} onChange={e => setCustFormAddress(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs resize-none" />
                 </div>
