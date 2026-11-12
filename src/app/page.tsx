@@ -1405,11 +1405,14 @@ export default function BbCafeHome() {
     
     const phoneClean = customerDetails.phone.replace("+91", "").trim();
     
-    const unsubPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
+   const unsubPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
       if (snap.exists()) {
-        setCustomerPoints(snap.data().points || 0);
+        const data = snap.data();
+        setCustomerPoints(data.points || 0);
+        setWalletBalance(data.walletBalance || 0);
       }
     }, (error) => console.warn("Points live check subscription bypassed:", error));
+
 
     const unsubHistory = onSnapshot(
       query(collection(db, "customer_points", phoneClean, "history"), orderBy("timestamp", "desc")),
