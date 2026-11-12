@@ -365,30 +365,58 @@ export default function CartDrawer({
           <div className="flex justify-between font-black text-xl font-mono"><span>{isHindi ? "भुगतान राशि" : "To Pay"}</span> <span>₹{getTotalBillPrice()}</span></div>
         </div>
 
-        {/* 9. PAYMENT METHOD & CHECKOUT */}
+       {/* 9. PAYMENT METHOD & CHECKOUT */}
         <div className="dark:bg-white/[0.02] bg-neutral-50 p-4 rounded-2xl border dark:border-white/5 border-neutral-200 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
           <label className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400">{isHindi ? "भुगतान का माध्यम चुनें:" : "Select Payment Method:"}</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => { triggerHaptic(); setPaymentMethod("cod"); }}
-              className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "cod" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300'}`}
+              className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all text-center ${paymentMethod === "cod" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300'}`}
             >
               <span className="text-sm">💵</span>
-              <span className="text-[9px] font-black">
+              <span className="text-[9px] font-black leading-tight">
                 {fulfillmentType === "delivery" 
-                  ? (isHindi ? "कैश ऑन डिलीवरी" : "Cash on Delivery") 
-                  : (isHindi ? "कैश काउंटर पेमेंट" : "Cash at Counter")
+                  ? (isHindi ? "कैश डिलीवरी" : "COD") 
+                  : (isHindi ? "कैश काउंटर" : "CASH")
                 }
               </span>
             </button>
+            
             <button
               onClick={() => { triggerHaptic(); setPaymentMethod("upi"); setIsUpiPopupOpen(true); }}
-              className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "upi" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300'}`}
+              className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all text-center ${paymentMethod === "upi" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300'}`}
             >
               <span className="text-sm">📱</span>
-              <span className="text-[9px] font-black">{isHindi ? "ऑनलाइन भुगतान (UPI)" : "Pay Online (UPI)"}</span>
+              <span className="text-[9px] font-black leading-tight">{isHindi ? "ऑनलाइन (UPI)" : "UPI"}</span>
+            </button>
+
+            {/* 👉 NEW: Wallet Payment Button */}
+            <button
+              onClick={() => {
+                triggerHaptic(); 
+                if (!customerDetails) {
+                   toast.error("Please create your profile first!");
+                   return;
+                }
+                if (walletBalance < getTotalBillPrice()) {
+                   toast.error(isHindi ? `आपके वॉलेट में पर्याप्त बैलेंस नहीं है (₹${walletBalance} मौजूद है)।` : `Insufficient Wallet Balance (₹${walletBalance} available).`);
+                   return;
+                }
+                setPaymentMethod("wallet");
+              }}
+              className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all text-center relative overflow-hidden ${paymentMethod === "wallet" ? 'border-green-500 bg-green-500/10 text-green-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300'}`}
+            >
+              {paymentMethod !== "wallet" && <div className="absolute top-0 right-0 w-8 h-8 bg-green-500/10 rounded-bl-full"></div>}
+              <span className="text-sm">💳</span>
+              <span className="text-[9px] font-black leading-tight">
+                 {isHindi ? "कैफे वॉलेट" : "WALLET"} <br/>
+                 <span className={`${paymentMethod === "wallet" ? "text-green-700 dark:text-green-400" : "text-green-600 dark:text-green-500"}`}>
+                   (₹{walletBalance || 0})
+                 </span>
+              </span>
             </button>
           </div>
+>>>>
 
           <button 
             onClick={handleCheckoutClick} 
