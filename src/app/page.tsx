@@ -1786,23 +1786,9 @@ export default function BbCafeHome() {
             <span>{isHindi ? "English" : "हिंदी"}</span>
           </button>
           
-          <a 
-            href="tel:+919714293759"
-            className="p-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl border border-transparent shadow flex items-center justify-center transition-colors flex-shrink-0"
-            title="Direct call to cafe"
-          >
-            <Phone size={18} />
-          </a>
-
-          <button 
-            onClick={() => { triggerHaptic(); setIsProfileOpen(true); }}
-            className="p-2.5 dark:bg-neutral-800 bg-neutral-100 dark:text-white text-neutral-900 rounded-xl border dark:border-neutral-700 border-neutral-300 hover:border-orange-500 hover:text-orange-500 transition-colors shadow flex-shrink-0"
-            title="My Profile & Loyalty Rewards"
-          >
-            <User size={18} />
-          </button>
-        </div>
+         </div>
       </div>
+
 
       {!storeOpen && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
