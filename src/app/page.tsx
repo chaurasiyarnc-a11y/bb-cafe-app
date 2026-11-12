@@ -139,6 +139,8 @@ export default function BbCafeHome() {
 
   const [isHindi, setIsHindi] = useState(false);
   const [customerPoints, setCustomerPoints] = useState<number>(0);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [isWalletOpen, setIsWalletOpen] = useState(false);
 
   const [socialCounts, setSocialCounts] = useState<any>({
     facebook: "500+ Followers",
