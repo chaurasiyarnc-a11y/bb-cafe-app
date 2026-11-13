@@ -8626,10 +8626,23 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 {/* Item Name */}
                 <input type="text" required placeholder="Item Name *" value={itemNameInput} onChange={e => setItemNameInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500" autoFocus />
                 
-                {/* Price & Code */}
+               {/* Price & Code */}
                 <div className="grid grid-cols-2 gap-3">
                   <input type="number" required min={0} placeholder="Default Price (₹) *" value={itemPriceInput} onChange={e => setItemPriceInput(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none focus:border-orange-500" />
-                  <input type="text" required placeholder="Short Code *" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none focus:border-orange-500" />
+                  <div className="flex gap-1.5">
+                    <input type="text" required placeholder="Short Code *" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none focus:border-orange-500" />
+                    <button
+                      type="button"
+                      title="इस Category का Next Code भरें"
+                      onClick={() => {
+                        const targetCat = isAddingNewCatInput && newCustomCategoryName.trim() ? newCustomCategoryName : itemCatInput;
+                        setItemCodeInput(generateNextCategoryCode(targetCat, products, editingItemObj?.id));
+                      }}
+                      className="px-2.5 bg-orange-500/15 hover:bg-orange-500/25 text-orange-600 dark:text-orange-400 rounded-xl font-black text-xs shrink-0 border border-orange-500/30"
+                    >
+                      🔄
+                    </button>
+                  </div>
                 </div>
 
                {/* Category Dropdown */}
@@ -8641,9 +8654,8 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       } else {
                         const chosenCat = e.target.value;
                         setItemCatInput(chosenCat);
-                        if (!editingItemObj) {
-                          setItemCodeInput(generateNextCategoryCode(chosenCat));
-                        }
+                        // 👉 Add और Update दोनों में Category चुनते ही उस Category का Next Item Code आ जाएगा
+                        setItemCodeInput(generateNextCategoryCode(chosenCat, products, editingItemObj?.id));
                       }
                     }} className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500">
                       {categories.filter(c => c !== 'All' && c !== '⭐ Top Items').map(c => <option key={c} value={c}>{c}</option>)}
@@ -8658,18 +8670,27 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                         onChange={e => {
                           const val = e.target.value;
                           setNewCustomCategoryName(val);
-                          if (!editingItemObj && val.trim()) {
-                            setItemCodeInput(generateNextCategoryCode(val));
+                          if (val.trim()) {
+                            setItemCodeInput(generateNextCategoryCode(val, products, editingItemObj?.id));
                           }
                         }}
                         className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500"
                         autoFocus
                       />
-                      <button type="button" onClick={() => { setIsAddingNewCatInput(false); setNewCustomCategoryName(''); }} className="px-3 bg-red-500/10 text-red-600 rounded-xl font-bold hover:bg-red-500/20">Cancel</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingNewCatInput(false);
+                          setNewCustomCategoryName('');
+                          setItemCodeInput(generateNextCategoryCode(itemCatInput, products, editingItemObj?.id));
+                        }}
+                        className="px-3 bg-red-500/10 text-red-600 rounded-xl font-bold hover:bg-red-500/20"
+                      >
+                        Cancel
+                      </button>
                     </div>
                   )}
                 </div>
-
                {/* Image URL & Availability */}
                 <input type="text" placeholder="Image URL (Optional)" value={itemImageInput} onChange={e => setItemImageInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 outline-none focus:border-orange-500" />
                 
