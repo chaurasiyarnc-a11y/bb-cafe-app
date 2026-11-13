@@ -5271,14 +5271,25 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
 {/* RIGHT CART PANEL */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-300 dark:border-neutral-800 flex flex-col p-3 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-neutral-300 dark:border-neutral-800 pb-2 mb-2 shrink-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-xs font-black uppercase text-orange-600 dark:text-orange-500">Cart ({cart.length})</h3>
-                        <button onClick={handleHoldCurrentCart} title="Park Cart [F3]" className="text-[10px] font-black uppercase px-2 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-500/30 rounded-md border border-amber-500/40 flex items-center gap-1">
+                    <div className="flex items-center justify-between border-b border-neutral-300 dark:border-neutral-800 pb-2 mb-2 shrink-0 gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-xs font-black uppercase text-orange-600 dark:text-orange-500 whitespace-nowrap">Cart ({cart.length})</h3>
+                        <button onClick={handleHoldCurrentCart} title="Park Cart [F3]" className="text-[10px] font-black uppercase px-2 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-500/30 rounded-md border border-amber-500/40 flex items-center gap-1 whitespace-nowrap">
                           <SafePauseCircle size={11} /> Hold [F3]
                         </button>
+                        <button
+                          onClick={() => setIsHeldCartsModalOpen(true)}
+                          title="View Parked Carts"
+                          className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border flex items-center gap-1 whitespace-nowrap transition-colors ${
+                            heldCarts.length > 0
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                              : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-700'
+                          }`}
+                        >
+                          <SafePlayCircle size={11} /> Parked ({heldCarts.length})
+                        </button>
                       </div>
-                      <button onClick={() => { setCart([]); setCartCustSearchInput(''); setGuestMen(''); setGuestWomen(''); setGuestKids(''); }} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={13} /> Clear [Del]</button>
+                      <button onClick={() => { setCart([]); setCartCustSearchInput(''); setGuestMen(''); setGuestWomen(''); setGuestKids(''); }} className="text-red-500 text-[11px] font-bold hover:underline flex items-center gap-1 whitespace-nowrap"><SafeTrash2 size={13} /> Clear [Del]</button>
                     </div>
 
                     {/* 👉 NEW: DYNAMIC CUSTOMER SEARCH (NAME OR NUMBER) & REDEEM SECTION */}
