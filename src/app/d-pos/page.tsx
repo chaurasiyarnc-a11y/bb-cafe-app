@@ -2319,10 +2319,10 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     }
   };
 
- const generateNextCategoryCode = (catName: string, currentList = products) => {
+const generateNextCategoryCode = (catName: string, currentList = products, excludeItemId?: string) => {
     const cleanCat = (catName || '').trim().toLowerCase();
     const existingCatNums = currentList
-      .filter(p => (p.category || '').trim().toLowerCase() === cleanCat)
+      .filter(p => p.id !== excludeItemId && (p.category || '').trim().toLowerCase() === cleanCat)
       .map(p => parseInt(String(p.itemCode || '').trim(), 10))
       .filter(num => !isNaN(num) && num > 0);
 
@@ -2334,6 +2334,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     let candidate = base === 1 ? 1 : base + 1;
     const allUsedCodes = new Set(
       currentList
+        .filter(p => p.id !== excludeItemId)
         .map(p => parseInt(String(p.itemCode || '').trim(), 10))
         .filter(n => !isNaN(n))
     );
@@ -2342,7 +2343,6 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     }
     return String(candidate);
   };
-
   // Products Loading with guaranteed Name & Price fallback
   useEffect(() => {
     if (!isLoggedIn) return;
