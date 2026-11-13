@@ -7421,13 +7421,23 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                                   </div>
                                   <p className="text-xs font-mono text-neutral-500 mt-0.5">📞 {cust.phone || cust.id}</p>
                               </div>
-                              <div className="flex flex-col items-end gap-1">
+                             <div className="flex flex-col items-end gap-1">
                                 <span className="bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 px-2 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
                                   ⭐ {cust.points || 0} Pts
                                 </span>
+                                {Number(cust.walletBalance) > 0 && (
+                                  <span className="bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/30 px-2 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
+                                    💳 ₹{cust.walletBalance} Wallet
+                                  </span>
+                                )}
                                 {cust.gamePoints > 0 && (
                                   <span className="bg-purple-100 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30 px-2 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
                                     🎰 {cust.gamePoints} Game
+                                  </span>
+                                )}
+                                {isAppCustomer(cust) && (
+                                  <span className="bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 shadow-sm">
+                                    📱 App User
                                   </span>
                                 )}
                               </div>
