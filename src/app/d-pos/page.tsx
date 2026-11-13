@@ -3437,6 +3437,44 @@ const handleFinalCheckoutAndPrintBill = async () => {
       let remainingPts = Math.max(0, customerPoints - loyPtsDeductedOffline) + earned;
       let remainingGamePts = customerGamePoints - gamePtsDeductedOffline;
 
+      // 👉 FIX: Firestore से असली पुराना बिल चेक करें ताकि Re-Edit पर डबल अमाउंट/पॉइंट न जुड़े
+      let prevOrderData: any = activeEditingPreviousOrder;
+      if (activeEditingOrderId && navigator.onLine) {
+        try {
+          const prevSnap = await getDoc(doc(db, "orders", activeEditingOrderId));
+          if (prevSnap.exists()) {
+            prevOrderData = { id: prevSnap.id, ...prevSnap.data() };
+          }
+        } catch (e) {}
+      }
+
+      const prevOrderPhone = prevOrderData?.customerPhone ? getSanitizedPhone(prevOrderData.customerPhone) : '';
+      const wasPrevOrderProcessed = Boolean(
+        prevOrderData &&
+        (prevOrderData.pointsProcessed ||
+          prevOrderData.pointsEarned !== undefined ||
+          prevOrderData.status === 'completed' ||
+          prevOrderData.paymentSettled)
+      );
+
+      if (wasPrevOrderProcessed && prevOrderPhone.length === 10 && prevOrderPhone !== cleanPhone && navigator.onLine) {
+        try {
+          const oldUserRef = doc(db, "customer_points", prevOrderPhone);
+          const oldUserSnap = await getDoc(oldUserRef);
+          if (oldUserSnap.exists()) {
+            const oldU = oldUserSnap.data();
+            const oldBillTotal = Number(prevOrderData.total) || 0;
+            const oldBillEarned = Number(prevOrderData.pointsEarned) || 0;
+            const oldBillRedeemed = Number(prevOrderData.pointsRedeemed) || 0;
+            await setDoc(oldUserRef, {
+              totalSpent: Math.max(0, (Number(oldU.totalSpent) || 0) - oldBillTotal),
+              totalVisits: Math.max(0, (Number(oldU.totalVisits) || 0) - 1),
+              points: Math.max(0, (Number(oldU.points) || 0) - oldBillEarned + oldBillRedeemed)
+            }, { merge: true });
+          }
+        } catch (e) {}
+      }
+
       if (cleanPhone.length === 10 && navigator.onLine) {
         const userRef = doc(db, "customer_points", cleanPhone);
         const userDoc = await getDoc(userRef);
@@ -3453,21 +3491,15 @@ const handleFinalCheckoutAndPrintBill = async () => {
           prevVisits = Number(data.totalVisits) || 0;
         }
 
-        // 🛡️ चेक करें कि क्या यह पुराना कम्प्लीट बिल एडिट हो रहा है?
-        const isReEditingCompletedBill = 
-          activeEditingPreviousOrder && 
-          (activeEditingPreviousOrder.pointsEarned !== undefined || 
-           activeEditingPreviousOrder.status === 'completed' || 
-           activeEditingPreviousOrder.paymentSettled);
+        const isSameCustomerReEdit = wasPrevOrderProcessed && prevOrderPhone === cleanPhone;
 
         let newSpent = prevSpent + finalTotal;
         let newVisits = prevVisits + 1;
 
-        if (isReEditingCompletedBill) {
-          // 👉 FIX 2: पुराने बिल का अमाउंट और पॉइंट्स पहले माइनस (Rollback) करें
-          const oldTotal = Number(activeEditingPreviousOrder.total) || 0;
-          const oldEarned = Number(activeEditingPreviousOrder.pointsEarned) || 0;
-          const oldRedeemed = Number(activeEditingPreviousOrder.pointsRedeemed) || 0;
+        if (isSameCustomerReEdit) {
+          const oldTotal = Number(prevOrderData.total) || 0;
+          const oldEarned = Number(prevOrderData.pointsEarned) || 0;
+          const oldRedeemed = Number(prevOrderData.pointsRedeemed) || 0;
 
           const spentBeforeOldBill = Math.max(0, prevSpent - oldTotal);
           newSpent = spentBeforeOldBill + finalTotal;
@@ -3492,7 +3524,6 @@ const handleFinalCheckoutAndPrintBill = async () => {
           newVisits = prevVisits + 1;
         }
 
-        // 🚀 OFFLINE POINTS SAVE LOGIC
         const updatedCustomerData = { 
           name: customerName || "Walk-in Guest", 
           phone: cleanPhone, 
@@ -3517,7 +3548,6 @@ const handleFinalCheckoutAndPrintBill = async () => {
         // बिना मोबाइल वाले ग्राहकों के लिए
         remainingPts = Math.max(0, customerPoints - redeemed) + earned;
       }
-
       const orderObj = { 
         billNumber,
         tokenNumber: token, 
