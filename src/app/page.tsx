@@ -218,8 +218,72 @@ export default function BbCafeHome() {
   // UI States
   const [showGreeting, setShowGreeting] = useState(true);
   const [isTrackerExpanded, setIsTrackerExpanded] = useState(true); // 👉 NEW: ट्रैकर को छोटा/बड़ा करने के लिए
-  // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
+  // 👉 MAP STATES & LEAFLET LOGIC
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [tempPinLocation, setTempPinLocation] = useState<{lat: number, lng: number} | null>(null);
 
+  useEffect(() => {
+    if (!isMapOpen) return;
+    let map: any = null;
+    const initMap = () => {
+      if (!(window as any).L) return;
+      const mapContainer = document.getElementById('osm-map');
+      if (!mapContainer) return;
+      if ((window as any).L.DomUtil.get('osm-map') !== null) {
+        (window as any).L.DomUtil.get('osm-map')._leaflet_id = null;
+      }
+      const initialLat = customerCoordinates?.lat || storeCoordinates.lat;
+      const initialLng = customerCoordinates?.lng || storeCoordinates.lng;
+      setTempPinLocation({ lat: initialLat, lng: initialLng });
+      map = (window as any).L.map('osm-map', { zoomControl: false }).setView([initialLat, initialLng], 16);
+      (window as any).L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap', maxZoom: 19
+      }).addTo(map);
+      map.on('move', () => {
+        const center = map.getCenter();
+        setTempPinLocation({ lat: center.lat, lng: center.lng });
+      });
+    };
+
+    if (!(window as any).L) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => setTimeout(initMap, 100);
+      document.head.appendChild(script);
+    } else {
+      setTimeout(initMap, 100);
+    }
+    return () => { if (map) map.remove(); };
+  }, [isMapOpen, customerCoordinates, storeCoordinates]);
+
+  const handleConfirmMapLocation = async () => {
+    triggerHaptic();
+    if(!tempPinLocation) return;
+    setIsMapOpen(false);
+    const { lat, lng } = tempPinLocation;
+    setCustomerCoordinates({ lat, lng });
+    const distance = calculateDistanceInKm(lat, lng, storeCoordinates.lat, storeCoordinates.lng);
+    setDistanceKm(Number(distance.toFixed(2)));
+    const toastId = toast.loading(isHindi ? "सटीक पता निकाला जा रहा है..." : "Fetching exact address...");
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=en`);
+      const data = await res.json();
+      const textAddress = data?.display_name || "";
+      const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
+      setAddress(textAddress ? `📍 Pinned Address: ${textAddress}\n🔗 Maps Link: ${mapLink}` : `📍 Pinned Location: ${mapLink}`);
+      toast.dismiss(toastId);
+      toast.success(isHindi ? "लोकेशन सेट हो गई!" : "Location set successfully!");
+    } catch (err) {
+      setAddress(`📍 Pinned Location: https://www.google.com/maps?q=${lat},${lng}`);
+      toast.dismiss(toastId);
+    }
+  };
+  
+// --- HELPERS, CALCULATIONS & GENERAL UTILS ---
   const triggerHaptic = (ms = 35) => {
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate(ms);
