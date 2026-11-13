@@ -6777,7 +6777,17 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             </span>
                             <span className="font-mono font-black text-sm text-green-600 dark:text-green-400">₹{order.total}</span>
                             <div className="flex gap-1.5">
-                             <button 
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSendWhatsAppBill(order);
+                                }} 
+                                className="px-2.5 py-2 bg-green-600/15 text-green-600 dark:text-green-400 hover:bg-green-600 hover:text-white border border-green-500/30 rounded-xl transition-colors flex items-center gap-1 text-[10px] font-black uppercase"
+                                title="WhatsApp पर बिल भेजें"
+                              >
+                                <SafeShare2 size={14} /> WhatsApp
+                              </button>
+                              <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (currentUser?.role === 'admin') { handleReEditOrder(order); } 
@@ -6788,7 +6798,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                               >
                                 <SafeEdit3 size={14} />
                               </button>
-                             <button 
+                              <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedReceipt(order);
