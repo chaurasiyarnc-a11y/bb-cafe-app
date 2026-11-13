@@ -6000,12 +6000,19 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                                 >
                                   <SafePrinter size={14} /> KOT
                                 </button>
-                                <button 
+                               <button 
                                   onClick={() => handlePrintReceiptDirect(order, false)} 
                                   className="px-3 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-xs font-black uppercase shadow flex items-center gap-1 border border-neutral-300 dark:border-neutral-700"
                                   title="कस्टमर के लिए बिल निकालें"
                                 >
                                   <SafePrinter size={14} /> Bill
+                                </button>
+                                <button 
+                                  onClick={() => handleSendWhatsAppBill(order)} 
+                                  className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase shadow flex items-center gap-1"
+                                  title="ग्राहक को WhatsApp पर बिल भेजें"
+                                >
+                                  <SafeShare2 size={14} /> WhatsApp
                                 </button>
                               </div>
                             ) : (
@@ -6027,6 +6034,13 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                                   className="px-3 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-xs font-bold flex items-center gap-1 border"
                                 >
                                   <SafePrinter size={14} /> Reprint
+                                </button>
+                                <button 
+                                  onClick={() => handleSendWhatsAppBill(order)} 
+                                  className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase shadow flex items-center gap-1"
+                                  title="ग्राहक को WhatsApp पर बिल भेजें"
+                                >
+                                  <SafeShare2 size={14} /> WhatsApp
                                 </button>
                               </div>
                             )}
