@@ -111,8 +111,7 @@ export default function BbCafeHome() {
   // कैफ़े की मुख्य UPI ID
   const [upiId, setUpiId] = useState("Q231198993@ybl");
   
-  const [storeCoordinates, setStoreCoordinates] = useState({ lat: 24.2863, lng: 80.1245 });
-
+  const [storeCoordinates, setStoreCoordinates] = useState({ lat: 24.190501, lng: 79.953694 });
   const [storeTimingHindi, setStoreTimingHindi] = useState("सुबह 10:00 से रात 11:00 बजे");
   const [storeTimingEnglish, setStoreTimingEnglish] = useState("10:00 AM to 11:00 PM");
 
