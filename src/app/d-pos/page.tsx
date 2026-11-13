@@ -3907,17 +3907,21 @@ const handleFinalCheckoutAndPrintBill = async () => {
  // 🟢 WhatsApp Bill Sender (With Customer Feedback Links)
   const handleSendWhatsAppBill = (targetOrder: any = null) => {
     const ord = targetOrder || { customerPhone, customerName, fulfillmentType, items: cart, total: getTotalBillPrice() };
-    const clean = getSanitizedPhone(ord.customerPhone || '');
-    if (clean.length !== 10) return toast.error("Enter valid 10-digit phone number!");
-    if (!ord.items || ord.items.length === 0) return toast.error("No items in cart!");
+    let clean = getSanitizedPhone(ord.customerPhone || '');
+    if (clean.length !== 10) {
+      const entered = window.prompt("इस बिल में नंबर सेव नहीं है। कृपया ग्राहक का 10-अंकों का WhatsApp नंबर दर्ज करें:");
+      if (!entered) return;
+      clean = getSanitizedPhone(entered);
+      if (clean.length !== 10) return toast.error("कृपया सही 10-अंकों का मोबाइल नंबर डालें!");
+    }
+    if (!ord.items || ord.items.length === 0) return toast.error("बिल में कोई आइटम नहीं है!");
 
     const itemsText = ord.items.map((i: any) => `• ${i.name} x${i.quantity} = ₹${i.price * i.quantity}`).join('%0A');
-    
-    // 👉 फीडबैक के लिए आपके कैफे के नंबर पर आटोमेटिक रिप्लाई सेट किया गया है
     const cafeNum = getSanitizedPhone(ownerPhoneConfig || '9714293759');
-    
-    const msg = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*%0A------------------------------%0A*Customer:* ${ord.customerName || 'Valued Guest'}%0A*Total Amount:* ₹${ord.total}%0A*Payment:* ${ord.paymentMethod || 'Paid'}%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe!_ 💛%0A%0A⭐ *Share Your Feedback:*%0Aकैसा रहा आपका अनुभव? नीचे क्लिक करें:%0A🟢 Excellent: https://wa.me/91${cafeNum}?text=Feedback:%20Excellent%20⭐%0A🟡 Average: https://wa.me/91${cafeNum}?text=Feedback:%20Average%20👍%0A🔴 Bad: https://wa.me/91${cafeNum}?text=Feedback:%20Bad%20👎`;
-    
+    const billLine = ord.billNumber ? `*Bill No:* #${ord.billNumber}%0A` : '';
+
+    const msg = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*%0A------------------------------%0A${billLine}*Customer:* ${ord.customerName || 'Valued Guest'}%0A*Total Amount:* ₹${ord.total}%0A*Payment:* ${(ord.paymentMethod || 'Paid').toUpperCase()}%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe!_ 💛%0A%0A⭐ *Share Your Feedback:*%0Aकैसा रहा आपका अनुभव? नीचे क्लिक करें:%0A🟢 Excellent: https://wa.me/91${cafeNum}?text=Feedback:%20Excellent%20⭐%0A🟡 Average: https://wa.me/91${cafeNum}?text=Feedback:%20Average%20👍%0A🔴 Bad: https://wa.me/91${cafeNum}?text=Feedback:%20Bad%20👎`;
+
     window.open(`https://wa.me/91${clean}?text=${msg}`, '_blank');
   };
 
