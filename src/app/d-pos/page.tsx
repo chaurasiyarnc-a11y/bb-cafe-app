@@ -2267,17 +2267,28 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     }
   };
 
-  const generateNextCategoryCode = (catName: string, currentList = products) => {
-    const base = getCategoryBaseCode(catName);
-    const existingNums = currentList
-      .filter(p => (p.category || '').trim().toLowerCase() === catName.trim().toLowerCase())
-      .map(p => parseInt(String(p.itemCode || '0'), 10))
-      .filter(num => !isNaN(num) && num >= base && num < base + 100);
+ const generateNextCategoryCode = (catName: string, currentList = products) => {
+    const cleanCat = (catName || '').trim().toLowerCase();
+    const existingCatNums = currentList
+      .filter(p => (p.category || '').trim().toLowerCase() === cleanCat)
+      .map(p => parseInt(String(p.itemCode || '').trim(), 10))
+      .filter(num => !isNaN(num) && num > 0);
 
-    if (existingNums.length === 0) {
-      return String(base === 1 ? 1 : base + 1);
+    if (existingCatNums.length > 0) {
+      return String(Math.max(...existingCatNums) + 1);
     }
-    return String(Math.max(...existingNums) + 1);
+
+    const base = getCategoryBaseCode(catName);
+    let candidate = base === 1 ? 1 : base + 1;
+    const allUsedCodes = new Set(
+      currentList
+        .map(p => parseInt(String(p.itemCode || '').trim(), 10))
+        .filter(n => !isNaN(n))
+    );
+    while (allUsedCodes.has(candidate)) {
+      candidate += 100;
+    }
+    return String(candidate);
   };
 
   // Products Loading with guaranteed Name & Price fallback
