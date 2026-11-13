@@ -2811,12 +2811,13 @@ const generateNextCategoryCode = (catName: string, currentList = products, exclu
     triggerBeep('tap');
     setIsAddingNewCatInput(false);
     setNewCustomCategoryName('');
-    if (item) {
+   if (item) {
+      const existingCat = item.category || 'Burgers';
       setEditingItemObj(item);
       setItemNameInput(item.name || item.title || '');
-      setItemCodeInput(item.itemCode || '');
+      setItemCatInput(existingCat);
+      setItemCodeInput(item.itemCode ? String(item.itemCode) : generateNextCategoryCode(existingCat, products, item.id));
       setItemPriceInput(item.price !== undefined ? Number(item.price) : 100);
-      setItemCatInput(item.category || 'Burgers');
       setItemImageInput(item.image || item.imageUrl || '');
       setItemIsAvailable(item.isAvailable !== false);
       if (item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0) {
@@ -2826,7 +2827,7 @@ const generateNextCategoryCode = (catName: string, currentList = products, exclu
         setHasVariants(false);
         setItemVariantsList({});
       }
-   } else {
+    } else {
       setEditingItemObj(null);
       setItemNameInput('');
       const defaultCat = (selectedCategory !== 'All' && selectedCategory !== '⭐ Top Items'
