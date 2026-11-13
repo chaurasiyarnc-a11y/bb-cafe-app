@@ -5099,16 +5099,10 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       <SafeHelpCircle size={12} /> Help [F1]
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button onClick={() => setIsHeldCartsModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
-                      <SafePauseCircle size={13} className="text-amber-500 shrink-0" />
-                      <span className="truncate">Parked ({heldCarts.length})</span>
-                    </button>
-                    <button onClick={() => setIsExpenseModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
-                      <Receipt size={13} className="text-red-500 shrink-0" />
-                      <span className="truncate">Expense [F6]</span>
-                    </button>
-                  </div>
+                 <button onClick={() => setIsExpenseModalOpen(true)} className="w-full bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 text-neutral-800 dark:text-white hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors">
+                    <Receipt size={13} className="text-red-500 shrink-0" />
+                    <span className="truncate">Expense [F6]</span>
+                  </button>
                 </div>
               )}
             </div>
