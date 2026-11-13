@@ -3687,11 +3687,14 @@ const handleFinalCheckoutAndPrintBill = async () => {
     setActiveEditingOriginalItems(order.items ? JSON.parse(JSON.stringify(order.items)) : []);
     setCart(order.items || []);
     
-    setCustomerName(order.customerName || '');
+   setCustomerName(order.customerName || '');
     const cleanPhone = order.customerPhone ? String(order.customerPhone).replace(/\D/g, '').slice(-10) : '';
     setCustomerPhone(cleanPhone);
     if (cleanPhone.length === 10) {
+      setCartCustSearchInput(`${order.customerName || 'Guest'} - ${cleanPhone}`);
       searchCustomerByExactPhone(cleanPhone); // Fetch latest profile/points
+    } else {
+      setCartCustSearchInput(order.customerName && order.customerName !== 'Walk-in Guest' ? order.customerName : '');
     }
     
     setAddress(order.address || '');
