@@ -10820,12 +10820,15 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
+             <div className="flex gap-2 pt-2">
                 <button onClick={() => { setIsReceiptModalOpen(false); handlePrintReceiptDirect(selectedReceipt, true); }} className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] rounded-xl shadow-lg transition-colors flex items-center justify-center gap-1">
                    <SafePrinter size={14}/> Print KOT
                 </button>
-               <button onClick={() => { setIsReceiptModalOpen(false); handlePrintReceiptDirect(selectedReceipt, false); }} className="flex-1 py-2.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase text-[10px] rounded-xl shadow border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors flex items-center justify-center gap-1">
+                <button onClick={() => { setIsReceiptModalOpen(false); handlePrintReceiptDirect(selectedReceipt, false); }} className="flex-1 py-2.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase text-[10px] rounded-xl shadow border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors flex items-center justify-center gap-1">
                    <SafePrinter size={14}/> Print Bill
+                </button>
+                <button onClick={() => handleSendWhatsAppBill(selectedReceipt)} className="flex-1 py-2.5 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-[10px] rounded-xl shadow-lg transition-colors flex items-center justify-center gap-1">
+                   <SafeShare2 size={14}/> WhatsApp
                 </button>
               </div>
             </motion.div>
