@@ -1304,8 +1304,55 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   const [isCustomersLoading, setIsCustomersLoading] = useState(false);
   const [customerTabSearch, setCustomerTabSearch] = useState('');
    const [customerSubTab, setCustomerSubTab] = useState<'directory' | 'dashboard'>('dashboard'); // 👈 डिफ़ॉल्ट रूप से अब CRM Dashboard खुलेगा
-// 👉 NEW: CUSTOMER SORTING & FILTERING
+// 👉 NEW: CUSTOMER SORTING & FILTERING (With Wallet & App Filter)
   const [customerSortBy, setCustomerSortBy] = useState<'recent' | 'points_high' | 'points_low' | 'spent_high'>('recent');
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<'all' | 'wallet' | 'app'>('all');
+
+  // ऑनलाइन / ऐप से ऑर्डर करने वाले नंबरों की लिस्ट
+  const onlineAppPhonesSet = useMemo(() => {
+    const phoneSet = new Set<string>();
+    liveOrders.forEach((o: any) => {
+      if (o.source !== 'PC_POS' && o.customerPhone) {
+        const clean = String(o.customerPhone).replace(/\D/g, '').slice(-10);
+        if (clean.length === 10) phoneSet.add(clean);
+      }
+    });
+    return phoneSet;
+  }, [liveOrders]);
+
+  const isWalletCustomer = (c: any) => (Number(c.walletBalance) || 0) > 0;
+
+  const isAppCustomer = (c: any) => {
+    const cleanP = String(c.phone || c.id || '').replace(/\D/g, '').slice(-10);
+    return Boolean(
+      c.isAppUser ||
+      c.appInstalled ||
+      c.fcmToken ||
+      c.uid ||
+      c.pin ||
+      c.password ||
+      c.lastAppLogin ||
+      c.lastAppOpen ||
+      c.appVersion ||
+      c.platform ||
+      c.source === 'app' ||
+      c.source === 'APP' ||
+      c.source === 'web' ||
+      c.source === 'WEB' ||
+      c.importSource === 'SpinGame' ||
+      c.importSource === 'CatchGame' ||
+      c.lastPlayedAt ||
+      c.lastPrizeWon ||
+      c.lastCatchGameScore !== undefined ||
+      (Number(c.gamePoints) || 0) > 0 ||
+      (Number(c.walletBalance) || 0) > 0 ||
+      (cleanP.length === 10 && onlineAppPhonesSet.has(cleanP))
+    );
+  };
+
+  const walletCustomersCount = useMemo(() => allCustomers.filter(isWalletCustomer).length, [allCustomers]);
+  const totalWalletInSystem = useMemo(() => allCustomers.reduce((acc, c) => acc + (Number(c.walletBalance) || 0), 0), [allCustomers]);
+  const appCustomersCount = useMemo(() => allCustomers.filter(isAppCustomer).length, [allCustomers, onlineAppPhonesSet]);
   
   // 👉 NEW: Pagination (पेज) के स्टेट्स (सिर्फ 50 ग्राहक दिखाने के लिए)
   const [customerCurrentPage, setCustomerCurrentPage] = useState(1);
@@ -1314,11 +1361,17 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   useEffect(() => {
     // जब भी कोई सर्च करे या फ़िल्टर बदले, तो पेज वापस 1 पर आ जाए
     setCustomerCurrentPage(1);
-  }, [customerTabSearch, customerSortBy]);
+  }, [customerTabSearch, customerSortBy, customerTypeFilter]);
 
-  // 👉 FIX 2: फ़िल्टर (Sorting) फिक्स कर दिया गया है
+  // 👉 FIX 2: फ़िल्टर (Wallet / App + Sorting)
   const processedCustomers = useMemo(() => {
-    let filtered = [...allCustomers]; 
+    let filtered = [...allCustomers];
+
+    if (customerTypeFilter === 'wallet') {
+      filtered = filtered.filter(isWalletCustomer);
+    } else if (customerTypeFilter === 'app') {
+      filtered = filtered.filter(isAppCustomer);
+    }
     
     if (customerTabSearch) {
       const q = customerTabSearch.toLowerCase();
@@ -1338,8 +1391,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       const timeB = b.lastActive?.toDate ? b.lastActive.toDate().getTime() : new Date(b.lastActive || 0).getTime();
       return timeB - timeA; // Default: Recent
     });
-  }, [allCustomers, customerTabSearch, customerSortBy]);
-
+  }, [allCustomers, customerTabSearch, customerSortBy, customerTypeFilter, onlineAppPhonesSet]);
   // 👉 NEW: 50 ग्राहकों का टुकड़ा (Slice) बनाने का लॉजिक
   const paginatedCustomers = useMemo(() => {
     const startIndex = (customerCurrentPage - 1) * customersPerPage;
