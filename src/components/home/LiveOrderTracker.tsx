@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, Lock, Loader2 } from 'lucide-react';
+import { Phone, Lock, Loader2, CheckCircle, Clock, ChefHat, Bike, X, Info } from 'lucide-react';
 
 interface LiveOrderTrackerProps {
   isHindi: boolean;
@@ -30,9 +30,9 @@ export default function LiveOrderTracker({
   const CAFE_LNG = 79.953694;
 
   useEffect(() => {
+    // मैप सिर्फ तब लोड होगा जब आर्डर 'Delivery' का हो
     if (!liveOrder || liveOrder.fulfillmentType !== 'delivery') return;
 
-    // 1. फ्री और फ़ास्ट मैप (Leaflet) की CSS लोड करें
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link');
       link.id = 'leaflet-css';
@@ -41,7 +41,6 @@ export default function LiveOrderTracker({
       document.head.appendChild(link);
     }
 
-    // 2. फ्री और फ़ास्ट मैप (Leaflet) की JS लोड करें
     if (!document.getElementById('leaflet-js')) {
       const script = document.createElement('script');
       script.id = 'leaflet-js';
@@ -50,12 +49,10 @@ export default function LiveOrderTracker({
       document.head.appendChild(script);
     }
 
-    // 🏠 ग्राहक की लोकेशन (अगर न मिले तो कैफे से थोड़ी दूर सेट करें)
     const custLat = liveOrder.latitude || CAFE_LAT + 0.0070;
     const custLng = liveOrder.longitude || CAFE_LNG + 0.0070;
 
     const checkInterval = setInterval(() => {
-      // जैसे ही मैप का कोड लोड हो जाए, मैप बना दें
       if ((window as any).L && mapContainerRef.current) {
         clearInterval(checkInterval);
         
@@ -66,7 +63,6 @@ export default function LiveOrderTracker({
 
           const L = (window as any).L;
           
-          // मैप को लॉक करें ताकि ग्राहक उसे खिसका न सके (सिर्फ ट्रैकिंग देखे)
           const map = L.map(mapContainerRef.current, {
              zoomControl: false,
              attributionControl: false,
@@ -76,29 +72,36 @@ export default function LiveOrderTracker({
              doubleClickZoom: false,
           });
 
-          // खूबसूरत और फ़ास्ट मैप टाइल्स (Free & No API Key required)
           L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
             maxZoom: 19,
           }).addTo(map);
 
-          // 🏪 कैफे का मार्कर (Orange)
-          L.circleMarker([CAFE_LAT, CAFE_LNG], {
-            color: '#ea580c', fillColor: '#ea580c', fillOpacity: 1, radius: 6
-          }).addTo(map);
+          // 🏪 कैफे का मार्कर
+          const cafeIcon = L.divIcon({
+            className: 'bg-transparent',
+            html: '<div style="font-size: 28px; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.4));">🏪</div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 30]
+          });
+          L.marker([CAFE_LAT, CAFE_LNG], { icon: cafeIcon }).addTo(map);
 
-          // 🏠 ग्राहक का मार्कर (Blue)
-          L.circleMarker([custLat, custLng], {
-            color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 1, radius: 6
-          }).addTo(map);
+          // 🏠 ग्राहक का मार्कर
+          const homeIcon = L.divIcon({
+            className: 'bg-transparent',
+            html: '<div style="font-size: 28px; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.4)); animation: bounce 2s infinite;">🏠</div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 30]
+          });
+          L.marker([custLat, custLng], { icon: homeIcon }).addTo(map);
 
-          // ➖ दोनों के बीच एक डैश वाली लाइन (Route) बनाएं
+          // ➖ रास्ता (Line)
           L.polyline([[CAFE_LAT, CAFE_LNG], [custLat, custLng]], {
              color: '#ea580c',
              weight: 3,
              dashArray: '6, 8'
           }).addTo(map);
 
-          // 👉 असली मैप पर स्कूटर की लोकेशन (Progress के हिसाब से)
+          // 👉 स्कूटर की लाइव पोजीशन
           let progress = 0.1;
           if (liveOrder.status === 'preparing') progress = 0.25;
           if (liveOrder.status === 'out_for_delivery') progress = 0.70;
@@ -107,7 +110,6 @@ export default function LiveOrderTracker({
           const currentLat = CAFE_LAT + (custLat - CAFE_LAT) * progress;
           const currentLng = CAFE_LNG + (custLng - CAFE_LNG) * progress;
 
-          // 🛵 स्कूटर का मुँह (Direction) सही करें
           const isMovingEast = custLng > CAFE_LNG;
           const flipStyle = isMovingEast ? 'transform: scaleX(-1);' : '';
           const bounceClass = liveOrder.status === 'preparing' ? 'animate-bounce' : '';
@@ -121,14 +123,13 @@ export default function LiveOrderTracker({
 
           L.marker([currentLat, currentLng], { icon: scooterIcon, zIndexOffset: 1000 }).addTo(map);
 
-          // 🔍 मैप को ऐसे ज़ूम करें कि कैफे और घर दोनों एक साथ स्क्रीन पर दिखें
+          // 🔍 मैप को दोनों लोकेशन्स के हिसाब से फिट करना
           const bounds = L.latLngBounds([[CAFE_LAT, CAFE_LNG], [custLat, custLng]]);
           map.fitBounds(bounds, { padding: [30, 30] });
 
           mapInstanceRef.current = map;
           setIsMapReady(true);
 
-          // 🛠️ मास्टर फिक्स: एनीमेशन के बाद मैप को रिफ्रेश करना (ग्रे बॉक्स हटाने के लिए)
           setTimeout(() => {
             if (mapInstanceRef.current) {
               mapInstanceRef.current.invalidateSize();
@@ -136,13 +137,12 @@ export default function LiveOrderTracker({
           }, 400);
 
         } catch (err) {
-           console.error("Map Load Error:", err);
+           console.error(err);
            setMapLoadError(true);
         }
       }
     }, 500);
 
-    // अगर 8 सेकंड में भी मैप लोड न हो (धीमा नेट), तो एरर सेट कर दें (ताकि पुराना डिज़ाइन आ जाए)
     const timeout = setTimeout(() => {
        if (!isMapReady) {
           clearInterval(checkInterval);
@@ -158,6 +158,53 @@ export default function LiveOrderTracker({
 
   if (!liveOrder) return null;
 
+  // 📝 आर्डर स्टेटस
+  const status = liveOrder.status || 'pending';
+  let statusText = isHindi ? "आर्डर प्राप्त हुआ" : "Order Received";
+  let StatusIcon = Clock;
+  let statusColor = "text-yellow-500";
+  let statusBg = "bg-yellow-500";
+  let progress = 25;
+
+  if (status === 'accepted' || status === 'preparing') {
+    statusText = isHindi ? "खाना बन रहा है 👨‍🍳" : "Preparing Food 👨‍🍳";
+    StatusIcon = ChefHat;
+    statusColor = "text-orange-500";
+    statusBg = "bg-orange-500";
+    progress = 50;
+  } else if (status === 'out_for_delivery') {
+    statusText = isHindi ? "आर्डर रास्ते में है 🛵" : "Out for Delivery 🛵";
+    StatusIcon = Bike;
+    statusColor = "text-blue-500";
+    statusBg = "bg-blue-500";
+    progress = 75;
+  } else if (status === 'delivered' || status === 'completed') {
+    statusText = isHindi ? "आर्डर डिलीवर हो गया 🎉" : "Order Delivered 🎉";
+    StatusIcon = CheckCircle;
+    statusColor = "text-green-500";
+    statusBg = "bg-green-500";
+    progress = 100;
+  } else if (status === 'rejected' || status === 'cancelled') {
+    statusText = isHindi ? "आर्डर रद्द हो गया ❌" : "Order Cancelled ❌";
+    StatusIcon = X;
+    statusColor = "text-red-500";
+    statusBg = "bg-red-500";
+    progress = 100;
+  }
+
+  const isDelivery = liveOrder.fulfillmentType === 'delivery';
+
+  // Fallback UI Icons (अगर मैप न हो तो क्या दिखे)
+  let destIcon = '🏠';
+  let destText = isHindi ? "आपका घर" : "Your Home";
+  if (liveOrder.fulfillmentType === 'pickup') {
+    destIcon = '🛍️';
+    destText = isHindi ? "आप (पिकअप)" : "You (Pickup)";
+  } else if (liveOrder.fulfillmentType === 'table') {
+    destIcon = '🪑';
+    destText = isHindi ? "टेबल" : "Table";
+  }
+
   return (
     <AnimatePresence>
       <motion.div 
@@ -167,12 +214,11 @@ export default function LiveOrderTracker({
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
         className="bg-gradient-to-br from-neutral-900 to-neutral-950 border border-orange-500/30 p-5 rounded-t-3xl shadow-[0_-10px_40px_rgba(234,88,12,0.15)] flex flex-col gap-4 text-xs text-left font-sans font-bold w-full mx-auto"
       >
-        {/* ड्रैग हैंडल (UI Design) */}
         <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-1" />
 
         <div className="flex justify-between items-center border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(234,88,12,0.8)]" />
+            <span className={`w-2.5 h-2.5 rounded-full ${statusBg} ${status !== 'rejected' ? 'animate-pulse' : ''} shadow-[0_0_8px_currentColor]`} />
             <span className="text-gray-100 font-extrabold uppercase tracking-wide text-sm">
               {isHindi ? `लाइव आर्डर (#${formatBillNumber(liveOrder.billNumber)})` : `Live Tracker (#${formatBillNumber(liveOrder.billNumber)})`}
             </span>
@@ -183,9 +229,8 @@ export default function LiveOrderTracker({
         </div>
 
         {/* 🗺️ LIVE TRACKING MAP (केवल डिलीवरी के लिए, एरर न होने पर) */}
-        {liveOrder.fulfillmentType === 'delivery' && !mapLoadError && (
-          <div className="w-full h-44 bg-neutral-800 rounded-2xl overflow-hidden relative border-2 border-neutral-700 shadow-inner">
-            
+        {isDelivery && !mapLoadError && (
+          <div className="w-full h-48 bg-neutral-800 rounded-2xl overflow-hidden relative border-2 border-neutral-700 shadow-inner">
             {!isMapReady && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-500 bg-neutral-900 z-10">
                 <Loader2 className="animate-spin mb-2" size={28} />
@@ -199,25 +244,25 @@ export default function LiveOrderTracker({
         )}
 
         {/* अगर पिकअप/डाइन-इन है या मैप लोड होने में एरर आ गया, तो पुरानी सड़क वाला डिज़ाइन दिखेगा */}
-        {(liveOrder.fulfillmentType !== 'delivery' || mapLoadError) && (
-          <div className="relative w-full h-8 flex items-center mt-3">
+        {(!isDelivery || mapLoadError) && (
+          <div className="relative w-full h-10 flex items-center mt-3 mb-2">
             <div className="absolute inset-x-4 h-1 border-t-2 border-dashed border-gray-600 top-1/2 -translate-y-1/2" />
             
             <div className="absolute left-0 z-10 flex flex-col items-center">
-              <span className="text-lg bg-neutral-800 p-1.5 rounded-full border border-white/10 shadow">🏨</span>
-              <span className="text-[7px] text-gray-500 font-bold uppercase tracking-wider mt-1">{isHindi ? "कैफ़े" : "Cafe"}</span>
+              <span className="text-xl bg-neutral-800 p-1.5 rounded-full border border-white/10 shadow">🏪</span>
+              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-wider mt-1">{isHindi ? "कैफ़े" : "Cafe"}</span>
             </div>
 
             <div className="absolute right-0 z-10 flex flex-col items-center">
-              <span className="text-lg bg-neutral-800 p-1.5 rounded-full border border-white/10 shadow">{liveOrder.fulfillmentType === 'pickup' ? '🛍️' : '🪑'}</span>
-              <span className="text-[7px] text-gray-500 font-bold uppercase tracking-wider mt-1">{isHindi ? "आपको मिलेगा" : "You"}</span>
+              <span className="text-xl bg-neutral-800 p-1.5 rounded-full border border-white/10 shadow">{destIcon}</span>
+              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-wider mt-1">{destText}</span>
             </div>
 
             <motion.div 
               className="absolute z-20"
               animate={{ 
-                left: liveOrder.status === 'pending' ? '4%' : liveOrder.status === 'preparing' ? '46%' : '88%',
-                scale: liveOrder.status === 'preparing' ? [1, 1.15, 1] : 1
+                left: status === 'pending' ? '4%' : status === 'preparing' ? '46%' : '88%',
+                scale: status === 'preparing' ? [1, 1.15, 1] : 1
               }}
               transition={{ 
                 left: { type: "spring", stiffness: 45, damping: 15 },
@@ -225,35 +270,31 @@ export default function LiveOrderTracker({
               }}
             >
               <span 
-                className="text-2xl drop-shadow-md inline-block -translate-y-3.5"
-                style={{ transform: liveOrder.fulfillmentType === 'delivery' ? 'scaleX(-1)' : 'none' }}
+                className="text-3xl drop-shadow-md inline-block -translate-y-4"
+                style={{ transform: isDelivery ? 'scaleX(-1)' : 'none' }}
               >
-                {liveOrder.fulfillmentType === 'delivery' ? '🛵' : '🍳'}
+                {isDelivery ? '🛵' : '🍳'}
               </span>
             </motion.div>
           </div>
         )}
 
         {/* लाइव स्टेटस टेक्स्ट विवरण */}
-        <div className="text-center bg-black/40 p-3.5 rounded-2xl border border-white/5 space-y-1.5 mt-1 shadow-inner">
-          <p className="text-[13px] font-black text-yellow-400 tracking-wide">
-            {liveOrder.status === 'pending' && (isHindi ? "⏳ आपके आर्डर की पुष्टि की जा रही है..." : "⏳ Confirming your order at counter...")}
-            {liveOrder.status === 'preparing' && (isHindi ? "👨‍🍳 शेफ रसोईघर में आपका भोजन तैयार कर रहे हैं..." : "👨‍🍳 Chef is preparing your delicious meal...")}
-            {liveOrder.status === 'out_for_delivery' && (isHindi ? "🛵 राइडर रास्ते में है, बस पहुँचने वाला है..." : "🛵 Rider is on the way to deliver your food!")}
-            {liveOrder.status === 'delivered' && (isHindi ? "✅ आर्डर सफलतापूर्वक पूरा हो गया है!" : "✅ Order successfully completed!")}
-            {liveOrder.status === 'rejected' && (isHindi ? "❌ आर्डर रद्द कर दिया गया है।" : "❌ Order was rejected.")}
-          </p>
+        <div className="text-center bg-black/40 p-3.5 rounded-2xl border border-white/5 space-y-1.5 shadow-inner">
+          <h3 className={`text-[13px] font-black flex items-center justify-center gap-2 ${statusColor}`}>
+            <StatusIcon size={16} /> {statusText}
+          </h3>
           <p className="text-[10px] text-gray-400 font-medium font-sans leading-relaxed">
-            {liveOrder.status === 'pending' && (isHindi ? "काउंटर मैनेजर आर्डर की जांच कर रहे हैं।" : "We are checking items availability.")}
-            {liveOrder.status === 'preparing' && (isHindi ? "ताज़ा और गरम सामग्री के साथ आर्डर बनाया जा रहा है।" : "We are cooking with fresh ingredients.")}
-            {liveOrder.status === 'out_for_delivery' && (isHindi ? "कृपया राइडर को रिसीव करने के लिए अपना मोबाइल ऑन रखें।" : "Please keep your mobile active for delivery boy call.")}
-            {liveOrder.status === 'delivered' && (isHindi ? "बम बम कैफ़े का भोजन चुनने के लिए धन्यवाद! 😊" : "Thank you for choosing Bum Bum Cafe! 😊")}
-            {liveOrder.status === 'rejected' && (isHindi ? "कृपया अधिक जानकारी के लिए सीधे कैफ़े को कॉल करें।" : "Please call the cafe directly for more info.")}
+            {status === 'pending' && (isHindi ? "काउंटर मैनेजर आर्डर की जांच कर रहे हैं।" : "We are checking items availability.")}
+            {status === 'preparing' && (isHindi ? "ताज़ा और गरम सामग्री के साथ आर्डर बनाया जा रहा है।" : "We are cooking with fresh ingredients.")}
+            {status === 'out_for_delivery' && (isHindi ? "कृपया राइडर को रिसीव करने के लिए अपना मोबाइल ऑन रखें।" : "Please keep your mobile active for delivery boy call.")}
+            {status === 'delivered' && (isHindi ? "बम बम कैफ़े का भोजन चुनने के लिए धन्यवाद! 😊" : "Thank you for choosing Bum Bum Cafe! 😊")}
+            {status === 'rejected' && (isHindi ? "कृपया अधिक जानकारी के लिए सीधे कैफ़े को कॉल करें।" : "Please call the cafe directly for more info.")}
           </p>
         </div>
 
         {/* --- डिलीवरी पिन (OTP) --- */}
-        {liveOrder.status !== 'delivered' && liveOrder.status !== 'completed' && liveOrder.status !== 'rejected' && liveOrder.deliveryPin && liveOrder.fulfillmentType === 'delivery' && (
+        {status !== 'delivered' && status !== 'completed' && status !== 'rejected' && liveOrder.deliveryPin && isDelivery && (
           <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-orange-500/20 p-3.5 rounded-2xl text-center space-y-2 shadow-lg mt-2 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-2 opacity-10">
               <Lock size={40} />
@@ -267,6 +308,18 @@ export default function LiveOrderTracker({
             </p>
             <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">
               {isHindi ? "(राइडर को यह पिन देकर ही अपना भोजन प्राप्त करें)" : "(Please share this PIN with rider to confirm delivery)"}
+            </p>
+          </div>
+        )}
+
+        {/* Fulfillment Alert for Pickup/Table */}
+        {!isDelivery && (
+          <div className="bg-orange-500/10 border border-orange-500/20 p-3 rounded-xl flex items-start gap-2.5 mt-2">
+            <Info size={16} className="text-orange-500 flex-shrink-0 mt-0.5" />
+            <p className="text-[10px] text-gray-300 font-bold leading-relaxed">
+              {liveOrder.fulfillmentType === 'pickup' 
+                ? (isHindi ? "यह एक सेल्फ़-पिकअप आर्डर है। कृपया कैफ़े से अपना खाना लें।" : "This is a Self-Pickup order. Please collect your food from the counter.") 
+                : (isHindi ? `डाइन-इन आर्डर। टेबल नंबर: ${liveOrder.tableNumber || 'N/A'}` : `Dine-In order. Serving at Table: ${liveOrder.tableNumber || 'N/A'}`)}
             </p>
           </div>
         )}
