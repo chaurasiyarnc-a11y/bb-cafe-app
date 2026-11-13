@@ -6812,16 +6812,24 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                                 <span className="font-mono text-sm font-black">₹{order.total}</span>
                               </div>
 <div className="flex gap-2">
-                                <button 
+                               <button 
                                   onClick={() => {
                                     setActiveEditingOrderId(order.id);
                                     setActiveEditingBillNumber(order.billNumber);
+                                    setActiveEditingPreviousOrder(order);
                                     setActiveEditingOriginalItems(order.items ? JSON.parse(JSON.stringify(order.items)) : []);
                                     setTableNumber(order.tableNumber || tName);
                                     setFulfillmentType('table');
                                     setCart(order.items || []);
                                     setCustomerName(order.customerName || '');
-                                    setCustomerPhone(order.customerPhone || '');
+                                    const cleanTablePhone = order.customerPhone ? String(order.customerPhone).replace(/\D/g, '').slice(-10) : '';
+                                    setCustomerPhone(cleanTablePhone);
+                                    if (cleanTablePhone.length === 10) {
+                                      setCartCustSearchInput(`${order.customerName || 'Guest'} - ${cleanTablePhone}`);
+                                      searchCustomerByExactPhone(cleanTablePhone);
+                                    } else {
+                                      setCartCustSearchInput('');
+                                    }
                                     setActiveTab('billing');
                                     toast.success(`Loaded ${tName} Bill #${order.billNumber}`);
                                     setTimeout(() => searchInputRef.current?.focus(), 80);
