@@ -2291,10 +2291,16 @@ export default function BbCafeHome() {
         </footer>
       </main>
 
-    {/* 🗺️ MAP PICKER MODAL */}
+    {/* 🗺️ MAP PICKER MODAL (100% FIXED ANIMATED) */}
       <AnimatePresence>
         {isMapOpen && (
-          <div className="fixed inset-0 z-[200] bg-white dark:bg-[#111] flex flex-col font-sans">
+          <motion.div 
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="fixed inset-0 z-[9999] bg-white dark:bg-[#111] flex flex-col font-sans"
+          >
             <div className="flex items-center gap-3 p-4 shadow-sm z-10 bg-white dark:bg-[#111] border-b border-neutral-200 dark:border-white/10">
               <button onClick={() => setIsMapOpen(false)} className="p-2 bg-neutral-100 dark:bg-white/10 rounded-full active:scale-95"><X size={20} className="text-neutral-700 dark:text-white" /></button>
               <div>
@@ -2313,9 +2319,9 @@ export default function BbCafeHome() {
               </button>
             </div>
             <div className="p-5 bg-white dark:bg-[#111] shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10 pb-safe">
-              <button onClick={handleConfirmMapLocation} className="w-full bg-orange-600 text-white font-black text-sm uppercase py-4 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"><MapPin size={18} />{isHindi ? "यही लोकेशन कन्फर्म करें" : "Confirm This Location"}</button>
+              <button onClick={handleConfirmMapLocation} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black text-sm uppercase py-4 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"><MapPin size={18} />{isHindi ? "यही लोकेशन कन्फर्म करें" : "Confirm This Location"}</button>
             </div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
