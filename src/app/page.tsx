@@ -218,27 +218,48 @@ export default function BbCafeHome() {
   // UI States
   const [showGreeting, setShowGreeting] = useState(true);
   const [isTrackerExpanded, setIsTrackerExpanded] = useState(true); // 👉 NEW: ट्रैकर को छोटा/बड़ा करने के लिए
-  // 👉 MAP STATES & LEAFLET LOGIC
+  // 👉 MAP STATES & LEAFLET LOGIC (100% FIXED)
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [tempPinLocation, setTempPinLocation] = useState<{lat: number, lng: number} | null>(null);
 
   useEffect(() => {
     if (!isMapOpen) return;
     let map: any = null;
+    let mapTimeout: any;
+
     const initMap = () => {
       if (!(window as any).L) return;
       const mapContainer = document.getElementById('osm-map');
-      if (!mapContainer) return;
+      
+      if (!mapContainer) {
+        mapTimeout = setTimeout(initMap, 200);
+        return;
+      }
+      
       if ((window as any).L.DomUtil.get('osm-map') !== null) {
         (window as any).L.DomUtil.get('osm-map')._leaflet_id = null;
       }
+      
       const initialLat = customerCoordinates?.lat || storeCoordinates.lat;
       const initialLng = customerCoordinates?.lng || storeCoordinates.lng;
       setTempPinLocation({ lat: initialLat, lng: initialLng });
+      
       map = (window as any).L.map('osm-map', { zoomControl: false }).setView([initialLat, initialLng], 16);
       (window as any).L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap', maxZoom: 19
       }).addTo(map);
+
+      const cafeIcon = (window as any).L.divIcon({
+        className: 'custom-cafe-icon',
+        html: '<div style="font-size: 32px; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.4)); animation: bounce 2s infinite;">🏪</div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 32]
+      });
+      (window as any).L.marker([storeCoordinates.lat, storeCoordinates.lng], { icon: cafeIcon })
+        .addTo(map)
+        .bindPopup('<b style="color:#ea580c; font-size:14px;">Bum Bum Cafe 🍕</b><br>हम यहाँ हैं!')
+        .openPopup();
+
       map.on('move', () => {
         const center = map.getCenter();
         setTempPinLocation({ lat: center.lat, lng: center.lng });
@@ -252,12 +273,16 @@ export default function BbCafeHome() {
       document.head.appendChild(link);
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.onload = () => setTimeout(initMap, 100);
+      script.onload = () => { mapTimeout = setTimeout(initMap, 200); };
       document.head.appendChild(script);
     } else {
-      setTimeout(initMap, 100);
+      mapTimeout = setTimeout(initMap, 200);
     }
-    return () => { if (map) map.remove(); };
+    
+    return () => { 
+      if (map) map.remove(); 
+      clearTimeout(mapTimeout);
+    };
   }, [isMapOpen, customerCoordinates, storeCoordinates]);
 
   const handleConfirmMapLocation = async () => {
