@@ -8516,19 +8516,39 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   <input type="text" required placeholder="Short Code *" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none focus:border-orange-500" />
                 </div>
 
-                {/* Category Dropdown */}
+               {/* Category Dropdown */}
                 <div className="flex gap-2 items-center">
                   {!isAddingNewCatInput ? (
                     <select value={itemCatInput} onChange={e => {
-                      if (e.target.value === 'ADD_NEW') setIsAddingNewCatInput(true);
-                      else setItemCatInput(e.target.value);
+                      if (e.target.value === 'ADD_NEW') {
+                        setIsAddingNewCatInput(true);
+                      } else {
+                        const chosenCat = e.target.value;
+                        setItemCatInput(chosenCat);
+                        if (!editingItemObj) {
+                          setItemCodeInput(generateNextCategoryCode(chosenCat));
+                        }
+                      }
                     }} className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500">
-                      {categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                      {categories.filter(c => c !== 'All' && c !== '⭐ Top Items').map(c => <option key={c} value={c}>{c}</option>)}
                       <option value="ADD_NEW" className="font-black text-orange-600">+ Add New Category</option>
                     </select>
                   ) : (
                     <div className="flex-1 flex gap-2">
-                      <input type="text" placeholder="New Category Name..." value={newCustomCategoryName} onChange={e => setNewCustomCategoryName(e.target.value)} className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500" autoFocus />
+                      <input
+                        type="text"
+                        placeholder="New Category Name..."
+                        value={newCustomCategoryName}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setNewCustomCategoryName(val);
+                          if (!editingItemObj && val.trim()) {
+                            setItemCodeInput(generateNextCategoryCode(val));
+                          }
+                        }}
+                        className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500"
+                        autoFocus
+                      />
                       <button type="button" onClick={() => { setIsAddingNewCatInput(false); setNewCustomCategoryName(''); }} className="px-3 bg-red-500/10 text-red-600 rounded-xl font-bold hover:bg-red-500/20">Cancel</button>
                     </div>
                   )}
