@@ -2447,16 +2447,16 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     return () => unsubCoupons();
   }, [isLoggedIn]);
 
-  // 👆👆 नया कोड यहाँ खत्म 👆👆
- 
-  // 👉 NEW: स्मार्ट नाम और नंबर सर्च लॉजिक
-  // 👉 NEW: स्मार्ट नाम और नंबर सर्च लॉजिक (Recent 10 Customers के साथ)
-  const handleCustomerSearchChange = (val: string) => {
-    setCartCustSearchInput(val);
-    setCustomerPhone(val.replace(/\D/g, '').slice(0, 10)); // बैकग्राउंड के लिए सिर्फ नंबर अलग करें
+ const handleCustomerSearchChange = (val: string) => {
+    const formattedVal = val
+      .split(' ')
+      .map(word => (word ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
+      .join(' ');
+    setCartCustSearchInput(formattedVal);
+    setCustomerPhone(formattedVal.replace(/\D/g, '').slice(0, 10)); // बैकग्राउंड के लिए सिर्फ नंबर अलग करें
 
-    if (val.length >= 3) {
-      const lowerVal = val.toLowerCase();
+    if (formattedVal.length >= 3) {
+      const lowerVal = formattedVal.toLowerCase();
       const matches = allCustomers.filter(c => 
         (c.phone && c.phone.includes(lowerVal)) || 
         (c.name && c.name.toLowerCase().includes(lowerVal))
@@ -2464,7 +2464,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
       
       setCustSuggestions(matches);
       setShowCustDropdown(true);
-    } else if (val.length === 0) {
+    } else if (formattedVal.length === 0) {
+      
       // 👉 NEW: जब इनपुट खाली हो, तो ड्रॉपडाउन में Recent 10 Customers दिखाएँ
       const enrichedRecents = recentCartCustomers.map(rc => {
         // पॉइंट्स और लेटेस्ट डेटा के लिए Main लिस्ट से मैच करें
