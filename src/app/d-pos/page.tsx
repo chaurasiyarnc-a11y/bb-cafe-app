@@ -3904,7 +3904,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
       toast.error("सेटलमेंट विफल रहा");
     }
   };
- // 🟢 WhatsApp Bill Sender (With Customer Feedback Links)
+ // 🟢 WhatsApp Bill Sender (Full Bill Details + Safe Encoding)
   const handleSendWhatsAppBill = (targetOrder: any = null) => {
     const ord = targetOrder || { customerPhone, customerName, fulfillmentType, items: cart, total: getTotalBillPrice() };
     let clean = getSanitizedPhone(ord.customerPhone || '');
@@ -3916,13 +3916,78 @@ const handleFinalCheckoutAndPrintBill = async () => {
     }
     if (!ord.items || ord.items.length === 0) return toast.error("बिल में कोई आइटम नहीं है!");
 
-    const itemsText = ord.items.map((i: any) => `• ${i.name} x${i.quantity} = ₹${i.price * i.quantity}`).join('%0A');
+    // तारीख और समय निकालना
+    let billDate = new Date();
+    if (ord.timestamp?.toDate) billDate = ord.timestamp.toDate();
+    else if (ord.timestamp?.seconds) billDate = new Date(ord.timestamp.seconds * 1000);
+    else if (ord.timestamp) billDate = new Date(ord.timestamp);
+    const dateStr = billDate.toLocaleString('en-IN', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: true
+    });
+
+    // सारे आइटम्स (Note सहित)
+    const itemsText = ord.items
+      .map((i: any, idx: number) => {
+        const line = `${idx + 1}. *${i.name}* (${i.quantity} x ₹${i.price}) = *₹${Number(i.price) * Number(i.quantity)}*`;
+        return i.note ? `${line}\n   _${i.note}_` : line;
+      })
+      .join('\n');
+
+    const subtotalVal = ord.subtotal !== undefined
+      ? Number(ord.subtotal)
+      : ord.items.reduce((acc: number, i: any) => acc + (Number(i.price) * Number(i.quantity)), 0);
+
+    const payStr = ord.paymentMethod === 'split'
+      ? `SPLIT (Cash: ₹${ord.splitCashAmount || 0}, UPI: ₹${ord.splitUpiAmount || 0})`
+      : ord.paymentMethod === 'due'
+      ? 'UDHARI (DUE)'
+      : (ord.paymentMethod || 'CASH').toUpperCase();
+
+    const statusStr = (ord.status === 'completed' || ord.paymentSettled)
+      ? 'Paid ✅'
+      : (ord.paymentMethod === 'due' ? 'Pending (उधार)' : 'Unsettled');
+
     const cafeNum = getSanitizedPhone(ownerPhoneConfig || '9714293759');
-    const billLine = ord.billNumber ? `*Bill No:* #${ord.billNumber}%0A` : '';
 
-    const msg = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*%0A------------------------------%0A${billLine}*Customer:* ${ord.customerName || 'Valued Guest'}%0A*Total Amount:* ₹${ord.total}%0A*Payment:* ${(ord.paymentMethod || 'Paid').toUpperCase()}%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe!_ 💛%0A%0A⭐ *Share Your Feedback:*%0Aकैसा रहा आपका अनुभव? नीचे क्लिक करें:%0A🟢 Excellent: https://wa.me/91${cafeNum}?text=Feedback:%20Excellent%20⭐%0A🟡 Average: https://wa.me/91${cafeNum}?text=Feedback:%20Average%20👍%0A🔴 Bad: https://wa.me/91${cafeNum}?text=Feedback:%20Bad%20👎`;
+    const lines = [
+      `*☕ ${storeNameConfig || 'BUM BUM CAFE'}*`,
+      storeAddressConfig ? `${storeAddressConfig}` : '',
+      storePhoneConfig ? `📞 Ph: ${storePhoneConfig}` : '',
+      `------------------------------`,
+      (ord.billNumber !== undefined && ord.billNumber !== null)
+        ? `*Bill No:* #${ord.billNumber}${ord.tokenNumber ? `  |  *Token:* ${ord.tokenNumber}` : ''}`
+        : '',
+      `*Date:* ${dateStr}`,
+      `*Order Type:* ${(ord.fulfillmentType || 'pickup').toUpperCase()}${ord.tableNumber ? ` (${ord.tableNumber})` : ''}`,
+      `*Customer:* ${ord.customerName || 'Walk-in Guest'}${clean ? ` (${clean})` : ''}`,
+      ord.address ? `*Address:* ${ord.address}` : '',
+      `------------------------------`,
+      `*ITEMS:*`,
+      itemsText,
+      `------------------------------`,
+      `*Subtotal:* ₹${subtotalVal}`,
+      Number(ord.discountAmount) > 0 ? `*Discount${ord.promoCodeUsed ? ` (${ord.promoCodeUsed})` : ''}:* -₹${ord.discountAmount}` : '',
+      Number(ord.pointsRedeemed) > 0 ? `*Points Redeemed:* -₹${ord.pointsRedeemed}` : '',
+      Number(ord.gstAmount) > 0 ? `*GST (${ord.gstRate || 0}%):* +₹${ord.gstAmount}` : '',
+      Number(ord.deliveryFee) > 0 ? `*Delivery Charge:* +₹${ord.deliveryFee}` : '',
+      Number(ord.packingCharge) > 0 ? `*Packing Charge:* +₹${ord.packingCharge}` : '',
+      `*GRAND TOTAL: ₹${ord.total}*`,
+      `*Payment:* ${payStr} (${statusStr})`,
+      (Number(ord.pointsEarned) > 0 || ord.remainingPoints !== undefined)
+        ? `------------------------------\n⭐ *Loyalty Points:*${Number(ord.pointsEarned) > 0 ? ` Earned +${ord.pointsEarned} Pts |` : ''} Balance: *${ord.remainingPoints ?? ord.customerPoints ?? 0} Pts*`
+        : '',
+      `------------------------------`,
+      `_Thank you for visiting ${storeNameConfig || 'Bum Bum Cafe'}!_ 💛`,
+      `\n⭐ *Share Your Feedback:*`,
+      `कैसा रहा आपका अनुभव? नीचे क्लिक करें:`,
+      `🟢 Excellent: https://wa.me/91${cafeNum}?text=Feedback:%20Excellent%20⭐`,
+      `🟡 Average: https://wa.me/91${cafeNum}?text=Feedback:%20Average%20👍`,
+      `🔴 Bad: https://wa.me/91${cafeNum}?text=Feedback:%20Bad%20👎`
+    ].filter(Boolean);
 
-    window.open(`https://wa.me/91${clean}?text=${msg}`, '_blank');
+    const msg = lines.join('\n');
+    window.open(`https://wa.me/91${clean}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
 // 📄 [HELPER] Professional EOD PDF Generator
