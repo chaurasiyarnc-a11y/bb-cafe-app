@@ -1708,6 +1708,20 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   
   // Cart & Order States
   const [cart, setCart] = useState<PosCartItem[]>([]);
+  const [editingCartQty, setEditingCartQty] = useState<{ [cartItemId: string]: string }>({});
+
+  const handleSetCartQuantity = (cartItemId: string, newQty: number) => {
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.cartItemId === cartItemId) {
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as PosCartItem[]
+    );
+  };
 
   // Collapsible Discount & Admin Promo Code State
   const [isDiscountOpen, setIsDiscountOpen] = useState(false);
