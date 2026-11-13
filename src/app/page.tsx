@@ -1835,72 +1835,37 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-     {/* FIXED STICKY SEARCH BAR WITH ZOMATO-STYLE LOCATION HEADER */}
+    {/* FIXED STICKY SEARCH BAR WITH ZOMATO-STYLE LOCATION HEADER */}
       <div className="sticky top-0 z-40 dark:bg-[#050505]/95 bg-white/95 backdrop-blur-md pt-2 pb-3 px-4 border-b dark:border-white/5 border-neutral-300 transition-colors duration-200 shadow-sm flex flex-col gap-3">
-        
-        {/* 👉 ZOMATO STYLE LOCATION BAR */}
-        <div 
-          onClick={() => {
-            triggerHaptic();
-            if (!address) {
-              handleDetectLocation();
-            } else {
-              setIsCartOpen(true); // एड्रेस बदलने के लिए कार्ट खोल देगा
-            }
-          }}
-          className="relative max-w-sm mx-auto w-full flex items-center justify-between cursor-pointer"
-        >
+        <div onClick={() => { triggerHaptic(); setIsMapOpen(true); }} className="relative max-w-sm mx-auto w-full flex items-center justify-between cursor-pointer">
           <div className="flex items-center gap-2 overflow-hidden pr-4">
             <div className="flex-shrink-0 relative">
               <MapPin size={26} className="text-orange-500 fill-orange-100 dark:fill-orange-500/20" />
               {!address && <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}
             </div>
-            
             <div className="flex flex-col truncate">
               <div className="flex items-center gap-1">
-                <h2 className="font-black text-[13px] dark:text-white text-neutral-900 tracking-wide">
-                  {isHindi ? "आपकी डिलीवरी लोकेशन" : "Delivery Location"}
-                </h2>
+                <h2 className="font-black text-[13px] dark:text-white text-neutral-900 tracking-wide">{isHindi ? "आपकी डिलीवरी लोकेशन" : "Delivery Location"}</h2>
                 <ChevronRight size={14} className="text-orange-500" />
               </div>
-              
               <span className="text-[10px] text-neutral-500 dark:text-gray-400 font-bold truncate">
-                {address 
-                  ? address.split('\n')[0].replace('📍 Accurate Address: ', '').replace('📍 Approx Area: ', '').replace('My GPS Location: ', '') 
-                  : (isHindi ? "📍 ऑटोमैटिक लोकेशन सेट करने के लिए यहाँ टैप करें..." : "📍 Tap here to fetch your GPS location...")}
+                {address ? address.split('\n')[0].replace('📍 Accurate Address: ', '').replace('📍 Approx Area: ', '').replace('My GPS Location: ', '').replace('📍 Pinned Address: ', '') : (isHindi ? "📍 ऑटोमैटिक लोकेशन सेट करने के लिए यहाँ टैप करें..." : "📍 Tap here to fetch your GPS location...")}
               </span>
             </div>
           </div>
-          
-          {/* User Profile Mini Icon (Zomato Style) */}
           <div onClick={(e) => { e.stopPropagation(); triggerHaptic(); setIsProfileOpen(true); }} className="bg-neutral-100 hover:bg-neutral-200 dark:bg-white/10 dark:hover:bg-white/20 p-2 rounded-full transition-colors flex-shrink-0 shadow-sm">
             <User size={16} className="text-neutral-700 dark:text-gray-200" />
           </div>
         </div>
-
-        {/* SEARCH INPUT AREA */}
         <div className="relative max-w-sm mx-auto flex items-center gap-2 w-full">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
-            <input 
-              type="text" 
-              placeholder={isHindi ? "पिज़्ज़ा, सैंडविच, पनीर स्पेशल खोजें..." : "Search pizza, sandwich, paneer special..."} 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
-              className="w-full dark:bg-neutral-800/80 bg-neutral-100 dark:text-white text-neutral-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-neutral-500 border dark:border-neutral-700 border-neutral-300 transition-colors duration-200 shadow-inner" 
-            />
+            <input type="text" placeholder={isHindi ? "पिज़्ज़ा, सैंडविच, पनीर स्पेशल खोजें..." : "Search pizza, sandwich, paneer special..."} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full dark:bg-neutral-800/80 bg-neutral-100 dark:text-white text-neutral-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-neutral-500 border dark:border-neutral-700 border-neutral-300 shadow-inner" />
           </div>
-
-          {/* HINDI / ENGLISH LANGUAGE TOGGLE */}
-          <button 
-            onClick={() => { triggerHaptic(); setIsHindi(!isHindi); }}
-            className="px-3 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black tracking-wider flex-shrink-0 transition-all active:scale-95 shadow flex items-center gap-1 min-w-[65px] border border-orange-600"
-          >
-            <Globe size={12} />
-            <span>{isHindi ? "English" : "हिंदी"}</span>
+          <button onClick={() => { triggerHaptic(); setIsHindi(!isHindi); }} className="px-3 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black tracking-wider flex-shrink-0 shadow flex items-center gap-1 min-w-[65px] border border-orange-600">
+            <Globe size={12} /><span>{isHindi ? "English" : "हिंदी"}</span>
           </button>
         </div>
-
       </div>
 
       {!storeOpen && (
