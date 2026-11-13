@@ -5476,10 +5476,68 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                               {item.note && <p className="text-[9px] text-neutral-600 dark:text-neutral-400 italic truncate">{item.note}</p>}
                               <p className="text-[11px] font-mono text-orange-600 dark:text-orange-400 font-black">₹{item.price * item.quantity}</p>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button onClick={() => handleUpdateCartQuantity(item.cartItemId, -1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-white rounded flex items-center justify-center font-black text-xs">-</button>
-                              <span className="w-5 text-center text-xs font-mono font-black text-neutral-900 dark:text-white">{item.quantity}</span>
-                              <button onClick={() => handleUpdateCartQuantity(item.cartItemId, 1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-white rounded flex items-center justify-center font-black text-xs">+</button>
+                           <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => {
+                                  setEditingCartQty(prev => {
+                                    const next = { ...prev };
+                                    delete next[item.cartItemId];
+                                    return next;
+                                  });
+                                  handleUpdateCartQuantity(item.cartItemId, -1);
+                                }}
+                                className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-white rounded flex items-center justify-center font-black text-xs"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min={0}
+                                value={editingCartQty[item.cartItemId] !== undefined ? editingCartQty[item.cartItemId] : item.quantity}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const rawVal = e.target.value;
+                                  setEditingCartQty(prev => ({ ...prev, [item.cartItemId]: rawVal }));
+                                  const parsed = parseInt(rawVal, 10);
+                                  if (!isNaN(parsed) && parsed > 0) {
+                                    handleSetCartQuantity(item.cartItemId, parsed);
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const rawVal = editingCartQty[item.cartItemId];
+                                  if (rawVal !== undefined) {
+                                    const parsed = parseInt(rawVal, 10);
+                                    if (!isNaN(parsed) && parsed === 0) {
+                                      handleSetCartQuantity(item.cartItemId, 0);
+                                    }
+                                    setEditingCartQty(prev => {
+                                      const next = { ...prev };
+                                      delete next[item.cartItemId];
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.currentTarget.blur();
+                                  }
+                                }}
+                                className="w-9 h-6 text-center text-xs font-mono font-black bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 rounded text-neutral-900 dark:text-white outline-none focus:border-orange-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <button
+                                onClick={() => {
+                                  setEditingCartQty(prev => {
+                                    const next = { ...prev };
+                                    delete next[item.cartItemId];
+                                    return next;
+                                  });
+                                  handleUpdateCartQuantity(item.cartItemId, 1);
+                                }}
+                                className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-white rounded flex items-center justify-center font-black text-xs"
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
                         ))
