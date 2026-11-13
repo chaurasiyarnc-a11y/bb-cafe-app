@@ -2999,10 +2999,53 @@ export default function BbCafeHome() {
                   Cancel
                 </button>
               </div>
-            </motion.form>
+         </motion.form>
           </div>
         )}
       </AnimatePresence>
+
+      {/* 🗺️ MAP PICKER MODAL (नक्शे का डिज़ाइन) */}
+      <AnimatePresence>
+        {isMapOpen && (
+          <div className="fixed inset-0 z-[200] bg-white dark:bg-[#111] flex flex-col font-sans">
+            <div className="flex items-center gap-3 p-4 shadow-sm z-10 bg-white dark:bg-[#111] border-b border-neutral-200 dark:border-white/10">
+              <button onClick={() => setIsMapOpen(false)} className="p-2 bg-neutral-100 dark:bg-white/10 rounded-full active:scale-95"><X size={20} className="text-neutral-700 dark:text-white" /></button>
+              <div>
+                <h3 className="text-base font-black text-neutral-900 dark:text-white leading-none">{isHindi ? "डिलीवरी लोकेशन चुनें" : "Set Delivery Location"}</h3>
+                <p className="text-[10px] text-neutral-500 font-bold mt-1">{isHindi ? "नक्शे को खिसकाकर सही लोकेशन पर पिन रखें" : "Drag the map to place pin on your exact location"}</p>
+              </div>
+            </div>
+            <div className="flex-1 relative w-full bg-neutral-200 dark:bg-neutral-800">
+              <div id="osm-map" className="w-full h-full"></div>
+              
+              {/* Center Fixed Pin */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-[400] pointer-events-none drop-shadow-2xl">
+                <MapPin size={45} className="text-orange-600 fill-orange-200 animate-bounce" />
+                <div className="w-2 h-1.5 bg-black/30 rounded-full mx-auto mt-1 blur-[1px]"></div>
+              </div>
+              
+              <button onClick={() => { setIsMapOpen(false); handleDetectLocation(); }} className="absolute bottom-6 right-4 z-[400] bg-white p-3.5 rounded-full shadow-lg border border-neutral-200 text-blue-600 active:scale-95 transition-all">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v2m0 16v2m10-10h-2M4 12H2"></path></svg>
+              </button>
+            </div>
+            <div className="p-5 bg-white dark:bg-[#111] shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10 pb-safe">
+              <button onClick={handleConfirmMapLocation} className="w-full bg-orange-600 text-white font-black text-sm uppercase py-4 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"><MapPin size={18} />{isHindi ? "यही लोकेशन कन्फर्म करें" : "Confirm This Location"}</button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 👉 SINGLE BOTTOM NAVIGATION BAR */}
+      <div className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0a0a0a] border-t border-neutral-200 dark:border-white/10 z-[90] flex justify-around items-center py-2 px-2 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.05)] font-sans">
+        <button onClick={scrollToMenu} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500"><Home size={20} /><span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "होम" : "Home"}</span></button>
+        <button onClick={() => { setIsWalletOpen(true); triggerHaptic(); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-green-500 relative"><Wallet size={20} />{walletBalance > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-green-500 rounded-full animate-ping"></span>}<span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "वॉलेट" : "Wallet"}</span></button>
+        <a href={`tel:+${whatsappNumber}`} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-blue-500"><Phone size={20} /><span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "कॉल" : "Call"}</span></a>
+        <button onClick={() => { triggerHaptic(); setIsCartOpen(true); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500 relative">
+          <div className="relative"><ShoppingBag size={20} className={cart.length > 0 ? "text-orange-500" : ""} />{cart.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-black h-4 w-4 rounded-full flex items-center justify-center font-mono shadow-sm">{cart.reduce((s:number, i:any) => s + i.quantity, 0)}</span>}</div>
+          <span className={`text-[8px] font-black uppercase tracking-wider ${cart.length > 0 ? 'text-orange-500' : ''}`}>{isHindi ? "कार्ट" : "Cart"}</span>
+        </button>
+        <button onClick={() => { triggerHaptic(); setIsProfileOpen(true); }} className="flex flex-col items-center gap-1 p-2 text-neutral-500 hover:text-orange-500"><User size={20} /><span className="text-[8px] font-black uppercase tracking-wider">{isHindi ? "प्रोफाइल" : "Profile"}</span></button>
+      </div>
 
     </div>
   );
