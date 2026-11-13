@@ -5427,9 +5427,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                           🎰
                         </button>
 
-                        <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/15 hover:bg-green-600/25 text-green-600 px-2.5 rounded-lg text-xs font-bold flex items-center shrink-0">
-                          <SafeShare2 size={13} />
-                        </button>
+                       
                       </div>
 
                      {/* CUSTOMER FOUND: FULL PROFILE & LOYALTY POINTS REDEEM */}
