@@ -25,9 +25,9 @@ export default function LiveOrderTracker({
   const [mapLoadError, setMapLoadError] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
 
-  // कैफे की फिक्स लोकेशन (मोहांद्रा)
-  const CAFE_LAT = 24.2863;
-  const CAFE_LNG = 80.1245;
+  // 🏪 कैफे की फिक्स लोकेशन (Bum Bum Cafe)
+  const CAFE_LAT = 24.190501;
+  const CAFE_LNG = 79.953694;
 
   useEffect(() => {
     if (!liveOrder || liveOrder.fulfillmentType !== 'delivery') return;
@@ -50,7 +50,7 @@ export default function LiveOrderTracker({
       document.head.appendChild(script);
     }
 
-    // ग्राहक की लोकेशन (अगर न मिले तो कैफे से थोड़ी दूर सेट करें)
+    // 🏠 ग्राहक की लोकेशन (अगर न मिले तो कैफे से थोड़ी दूर सेट करें)
     const custLat = liveOrder.latitude || CAFE_LAT + 0.0070;
     const custLng = liveOrder.longitude || CAFE_LNG + 0.0070;
 
@@ -81,17 +81,17 @@ export default function LiveOrderTracker({
             maxZoom: 19,
           }).addTo(map);
 
-          // कैफे का मार्कर (Orange)
+          // 🏪 कैफे का मार्कर (Orange)
           L.circleMarker([CAFE_LAT, CAFE_LNG], {
             color: '#ea580c', fillColor: '#ea580c', fillOpacity: 1, radius: 6
           }).addTo(map);
 
-          // ग्राहक का मार्कर (Blue)
+          // 🏠 ग्राहक का मार्कर (Blue)
           L.circleMarker([custLat, custLng], {
             color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 1, radius: 6
           }).addTo(map);
 
-          // दोनों के बीच एक डैश वाली लाइन (Route) बनाएं
+          // ➖ दोनों के बीच एक डैश वाली लाइन (Route) बनाएं
           L.polyline([[CAFE_LAT, CAFE_LNG], [custLat, custLng]], {
              color: '#ea580c',
              weight: 3,
@@ -107,7 +107,7 @@ export default function LiveOrderTracker({
           const currentLat = CAFE_LAT + (custLat - CAFE_LAT) * progress;
           const currentLng = CAFE_LNG + (custLng - CAFE_LNG) * progress;
 
-          // स्कूटर का मुँह (Direction) सही करें: अगर पूर्व (East) जा रहा है तो घुमा दें (ताकि उल्टा न चले)
+          // 🛵 स्कूटर का मुँह (Direction) सही करें
           const isMovingEast = custLng > CAFE_LNG;
           const flipStyle = isMovingEast ? 'transform: scaleX(-1);' : '';
           const bounceClass = liveOrder.status === 'preparing' ? 'animate-bounce' : '';
@@ -121,14 +121,22 @@ export default function LiveOrderTracker({
 
           L.marker([currentLat, currentLng], { icon: scooterIcon, zIndexOffset: 1000 }).addTo(map);
 
-          // मैप को ऐसे ज़ूम करें कि कैफे और घर दोनों एक साथ स्क्रीन पर दिखें
+          // 🔍 मैप को ऐसे ज़ूम करें कि कैफे और घर दोनों एक साथ स्क्रीन पर दिखें
           const bounds = L.latLngBounds([[CAFE_LAT, CAFE_LNG], [custLat, custLng]]);
           map.fitBounds(bounds, { padding: [30, 30] });
 
           mapInstanceRef.current = map;
           setIsMapReady(true);
+
+          // 🛠️ मास्टर फिक्स: एनीमेशन के बाद मैप को रिफ्रेश करना (ग्रे बॉक्स हटाने के लिए)
+          setTimeout(() => {
+            if (mapInstanceRef.current) {
+              mapInstanceRef.current.invalidateSize();
+            }
+          }, 400);
+
         } catch (err) {
-           console.error(err);
+           console.error("Map Load Error:", err);
            setMapLoadError(true);
         }
       }
@@ -153,31 +161,35 @@ export default function LiveOrderTracker({
   return (
     <AnimatePresence>
       <motion.div 
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        className="bg-gradient-to-br from-neutral-900 to-neutral-950 border border-orange-500/30 p-5 rounded-3xl shadow-xl flex flex-col gap-4 text-xs text-left font-sans font-bold w-full"
+        exit={{ opacity: 0, y: 50 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="bg-gradient-to-br from-neutral-900 to-neutral-950 border border-orange-500/30 p-5 rounded-t-3xl shadow-[0_-10px_40px_rgba(234,88,12,0.15)] flex flex-col gap-4 text-xs text-left font-sans font-bold w-full mx-auto"
       >
-        <div className="flex justify-between items-center border-b border-white/5 pb-2">
+        {/* ड्रैग हैंडल (UI Design) */}
+        <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-1" />
+
+        <div className="flex justify-between items-center border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />
-            <span className="text-gray-100 font-extrabold uppercase tracking-wide">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(234,88,12,0.8)]" />
+            <span className="text-gray-100 font-extrabold uppercase tracking-wide text-sm">
               {isHindi ? `लाइव आर्डर (#${formatBillNumber(liveOrder.billNumber)})` : `Live Tracker (#${formatBillNumber(liveOrder.billNumber)})`}
             </span>
           </div>
-          <span className="bg-orange-500/10 text-orange-400 px-2.5 py-1 rounded-lg text-[9px] font-black font-mono">
+          <span className="bg-orange-500/15 text-orange-400 border border-orange-500/30 px-2.5 py-1 rounded-lg text-[10px] font-black font-mono shadow-sm">
             Token: #{liveOrder.tokenNumber}
           </span>
         </div>
 
         {/* 🗺️ LIVE TRACKING MAP (केवल डिलीवरी के लिए, एरर न होने पर) */}
         {liveOrder.fulfillmentType === 'delivery' && !mapLoadError && (
-          <div className="w-full h-40 bg-neutral-800 rounded-2xl overflow-hidden relative border-2 border-neutral-700 shadow-inner">
+          <div className="w-full h-44 bg-neutral-800 rounded-2xl overflow-hidden relative border-2 border-neutral-700 shadow-inner">
             
             {!isMapReady && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-500 bg-neutral-900 z-10">
-                <Loader2 className="animate-spin mb-2" size={24} />
-                <span className="text-[10px] font-bold uppercase">{isHindi ? "लाइव मैप कनेक्ट हो रहा है..." : "Connecting to Live Map..."}</span>
+                <Loader2 className="animate-spin mb-2" size={28} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">{isHindi ? "लाइव मैप कनेक्ट हो रहा है..." : "Connecting to Live Map..."}</span>
               </div>
             )}
             
@@ -223,11 +235,11 @@ export default function LiveOrderTracker({
         )}
 
         {/* लाइव स्टेटस टेक्स्ट विवरण */}
-        <div className="text-center bg-black/40 p-3 rounded-2xl border border-white/5 space-y-1 mt-2">
-          <p className="text-xs font-black text-yellow-400">
+        <div className="text-center bg-black/40 p-3.5 rounded-2xl border border-white/5 space-y-1.5 mt-1 shadow-inner">
+          <p className="text-[13px] font-black text-yellow-400 tracking-wide">
             {liveOrder.status === 'pending' && (isHindi ? "⏳ आपके आर्डर की पुष्टि की जा रही है..." : "⏳ Confirming your order at counter...")}
             {liveOrder.status === 'preparing' && (isHindi ? "👨‍🍳 शेफ रसोईघर में आपका भोजन तैयार कर रहे हैं..." : "👨‍🍳 Chef is preparing your delicious meal...")}
-            {liveOrder.status === 'out_for_delivery' && (isHindi ? "🛵 डिलीवरी बॉय रास्ते में है..." : "🛵 Rider is on the way to deliver your food!")}
+            {liveOrder.status === 'out_for_delivery' && (isHindi ? "🛵 राइडर रास्ते में है, बस पहुँचने वाला है..." : "🛵 Rider is on the way to deliver your food!")}
             {liveOrder.status === 'delivered' && (isHindi ? "✅ आर्डर सफलतापूर्वक पूरा हो गया है!" : "✅ Order successfully completed!")}
             {liveOrder.status === 'rejected' && (isHindi ? "❌ आर्डर रद्द कर दिया गया है।" : "❌ Order was rejected.")}
           </p>
@@ -242,12 +254,15 @@ export default function LiveOrderTracker({
 
         {/* --- डिलीवरी पिन (OTP) --- */}
         {liveOrder.status !== 'delivered' && liveOrder.status !== 'completed' && liveOrder.status !== 'rejected' && liveOrder.deliveryPin && liveOrder.fulfillmentType === 'delivery' && (
-          <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-2xl text-center space-y-1.5 shadow-inner mt-2">
-            <p className="text-[9px] uppercase tracking-wider text-yellow-500 font-black flex items-center justify-center gap-1 leading-none">
-              <Lock size={10} />
-              <span>{isHindi ? "🔑 डिलीवरी पुष्टि पिन (OTP):" : "🔑 Delivery Security OTP:"}</span>
+          <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-orange-500/20 p-3.5 rounded-2xl text-center space-y-2 shadow-lg mt-2 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-2 opacity-10">
+              <Lock size={40} />
+            </div>
+            <p className="text-[10px] uppercase tracking-wider text-orange-400 font-black flex items-center justify-center gap-1.5 leading-none">
+              <Lock size={12} />
+              <span>{isHindi ? "डिलीवरी सिक्योरिटी पिन (OTP):" : "Delivery Security OTP:"}</span>
             </p>
-            <p className="text-2xl font-black text-white tracking-widest font-mono leading-none py-0.5">
+            <p className="text-3xl font-black text-white tracking-[0.3em] font-mono leading-none py-1 drop-shadow-md">
               {liveOrder.deliveryPin}
             </p>
             <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">
@@ -256,13 +271,13 @@ export default function LiveOrderTracker({
           </div>
         )}
 
-        <div className="flex gap-2 mt-2">
+        <div className="flex gap-3 mt-2">
           <a 
             href={`tel:+${whatsappNumber}`}
             onClick={() => triggerHaptic(20)}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center text-[10px] py-3 rounded-xl border border-transparent transition-all flex items-center justify-center gap-1 uppercase"
+            className="flex-[2] bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white text-center text-xs py-3.5 rounded-xl border border-transparent shadow-lg transition-all flex items-center justify-center gap-2 uppercase tracking-wide"
           >
-            <Phone size={12} />
+            <Phone size={14} />
             <span>{isHindi ? "कैफ़े को कॉल करें" : "Call Cafe"}</span>
           </a>
           <button 
@@ -271,9 +286,9 @@ export default function LiveOrderTracker({
               triggerHaptic(); 
               setLiveOrder(null); 
             }}
-            className="bg-neutral-800 text-gray-400 px-4 py-3 rounded-xl hover:text-white uppercase text-[10px]"
+            className="flex-1 bg-white/5 border border-white/10 text-gray-300 py-3.5 rounded-xl hover:bg-white/10 hover:text-white uppercase text-[10px] shadow-sm transition-all"
           >
-            {isHindi ? "छिपाएं" : "Dismiss"}
+            {isHindi ? "बंद करें" : "Dismiss"}
           </button>
         </div>
       </motion.div>
