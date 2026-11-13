@@ -2774,10 +2774,12 @@ const handleSendUdhariReminder = (targetOrder: any) => {
         setHasVariants(false);
         setItemVariantsList({});
       }
-    } else {
+   } else {
       setEditingItemObj(null);
       setItemNameInput('');
-      const defaultCat = categories.find(c => c !== 'All') || 'Burgers';
+      const defaultCat = (selectedCategory !== 'All' && selectedCategory !== '⭐ Top Items'
+        ? selectedCategory
+        : categories.find(c => c !== 'All' && c !== '⭐ Top Items')) || 'Burgers';
       setItemCatInput(defaultCat);
       setItemCodeInput(generateNextCategoryCode(defaultCat));
       setItemPriceInput(100);
