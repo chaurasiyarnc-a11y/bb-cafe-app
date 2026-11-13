@@ -7297,24 +7297,77 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                 </div>
 
                 {/* Stats & Sorting Header */}
-                <div className="flex flex-col lg:flex-row gap-3 justify-between lg:items-center bg-orange-500/10 dark:bg-orange-500/5 border border-orange-500/20 p-3 rounded-2xl shrink-0">
-                  <div className="flex gap-6 items-center px-2">
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400">Total Customers</p>
-                      <p className="text-xl font-black font-mono text-neutral-900 dark:text-white">{totalCustomersCount}</p>
+                <div className="flex flex-col gap-3 bg-orange-500/10 dark:bg-orange-500/5 border border-orange-500/20 p-3 rounded-2xl shrink-0">
+                  <div className="flex flex-col lg:flex-row gap-3 justify-between lg:items-center">
+                    <div className="flex flex-wrap gap-5 items-center px-2">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400">Total Customers</p>
+                        <p className="text-xl font-black font-mono text-neutral-900 dark:text-white">{totalCustomersCount}</p>
+                      </div>
+                      <div className="w-px h-8 bg-orange-500/20"></div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400">Total Loyalty Points</p>
+                        <p className="text-xl font-black font-mono text-neutral-900 dark:text-white">⭐ {totalPointsInSystem}</p>
+                      </div>
+                      <div className="w-px h-8 bg-orange-500/20"></div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-green-600 dark:text-green-400">Total Wallet Balance</p>
+                        <p className="text-xl font-black font-mono text-green-600 dark:text-green-400">💳 ₹{totalWalletInSystem}</p>
+                      </div>
                     </div>
-                    <div className="w-px h-8 bg-orange-500/20"></div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400">Total Loyalty Points</p>
-                      <p className="text-xl font-black font-mono text-neutral-900 dark:text-white">⭐ {totalPointsInSystem}</p>
+                    
+                    <div className="flex bg-white dark:bg-neutral-900 rounded-xl border border-neutral-300 dark:border-neutral-700 p-1 shadow-sm shrink-0">
+                      <button onClick={() => setCustomerSortBy('recent')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'recent' ? 'bg-orange-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Recent</button>
+                      <button onClick={() => setCustomerSortBy('spent_high')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'spent_high' ? 'bg-green-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Top Spender</button>
+                      <button onClick={() => setCustomerSortBy('points_high')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'points_high' ? 'bg-amber-500 text-black' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>High Points</button>
+                      <button onClick={() => setCustomerSortBy('points_low')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'points_low' ? 'bg-orange-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Low Points</button>
                     </div>
                   </div>
-                  
-                  <div className="flex bg-white dark:bg-neutral-900 rounded-xl border border-neutral-300 dark:border-neutral-700 p-1 shadow-sm shrink-0">
-                    <button onClick={() => setCustomerSortBy('recent')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'recent' ? 'bg-orange-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Recent</button>
-                    <button onClick={() => setCustomerSortBy('spent_high')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'spent_high' ? 'bg-green-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Top Spender</button>
-                    <button onClick={() => setCustomerSortBy('points_high')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'points_high' ? 'bg-amber-500 text-black' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>High Points</button>
-                    <button onClick={() => setCustomerSortBy('points_low')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'points_low' ? 'bg-orange-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Low Points</button>
+
+                  {/* 👉 NEW: अलग से Wallet Users और App Users फ़िल्टर बटन */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-orange-500/20 px-1">
+                    <span className="text-[10px] font-black uppercase text-neutral-500 mr-1">Filter Users:</span>
+                    <button
+                      type="button"
+                      onClick={() => setCustomerTypeFilter('all')}
+                      className={`px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all border shadow-sm ${
+                        customerTypeFilter === 'all'
+                          ? 'bg-neutral-900 dark:bg-white text-white dark:text-black border-neutral-900 dark:border-white'
+                          : 'bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700 hover:border-orange-500'
+                      }`}
+                    >
+                      👥 All Customers ({totalCustomersCount})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCustomerTypeFilter(customerTypeFilter === 'wallet' ? 'all' : 'wallet')}
+                      className={`px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all border shadow-sm flex items-center gap-1.5 ${
+                        customerTypeFilter === 'wallet'
+                          ? 'bg-green-600 text-white border-green-600 shadow-green-600/30'
+                          : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-300 dark:border-green-800 hover:bg-green-100'
+                      }`}
+                    >
+                      <span>💳 Wallet Users</span>
+                      <span className={`px-1.5 py-0.5 rounded-md font-mono text-[9px] ${customerTypeFilter === 'wallet' ? 'bg-black/25 text-white' : 'bg-green-600 text-white'}`}>
+                        {walletCustomersCount}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCustomerTypeFilter(customerTypeFilter === 'app' ? 'all' : 'app')}
+                      className={`px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all border shadow-sm flex items-center gap-1.5 ${
+                        customerTypeFilter === 'app'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-blue-600/30'
+                          : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800 hover:bg-blue-100'
+                      }`}
+                    >
+                      <span>📱 App Users</span>
+                      <span className={`px-1.5 py-0.5 rounded-md font-mono text-[9px] ${customerTypeFilter === 'app' ? 'bg-black/25 text-white' : 'bg-blue-600 text-white'}`}>
+                        {appCustomersCount}
+                      </span>
+                    </button>
                   </div>
                 </div>
 
