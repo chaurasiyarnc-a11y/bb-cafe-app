@@ -4334,8 +4334,8 @@ const handleFinalCheckoutAndPrintBill = async () => {
     return new Promise<Blob | null>((resolve) => canvas.toBlob((blob) => resolve(blob), 'image/png'));
   };
 
-  // 🟢 WhatsApp Bill Sender (Digital Receipt Image कॉपी + Clickable Links Caption में)
-  const handleSendWhatsAppBill = async (targetOrder: any = null) => {
+// 🟢 1-Click WhatsApp Live Digital Bill Link Sender (No Ctrl+V needed!)
+  const handleSendWhatsAppBill = (targetOrder: any = null) => {
     const ord = targetOrder || { customerPhone, customerName, fulfillmentType, items: cart, total: getTotalBillPrice() };
     let clean = getSanitizedPhone(ord.customerPhone || '');
     if (clean.length !== 10) {
@@ -4344,61 +4344,36 @@ const handleFinalCheckoutAndPrintBill = async () => {
       clean = getSanitizedPhone(entered);
       if (clean.length !== 10) return toast.error("कृपया सही 10-अंकों का मोबाइल नंबर डालें!");
     }
-    if (!ord.items || ord.items.length === 0) return toast.error("बिल में कोई आइटम नहीं है!");
 
-    const toastId = toast.loading("Digital Receipt तैयार की जा रही है...");
-    try {
-      const pngBlob = await generateDigitalReceiptBlob(ord, clean);
-      toast.dismiss(toastId);
-
-      if (!pngBlob) {
-        return toast.error("Digital Receipt बनाने में समस्या आई!");
-      }
-
-      let copied = false;
-      const ClipItem = (window as any).ClipboardItem;
-      if (navigator.clipboard && ClipItem) {
-        try {
-          await navigator.clipboard.write([new ClipItem({ 'image/png': pngBlob })]);
-          copied = true;
-        } catch (clipErr) {
-          console.warn("Clipboard write failed:", clipErr);
-        }
-      }
-
-      if (copied) {
-        toast.success("🧾 Digital Receipt फोटो कॉपी हो गई! WhatsApp में बस Ctrl + V दबाकर Send करें!", { duration: 7000 });
-      } else {
-        const url = URL.createObjectURL(pngBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Digital_Receipt_${ord.billNumber || Date.now()}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        toast.success("🧾 Digital Receipt डाउनलोड हो गई! WhatsApp में फोटो अटैच करके भेजें!", { duration: 7000 });
-      }
-
-      const captionLines = [
-        `*${storeNameConfig || 'BUM BUM CAFE'} - Digital Receipt*`,
-        `Bill No: *#${ord.billNumber ?? 'N/A'}*  |  Total: *₹${ord.total}*`,
-        ``,
-        `*घर बैठे अभी ऑनलाइन ऑर्डर करें (Order Online):*`,
-        `https://bb-cafe-app.vercel.app/`,
-        ``,
-        `*कैफे की लोकेशन (Google Maps Direction):*`,
-        `https://maps.app.goo.gl/UBR3p1E66WkbJsSV8`,
-        ``,
-        `*हमारी सर्विस कैसी लगी? Google पर 5-Star Review दें:*`,
-        `https://search.google.com/local/writereview?placeid=ChIJLyEjP4A3gjkRvyz8dQthZo8`
-      ];
-
-      window.open(`https://wa.me/91${clean}?text=${encodeURIComponent(captionLines.join('\n'))}`, '_blank');
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Digital Receipt भेजने में त्रुटि आई!");
+    if (!ord.id || String(ord.id).startsWith('offline_')) {
+      return toast.error("यह बिल अभी ऑफ़लाइन है! पहले 'Sync Cloud' करें ताकि Live Digital Bill लिंक बन सके।");
     }
+
+    const receiptUrl = `https://bb-cafe-app.vercel.app/receipt/${ord.id}`;
+    const statusLabel = (ord.status === 'completed' || ord.paymentSettled)
+      ? 'PAID'
+      : (ord.paymentMethod === 'due' ? 'UDHAR / DUE' : 'UNSETTLED');
+
+    const lines = [
+      `*${storeNameConfig || 'BUM BUM CAFE'} - Digital Receipt*`,
+      `Bill No: *#${ord.billNumber ?? 'N/A'}*  |  Total: *₹${ord.total}* (${statusLabel})`,
+      ``,
+      `*अपना पूरा Digital Bill देखने व Pay करने के लिए नीचे क्लिक करें:*`,
+      receiptUrl,
+      ``,
+      `*घर बैठे ऑनलाइन ऑर्डर करें (Order Online):*`,
+      `https://bb-cafe-app.vercel.app/`,
+      ``,
+      `*कैफे की लोकेशन (Google Map):*`,
+      `https://maps.app.goo.gl/UBR3p1E66WkbJsSV8`,
+      ``,
+      `*हमारी सर्विस अच्छी लगी हो तो Google पर 5-Star Review दें:*`,
+      `https://search.google.com/local/writereview?placeid=ChIJLyEjP4A3gjkRvyz8dQthZo8`,
+      ``,
+      `_Thank you for visiting ${storeNameConfig || 'BUM BUM CAFE'}!_`
+    ];
+
+    window.open(`https://wa.me/91${clean}?text=${encodeURIComponent(lines.join('\n'))}`, '_blank');
   };
 // 📄 [HELPER] Professional EOD PDF Generator
   const generateProfessionalPDF = () => {
