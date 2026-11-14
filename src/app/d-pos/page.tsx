@@ -3904,8 +3904,438 @@ const handleFinalCheckoutAndPrintBill = async () => {
       toast.error("सेटलमेंट विफल रहा");
     }
   };
- // 🟢 WhatsApp Bill Sender (Full Bill Details + Safe Encoding)
-  const handleSendWhatsAppBill = (targetOrder: any = null) => {
+// 🟢 WhatsApp Digital Receipt Generator (Real Receipt Image + Auto Copy + Order/Map/Review Links)
+  const generateDigitalReceiptBlob = async (ord: any, cleanPhone: string): Promise<Blob | null> => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const W = 560;
+    const pad = 28;
+    const contentW = W - pad * 2;
+
+    const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    };
+
+    const wrapLines = (text: string, maxWidth: number, font: string): string[] => {
+      ctx.font = font;
+      const words = String(text || '').split(' ');
+      const lines: string[] = [];
+      let current = '';
+      for (const word of words) {
+        const test = current ? `${current} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth && current) {
+          lines.push(current);
+          current = word;
+        } else {
+          current = test;
+        }
+      }
+      if (current) lines.push(current);
+      return lines.length > 0 ? lines : [''];
+    };
+
+    // तारीख व समय
+    let billDate = new Date();
+    if (ord.timestamp?.toDate) billDate = ord.timestamp.toDate();
+    else if (ord.timestamp?.seconds) billDate = new Date(ord.timestamp.seconds * 1000);
+    else if (ord.timestamp) billDate = new Date(ord.timestamp);
+    const dateStr = billDate.toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: true
+    });
+
+    const subtotalVal = ord.subtotal !== undefined
+      ? Number(ord.subtotal)
+      : ord.items.reduce((acc: number, i: any) => acc + (Number(i.price) * Number(i.quantity)), 0);
+
+    const isPaid = Boolean(ord.status === 'completed' || ord.paymentSettled);
+    const isDue = ord.paymentMethod === 'due';
+
+    // पहले से ऊँचाई (Height) मापें
+    const addrLines = storeAddressConfig ? wrapLines(storeAddressConfig, contentW - 20, '500 13px "Segoe UI", Arial, sans-serif') : [];
+    const custAddrLines = ord.address ? wrapLines(`Address: ${ord.address}`, contentW - 24, '500 12px "Segoe UI", Arial, sans-serif') : [];
+
+    const measuredItems = ord.items.map((item: any, idx: number) => {
+      const nameLines = wrapLines(`${idx + 1}. ${item.name}`, 270, '600 14px "Segoe UI", Arial, sans-serif');
+      const noteLines = item.note ? wrapLines(item.note, 260, 'italic 11px "Segoe UI", Arial, sans-serif') : [];
+      const rowH = Math.max(30, nameLines.length * 18 + noteLines.length * 15 + 14);
+      return { item, nameLines, noteLines, rowH };
+    });
+
+    const itemsTotalH = measuredItems.reduce((sum: number, m: any) => sum + m.rowH, 0);
+
+    let extraChargesCount = 1; // Subtotal
+    if (Number(ord.discountAmount) > 0) extraChargesCount++;
+    if (Number(ord.pointsRedeemed) > 0) extraChargesCount++;
+    if (Number(ord.gstAmount) > 0) extraChargesCount++;
+    if (Number(ord.deliveryFee) > 0) extraChargesCount++;
+    if (Number(ord.packingCharge) > 0) extraChargesCount++;
+
+    const hasLoyalty = Number(ord.pointsEarned) > 0 || ord.remainingPoints !== undefined;
+
+    // QR Code इमेज तैयार करें (अगर टोटल > 0 है)
+    let qrImg: HTMLImageElement | null = null;
+    if (Number(ord.total) > 0 && upiIdConfig) {
+      try {
+        const upiStr = `upi://pay?pa=${ord.upiId || upiIdConfig}&pn=${encodeURIComponent(storeNameConfig || 'Bum Bum Cafe')}&am=${ord.total}&cu=INR&tn=Bill-${ord.billNumber || 'Order'}`;
+        const qrDataUrl = await QRCode.toDataURL(upiStr, { width: 130, margin: 1 });
+        qrImg = await new Promise<HTMLImageElement | null>((res) => {
+          const img = new Image();
+          img.onload = () => res(img);
+          img.onerror = () => res(null);
+          img.src = qrDataUrl;
+        });
+      } catch (e) {}
+    }
+
+    const headerH = 95 + addrLines.length * 18;
+    const metaBoxH = 105 + (custAddrLines.length > 0 ? custAddrLines.length * 16 + 6 : 0);
+    const tableHeaderH = 34;
+    const summaryH = extraChargesCount * 24 + 92;
+    const loyaltyH = hasLoyalty ? 58 : 0;
+    const qrH = qrImg ? 165 : 0;
+    const footerH = 160;
+
+    const totalH = headerH + metaBoxH + tableHeaderH + itemsTotalH + summaryH + loyaltyH + qrH + footerH;
+    canvas.width = W;
+    canvas.height = totalH;
+
+    // बैकग्राउंड
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, totalH);
+
+    // ऊपर की ऑरेंज पट्टी
+    ctx.fillStyle = '#ea580c';
+    ctx.fillRect(0, 0, W, 10);
+
+    let y = 44;
+
+    // 1. कैफे का नाम व पता
+    ctx.fillStyle = '#111827';
+    ctx.font = '900 26px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText((storeNameConfig || 'BUM BUM CAFE').toUpperCase(), W / 2, y);
+    y += 22;
+
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '500 13px "Segoe UI", Arial, sans-serif';
+    addrLines.forEach((line) => {
+      ctx.fillText(line, W / 2, y);
+      y += 18;
+    });
+
+    if (storePhoneConfig) {
+      ctx.fillStyle = '#374151';
+      ctx.font = '700 13px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(`Ph: ${storePhoneConfig}`, W / 2, y);
+      y += 18;
+    }
+
+    y += 10;
+
+    // 2. DIGITAL RECEIPT हेडर और PAID/DUE बैज
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(W - pad, y);
+    ctx.stroke();
+    y += 24;
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#111827';
+    ctx.font = '800 16px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('DIGITAL RECEIPT', pad, y);
+
+    const badgeText = isPaid ? 'PAID' : isDue ? 'UDHAR / DUE' : 'UNSETTLED';
+    const badgeBg = isPaid ? '#dcfce7' : isDue ? '#fee2e2' : '#fef3c7';
+    const badgeColor = isPaid ? '#15803d' : isDue ? '#b91c1c' : '#b45309';
+    ctx.font = '800 12px "Segoe UI", Arial, sans-serif';
+    const badgeW = ctx.measureText(badgeText).width + 24;
+    drawRoundedRect(W - pad - badgeW, y - 18, badgeW, 24, 6);
+    ctx.fillStyle = badgeBg;
+    ctx.fill();
+    ctx.fillStyle = badgeColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(badgeText, W - pad - badgeW / 2, y - 2);
+
+    y += 16;
+
+    // 3. बिल और कस्टमर डिटेल बॉक्स
+    drawRoundedRect(pad, y, contentW, metaBoxH - 16, 12);
+    ctx.fillStyle = '#f9fafb';
+    ctx.fill();
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.stroke();
+
+    let my = y + 22;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '700 12px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Bill No:', pad + 14, my);
+    ctx.fillStyle = '#111827';
+    ctx.font = '800 13px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(`#${ord.billNumber ?? 'N/A'}`, pad + 70, my);
+
+    if (ord.tokenNumber) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#6b7280';
+      ctx.font = '700 12px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(`Token: ${ord.tokenNumber}`, W - pad - 14, my);
+    }
+
+    my += 21;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '600 12px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(`Date: ${dateStr}`, pad + 14, my);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ea580c';
+    ctx.font = '800 12px "Segoe UI", Arial, sans-serif';
+    const typeLabel = `${(ord.fulfillmentType || 'pickup').toUpperCase()}${ord.tableNumber ? ` (${ord.tableNumber})` : ''}`;
+    ctx.fillText(typeLabel, W - pad - 14, my);
+
+    my += 21;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#111827';
+    ctx.font = '700 13px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(`Customer: ${ord.customerName || 'Walk-in Guest'}${cleanPhone ? ` (${cleanPhone})` : ''}`, pad + 14, my);
+
+    if (custAddrLines.length > 0) {
+      my += 18;
+      ctx.fillStyle = '#4b5563';
+      ctx.font = '500 12px "Segoe UI", Arial, sans-serif';
+      custAddrLines.forEach((line) => {
+        ctx.fillText(line, pad + 14, my);
+        my += 16;
+      });
+    }
+
+    y += metaBoxH;
+
+    // 4. आइटम्स की टेबल हेडिंग
+    drawRoundedRect(pad, y, contentW, tableHeaderH, 8);
+    ctx.fillStyle = '#1f2937';
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 12px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('ITEM', pad + 12, y + 21);
+    ctx.textAlign = 'center';
+    ctx.fillText('QTY', pad + 315, y + 21);
+    ctx.textAlign = 'right';
+    ctx.fillText('RATE', pad + 405, y + 21);
+    ctx.fillText('AMT', W - pad - 12, y + 21);
+
+    y += tableHeaderH;
+
+    // 5. आइटम्स की पंक्तियाँ
+    measuredItems.forEach((m: any, idx: number) => {
+      if (idx % 2 === 1) {
+        ctx.fillStyle = '#f9fafb';
+        ctx.fillRect(pad, y, contentW, m.rowH);
+      }
+
+      let iy = y + 20;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#111827';
+      ctx.font = '600 14px "Segoe UI", Arial, sans-serif';
+      m.nameLines.forEach((nl: string) => {
+        ctx.fillText(nl, pad + 10, iy);
+        iy += 18;
+      });
+
+      if (m.noteLines.length > 0) {
+        ctx.fillStyle = '#6b7280';
+        ctx.font = 'italic 11px "Segoe UI", Arial, sans-serif';
+        m.noteLines.forEach((nl: string) => {
+          ctx.fillText(nl, pad + 18, iy);
+          iy += 15;
+        });
+      }
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#111827';
+      ctx.font = '700 14px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(String(m.item.quantity), pad + 315, y + 20);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#4b5563';
+      ctx.font = '600 13px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(`₹${m.item.price}`, pad + 405, y + 20);
+
+      ctx.fillStyle = '#111827';
+      ctx.font = '800 14px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(`₹${Number(m.item.price) * Number(m.item.quantity)}`, W - pad - 12, y + 20);
+
+      y += m.rowH;
+    });
+
+    // डैश्ड लाइन
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = '#d1d5db';
+    ctx.beginPath();
+    ctx.moveTo(pad, y + 4);
+    ctx.lineTo(W - pad, y + 4);
+    ctx.stroke();
+    ctx.restore();
+
+    y += 24;
+
+    // 6. टोटल व टैक्स/छूट विवरण
+    const drawSummaryRow = (label: string, val: string, color = '#374151') => {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#4b5563';
+      ctx.font = '600 13px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(label, pad + 10, y);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = color;
+      ctx.font = '700 14px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(val, W - pad - 10, y);
+      y += 24;
+    };
+
+    drawSummaryRow('Subtotal', `₹${subtotalVal}`);
+    if (Number(ord.discountAmount) > 0) {
+      drawSummaryRow(`Discount${ord.promoCodeUsed ? ` (${ord.promoCodeUsed})` : ''}`, `-₹${ord.discountAmount}`, '#ea580c');
+    }
+    if (Number(ord.pointsRedeemed) > 0) {
+      drawSummaryRow('Loyalty Points Redeemed', `-₹${ord.pointsRedeemed}`, '#d97706');
+    }
+    if (Number(ord.gstAmount) > 0) {
+      drawSummaryRow(`GST (${ord.gstRate || 0}%)`, `+₹${ord.gstAmount}`, '#dc2626');
+    }
+    if (Number(ord.deliveryFee) > 0) {
+      drawSummaryRow('Delivery Charge', `+₹${ord.deliveryFee}`, '#2563eb');
+    }
+    if (Number(ord.packingCharge) > 0) {
+      drawSummaryRow('Packing Charge', `+₹${ord.packingCharge}`, '#ea580c');
+    }
+
+    // GRAND TOTAL बॉक्स
+    y += 4;
+    drawRoundedRect(pad, y, contentW, 44, 10);
+    ctx.fillStyle = '#ecfdf5';
+    ctx.fill();
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#111827';
+    ctx.font = '900 16px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('GRAND TOTAL', pad + 14, y + 28);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#15803d';
+    ctx.font = '900 22px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(`₹${ord.total}`, W - pad - 14, y + 29);
+
+    y += 60;
+
+    const payStr = ord.paymentMethod === 'split'
+      ? `SPLIT (Cash: ₹${ord.splitCashAmount || 0}, UPI: ₹${ord.splitUpiAmount || 0})`
+      : ord.paymentMethod === 'due'
+      ? 'UDHARI (DUE)'
+      : (ord.paymentMethod || 'CASH').toUpperCase();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '700 12px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(`Payment Method: ${payStr}`, W / 2, y);
+    y += 20;
+
+    // 7. Loyalty Points बॉक्स
+    if (hasLoyalty) {
+      drawRoundedRect(pad, y, contentW, 38, 10);
+      ctx.fillStyle = '#fffbeb';
+      ctx.fill();
+      ctx.strokeStyle = '#fcd34d';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#92400e';
+      ctx.font = '700 13px "Segoe UI", Arial, sans-serif';
+      const earnedTxt = Number(ord.pointsEarned) > 0 ? `Earned Today: +${ord.pointsEarned} Pts   |   ` : '';
+      ctx.fillText(`Loyalty Points -> ${earnedTxt}Balance: ${ord.remainingPoints ?? ord.customerPoints ?? 0} Pts`, W / 2, y + 23);
+      y += 54;
+    }
+
+    // 8. UPI QR Code
+    if (qrImg) {
+      y += 6;
+      const qrSize = 124;
+      ctx.drawImage(qrImg, (W - qrSize) / 2, y, qrSize, qrSize);
+      y += qrSize + 18;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#374151';
+      ctx.font = '700 12px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(`Scan & Pay via UPI (₹${ord.total})`, W / 2, y);
+      y += 22;
+    }
+
+    // 9. Footer (Online Order + Google Map + Review Box)
+    y += 10;
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(W - pad, y);
+    ctx.stroke();
+    y += 24;
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#111827';
+    ctx.font = '700 13px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(`Thank you for visiting ${storeNameConfig || 'BUM BUM CAFE'}!`, W / 2, y);
+    y += 18;
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '500 12px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Please visit again!  |  We value your feedback', W / 2, y);
+
+    y += 16;
+    drawRoundedRect(pad, y, contentW, 72, 10);
+    ctx.fillStyle = '#fff7ed';
+    ctx.fill();
+    ctx.strokeStyle = '#fdba74';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#c2410c';
+    ctx.font = '800 12px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Order Online: https://bb-cafe-app.vercel.app/', W / 2, y + 22);
+
+    ctx.fillStyle = '#1d4ed8';
+    ctx.font = '700 12px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Google Map: https://maps.app.goo.gl/UBR3p1E66WkbJsSV8', W / 2, y + 43);
+
+    ctx.fillStyle = '#15803d';
+    ctx.font = '700 11px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Rate Us 5-Star on Google (Review Link in Message)', W / 2, y + 62);
+
+    return new Promise<Blob | null>((resolve) => canvas.toBlob((blob) => resolve(blob), 'image/png'));
+  };
+
+  // 🟢 WhatsApp Bill Sender (Digital Receipt Image कॉपी + Clickable Links Caption में)
+  const handleSendWhatsAppBill = async (targetOrder: any = null) => {
     const ord = targetOrder || { customerPhone, customerName, fulfillmentType, items: cart, total: getTotalBillPrice() };
     let clean = getSanitizedPhone(ord.customerPhone || '');
     if (clean.length !== 10) {
@@ -3916,80 +4346,60 @@ const handleFinalCheckoutAndPrintBill = async () => {
     }
     if (!ord.items || ord.items.length === 0) return toast.error("बिल में कोई आइटम नहीं है!");
 
-    // तारीख और समय निकालना
-    let billDate = new Date();
-    if (ord.timestamp?.toDate) billDate = ord.timestamp.toDate();
-    else if (ord.timestamp?.seconds) billDate = new Date(ord.timestamp.seconds * 1000);
-    else if (ord.timestamp) billDate = new Date(ord.timestamp);
-    const dateStr = billDate.toLocaleString('en-IN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: true
-    });
+    const toastId = toast.loading("Digital Receipt तैयार की जा रही है...");
+    try {
+      const pngBlob = await generateDigitalReceiptBlob(ord, clean);
+      toast.dismiss(toastId);
 
-    // सारे आइटम्स (Note सहित)
-    const itemsText = ord.items
-      .map((i: any, idx: number) => {
-        const line = `${idx + 1}. *${i.name}* (${i.quantity} x ₹${i.price}) = *₹${Number(i.price) * Number(i.quantity)}*`;
-        return i.note ? `${line}\n   _${i.note}_` : line;
-      })
-      .join('\n');
+      if (!pngBlob) {
+        return toast.error("Digital Receipt बनाने में समस्या आई!");
+      }
 
-    const subtotalVal = ord.subtotal !== undefined
-      ? Number(ord.subtotal)
-      : ord.items.reduce((acc: number, i: any) => acc + (Number(i.price) * Number(i.quantity)), 0);
+      let copied = false;
+      const ClipItem = (window as any).ClipboardItem;
+      if (navigator.clipboard && ClipItem) {
+        try {
+          await navigator.clipboard.write([new ClipItem({ 'image/png': pngBlob })]);
+          copied = true;
+        } catch (clipErr) {
+          console.warn("Clipboard write failed:", clipErr);
+        }
+      }
 
-    const payStr = ord.paymentMethod === 'split'
-      ? `SPLIT (Cash: ₹${ord.splitCashAmount || 0}, UPI: ₹${ord.splitUpiAmount || 0})`
-      : ord.paymentMethod === 'due'
-      ? 'UDHARI (DUE)'
-      : (ord.paymentMethod || 'CASH').toUpperCase();
+      if (copied) {
+        toast.success("🧾 Digital Receipt फोटो कॉपी हो गई! WhatsApp में बस Ctrl + V दबाकर Send करें!", { duration: 7000 });
+      } else {
+        const url = URL.createObjectURL(pngBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Digital_Receipt_${ord.billNumber || Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success("🧾 Digital Receipt डाउनलोड हो गई! WhatsApp में फोटो अटैच करके भेजें!", { duration: 7000 });
+      }
 
-    const statusStr = (ord.status === 'completed' || ord.paymentSettled)
-      ? 'Paid ✅'
-      : (ord.paymentMethod === 'due' ? 'Pending (उधार)' : 'Unsettled');
+      const captionLines = [
+        `*${storeNameConfig || 'BUM BUM CAFE'} - Digital Receipt*`,
+        `Bill No: *#${ord.billNumber ?? 'N/A'}*  |  Total: *₹${ord.total}*`,
+        ``,
+        `*घर बैठे अभी ऑनलाइन ऑर्डर करें (Order Online):*`,
+        `https://bb-cafe-app.vercel.app/`,
+        ``,
+        `*कैफे की लोकेशन (Google Maps Direction):*`,
+        `https://maps.app.goo.gl/UBR3p1E66WkbJsSV8`,
+        ``,
+        `*हमारी सर्विस कैसी लगी? Google पर 5-Star Review दें:*`,
+        `https://search.google.com/local/writereview?placeid=ChIJLyEjP4A3gjkRvyz8dQthZo8`
+      ];
 
-    const cafeNum = getSanitizedPhone(ownerPhoneConfig || '9714293759');
-
-    const lines = [
-      `*☕ ${storeNameConfig || 'BUM BUM CAFE'}*`,
-      storeAddressConfig ? `${storeAddressConfig}` : '',
-      storePhoneConfig ? `📞 Ph: ${storePhoneConfig}` : '',
-      `------------------------------`,
-      (ord.billNumber !== undefined && ord.billNumber !== null)
-        ? `*Bill No:* #${ord.billNumber}${ord.tokenNumber ? `  |  *Token:* ${ord.tokenNumber}` : ''}`
-        : '',
-      `*Date:* ${dateStr}`,
-      `*Order Type:* ${(ord.fulfillmentType || 'pickup').toUpperCase()}${ord.tableNumber ? ` (${ord.tableNumber})` : ''}`,
-      `*Customer:* ${ord.customerName || 'Walk-in Guest'}${clean ? ` (${clean})` : ''}`,
-      ord.address ? `*Address:* ${ord.address}` : '',
-      `------------------------------`,
-      `*ITEMS:*`,
-      itemsText,
-      `------------------------------`,
-      `*Subtotal:* ₹${subtotalVal}`,
-      Number(ord.discountAmount) > 0 ? `*Discount${ord.promoCodeUsed ? ` (${ord.promoCodeUsed})` : ''}:* -₹${ord.discountAmount}` : '',
-      Number(ord.pointsRedeemed) > 0 ? `*Points Redeemed:* -₹${ord.pointsRedeemed}` : '',
-      Number(ord.gstAmount) > 0 ? `*GST (${ord.gstRate || 0}%):* +₹${ord.gstAmount}` : '',
-      Number(ord.deliveryFee) > 0 ? `*Delivery Charge:* +₹${ord.deliveryFee}` : '',
-      Number(ord.packingCharge) > 0 ? `*Packing Charge:* +₹${ord.packingCharge}` : '',
-      `*GRAND TOTAL: ₹${ord.total}*`,
-      `*Payment:* ${payStr} (${statusStr})`,
-      (Number(ord.pointsEarned) > 0 || ord.remainingPoints !== undefined)
-        ? `------------------------------\n⭐ *Loyalty Points:*${Number(ord.pointsEarned) > 0 ? ` Earned +${ord.pointsEarned} Pts |` : ''} Balance: *${ord.remainingPoints ?? ord.customerPoints ?? 0} Pts*`
-        : '',
-      `------------------------------`,
-      `_Thank you for visiting ${storeNameConfig || 'Bum Bum Cafe'}!_ 💛`,
-      `\n⭐ *Share Your Feedback:*`,
-      `कैसा रहा आपका अनुभव? नीचे क्लिक करें:`,
-      `🟢 Excellent: https://wa.me/91${cafeNum}?text=Feedback:%20Excellent%20⭐`,
-      `🟡 Average: https://wa.me/91${cafeNum}?text=Feedback:%20Average%20👍`,
-      `🔴 Bad: https://wa.me/91${cafeNum}?text=Feedback:%20Bad%20👎`
-    ].filter(Boolean);
-
-    const msg = lines.join('\n');
-    window.open(`https://wa.me/91${clean}?text=${encodeURIComponent(msg)}`, '_blank');
+      window.open(`https://wa.me/91${clean}?text=${encodeURIComponent(captionLines.join('\n'))}`, '_blank');
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Digital Receipt भेजने में त्रुटि आई!");
+    }
   };
-
 // 📄 [HELPER] Professional EOD PDF Generator
   const generateProfessionalPDF = () => {
     const doc = new jsPDF();
