@@ -1889,6 +1889,24 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   }, []);
 
   const getSanitizedPhone = (p: string) => (p || '').replace(/\D/g, '').slice(-10);
+
+  const toTitleCase = (val: string) =>
+    (val || '').replace(/(^|[\s,])\S/g, (char) => char.toUpperCase());
+
+  const handleTitleCaseChange =
+    (setter: React.Dispatch<React.SetStateAction<string>>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const input = e.target;
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const formatted = toTitleCase(input.value);
+      setter(formatted);
+      requestAnimationFrame(() => {
+        if (document.activeElement === input && start !== null && end !== null) {
+          input.setSelectionRange(start, end);
+        }
+      });
+    };
   // Invoice Number Generator
   const getNextBillNumber = (): number => {
     const saved = localStorage.getItem("bb_pos_local_bill_counter_pc");
