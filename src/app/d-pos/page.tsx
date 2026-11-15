@@ -11046,7 +11046,7 @@ onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
                 const toastId = toast.loading("Saving staff...");
                 try {
                   if (editStaffId) {
-                    await updateDoc(doc(db, "cafe_users", editStaffId), { name: staffFormName, pin: staffFormPin, role: staffFormRole });
+                    await updateDoc(doc(db, "cafe_users", editStaffId), { name: toTitleCase(staffFormName.trim()), pin: staffFormPin, role: staffFormRole });
                   } else {
                     // डुप्लीकेट PIN चेक करें
                     const q = query(collection(db, "cafe_users"), where("pin", "==", staffFormPin));
@@ -11055,7 +11055,7 @@ onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
                       toast.dismiss(toastId);
                       return toast.error("❌ यह PIN पहले से किसी और का है! कोई दूसरा PIN बनाएं।");
                     }
-                    await addDoc(collection(db, "cafe_users"), { name: staffFormName, pin: staffFormPin, role: staffFormRole });
+                    await addDoc(collection(db, "cafe_users"), { name: toTitleCase(staffFormName.trim()), pin: staffFormPin, role: staffFormRole });
                   }
                   toast.dismiss(toastId);
                   toast.success("Staff Profile Saved! ✅");
