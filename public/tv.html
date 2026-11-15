@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cash Counter Digital Menu & Ad Player</title>
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    color: #fff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* App Root handles Global Screen Rotation (0, 90, 180, 270) */
+  #app-root {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    overflow: hidden;
+    transform-origin: center center;
+  }
+
+  #app-root.rot-90 {
+    width: 100vh;
+    height: 100vw;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+
+  #app-root.rot-180 {
+    width: 100vw;
+    height: 100vh;
+    top: 0;
+    left: 0;
+    transform: rotate(180deg);
+  }
+
+  #app-root.rot-270 {
+    width: 100vh;
+    height: 100vw;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(270deg);
+  }
+
+  /* Main Player Container */
+  #player-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+  }
+
+  #stage {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+  }
+
+  .slide-item {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.6s ease-in-out;
+    overflow: hidden;
+  }
+
+  .slide-item.active {
+    opacity: 1;
+    z-index: 2;
+  }
+
+  .slide-item img,
+  .slide-item video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+  }
+
+  .slide-item.cover img,
+  .slide-item.cover video {
+    object-fit: cover;
+  }
+
+  /* Built-in Digital Menu Board Styling (vmin scales cleanly in both Landscape & Portrait) */
+  .menu-board {
+    width: 100%;
+    height: 100%;
+    padding: 2.5vmin 3.5vmin;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: radial-gradient(circle at top right, #1f1a17, #0d0b0a);
+  }
+
+  .menu-board.theme-red {
+    background: radial-gradient(circle at top right, #4a0e0e, #1a0404);
+  }
+  .menu-board.theme-green {
+    background: radial-gradient(circle at top right, #0f3822, #05170d);
+  }
+  .menu-board.theme-blue {
+    background: radial-gradient(circle at top right, #0f2547, #050d1a);
+  }
+
+  .menu-header {
+    text-align: center;
+    padding-bottom: 1.5vmin;
+    margin-bottom: 2vmin;
+    border-bottom: 2px solid rgba(255, 193, 7, 0.5);
+  }
+
+  .menu-header h1 {
+    font-size: clamp(22px, 4.5vmin, 56px);
+    color: #ffc107;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+  }
+
+  .menu-header p {
+    font-size: clamp(13px, 2vmin, 24px);
+    color: #e0e0e0;
+    margin-top: 0.4vmin;
+  }
+
+  .menu-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 2vmin 2.5vmin;
+    align-content: start;
+    overflow: hidden;
+  }
+
+  .menu-category {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 1.8vmin 2vmin;
+  }
+
+  .menu-category h2 {
+    font-size: clamp(16px, 2.5vmin, 30px);
+    color: #ffca28;
+    border-bottom: 1px dashed rgba(255, 202, 40, 0.4);
+    padding-bottom: 0.8vmin;
+    margin-bottom: 1.2vmin;
+    text-transform: uppercase;
+  }
+
+  .menu-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.65vmin 0;
+    border-bottom: 1px dotted rgba(255, 255, 255, 0.1);
+    font-size: clamp(14px, 2vmin, 24px);
+  }
+
+  .menu-row:last-child {
+    border-bottom: none;
+  }
+
+  .menu-item-name {
+    color: #fff;
+    font-weight: 500;
+    padding-right: 12px;
+  }
+
+  .menu-item-price {
+    color: #4ade80;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* Bottom Scrolling Ticker */
+  #ticker-bar {
+    width: 100%;
+    background: #b91c1c;
+    color: #fff;
+    padding: 1.1vmin 0;
+    font-size: clamp(15px, 2.3vmin, 28px);
+    font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    border-top: 2px solid #facc15;
+    z-index: 5;
+  }
+
+  #ticker-bar.hidden {
+    display: none;
+  }
+
+  #ticker-text {
+    display: inline-block;
+    padding-left: 100%;
+    animation: tickerAnim 22s linear infinite;
+  }
+
+  @keyframes tickerAnim {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  /* Floating Controls */
+  #controls-overlay {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    z-index: 50;
+    background: rgba(15, 15, 15, 0.85);
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.2);
+    backdrop-filter: blur(6px);
+    transition: opacity 0.4s ease;
+    max-width: calc(100% - 32px);
+  }
+
+  #controls-overlay.idle {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  body.cursor-hidden {
+    cursor: none;
+  }
+
+  .ctrl-btn {
+    background: #27272a;
+    color: #fff;
+    border: 1px solid #3f3f46;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .ctrl-btn:hover {
+    background: #3f3f46;
+  }
+
+  .ctrl-btn.primary {
+    background: #eab308;
+    color: #000;
+    border-color: #eab308;
+  }
+
+  /* Toast message */
+  #toast {
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid #eab308;
+    font-size: 15px;
+    z-index: 60;
+    display: none;
+    text-align: center;
+  }
+
+  /* Settings Modal */
+  #settings-modal {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  #settings-modal.open {
+    display: flex;
+  }
+
+  .modal-box {
+    background: #18181b;
+    border: 1px solid #3f3f46;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 920px;
+    max-height: 92%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: #f4f4f5;
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+    background: #27272a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #3f3f46;
+  }
+
+  .modal-header h2 {
+    font-size: 18px;
+    color: #facc15;
+  }
+
+  .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .section-card {
+    background: #202024;
+    border: 1px solid #333338;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+
+  .section-card h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: #fde047;
+  }
+
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .btn {
+    padding: 9px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-yellow { background: #eab308; color: #000; }
+  .btn-blue { background: #2563eb; color: #fff; }
+  .btn-green { background: #16a34a; color: #fff; }
+  .btn-red { background: #dc2626; color: #fff; }
+  .btn-gray { background: #3f3f46; color: #fff; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  .playlist-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: #141417;
+    border: 1px solid #2e2e34;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+
+  .playlist-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .badge-image { background: #0284c7; color: #fff; }
+  .badge-video { background: #9333ea; color: #fff; }
+  .badge-menu { background: #ca8a04; color: #000; }
+
+  .playlist-title {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .playlist-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .input-field {
+    background: #111113;
+    border: 1px solid #3f3f46;
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  .input-sm {
+    width: 65px;
+    padding: 5px 6px;
+    font-size: 13px;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .form-group label {
+    font-size: 13px;
+    color: #a1a1aa;
+  }
+
+  /* Menu Editor Sub-box */
+  #menu-editor-box {
+    display: none;
+    background: #141417;
+    border: 1px solid #eab308;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 12px;
+  }
+
+  #menu-editor-box.open {
+    display: block;
+  }
+
+  .cat-editor-block {
+    background: #1e1e22;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .item-editor-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="app-root">
+  <div id="player-wrapper">
+    <div id="stage"></div>
+    <div id="ticker-bar">
+      <span id="ticker-text"></span>
+    </div>
+  </div>
+
+  <!-- Floating Controls -->
+  <div id="controls-overlay">
+    <button class="ctrl-btn" id="btn-prev" title="Previous">⏮ Prev</button>
+    <button class="ctrl-btn" id="btn-playpause" title="Play/Pause">⏸ Pause</button>
+    <button class="ctrl-btn" id="btn-next" title="Next">⏭ Next</button>
+    <button class="ctrl-btn" id="btn-rotate-screen" title="Rotate Screen">🔄 Rotate: 0°</button>
+    <button class="ctrl-btn" id="btn-fullscreen" title="Full Screen">⛶ Full Screen</button>
+    <button class="ctrl-btn primary" id="btn-open-settings">⚙ Settings / Add Ads</button>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>📺 Player Settings & Playlist Manager</h2>
+        <button class="btn btn-red btn-sm" id="btn-close-settings">✖ Close & Play</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Add Content Section -->
+        <div class="section-card">
+          <h3>1. Naya Menu, Video ya Image Ad Add Karein</h3>
+          <div class="action-row">
+            <button class="btn btn-blue" id="btn-add-image">🖼 + Add Image / Menu Photo</button>
+            <button class="btn btn-yellow" id="btn-add-video">🎬 + Add Video Ad (MP4/WebM)</button>
+            <button class="btn btn-green" id="btn-add-menu">📋 + Create Editable Digital Menu</button>
+          </div>
+          <input type="file" id="file-image-input" accept="image/*" multiple style="display:none" />
+          <input type="file" id="file-video-input" accept="video/mp4,video/webm,video/ogg" multiple style="display:none" />
+
+          <!-- Digital Menu Editor -->
+          <div id="menu-editor-box">
+            <h4 style="color:#4ade80; margin-bottom:10px;">📋 Digital Menu Editor</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Shop / Heading Name</label>
+                <input type="text" id="me-title" class="input-field" placeholder="e.g., ROYAL CAFE MENU" />
+              </div>
+              <div class="form-group">
+                <label>Subtitle (Optional)</label>
+                <input type="text" id="me-subtitle" class="input-field" placeholder="e.g., Fresh & Delicious Food" />
+              </div>
+              <div class="form-group">
+                <label>Kitne Second Dikhana Hai?</label>
+                <input type="number" id="me-duration" class="input-field" value="15" min="3" />
+              </div>
+              <div class="form-group">
+                <label>Background Theme</label>
+                <select id="me-theme" class="input-field">
+                  <option value="dark">Dark Gold (Classic)</option>
+                  <option value="red">Spicy Red (Fast Food)</option>
+                  <option value="green">Fresh Green (Pure Veg/Juice)</option>
+                  <option value="blue">Cool Blue (Ice Cream/Cafe)</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="me-categories-container"></div>
+            <div class="action-row" style="margin-top:10px;">
+              <button class="btn btn-gray btn-sm" id="btn-me-add-cat">+ Add Category</button>
+              <button class="btn btn-green" id="btn-me-save">💾 Save Menu Slide</button>
+              <button class="btn btn-red btn-sm" id="btn-me-cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Playlist Section -->
+        <div class="section-card">
+          <h3>2. Aapki Playlist (Bari-Bari Se Chalne Wale Slides)</h3>
+          <div id="playlist-container"></div>
+        </div>
+
+        <!-- General & Ticker Settings -->
+        <div class="section-card">
+          <h3>3. Offer Patti (Bottom Ticker), Rotation & Display Settings</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Poori TV Screen Rotate Karein</label>
+              <select id="cfg-screen-rotation" class="input-field">
+                <option value="0">0° (Normal Horizontal TV)</option>
+                <option value="90">90° (Khadi TV / Vertical Right)</option>
+                <option value="180">180° (Ulti TV / Upside Down)</option>
+                <option value="270">270° (Khadi TV / Vertical Left)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Image / Video Fit Mode</label>
+              <select id="cfg-fit-mode" class="input-field">
+                <option value="contain">Fit Poori Image (Black borders allowed)</option>
+                <option value="cover">Full Screen Stretch/Crop (No black bars)</option>
+              </select>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="checkbox-label">
+                <input type="checkbox" id="cfg-ticker-enabled" />
+                Neeche chalti hui Offer Patti (Ticker) dikhayein
+              </label>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Offer Patti ka Text (Jo neeche chalega)</label>
+              <input type="text" id="cfg-ticker-text" class="input-field" placeholder="🔥 Today's Special: Paneer Burger + Cold Coffee Combo sirf ₹149 mein!" />
+            </div>
+            <div class="form-group">
+              <label>Offer Patti ka Background Color</label>
+              <input type="color" id="cfg-ticker-bg" class="input-field" value="#b91c1c" style="height:40px; padding:2px;" />
+            </div>
+            <div class="form-group" style="justify-content: center;">
+              <label class="checkbox-label">
+                <input type="checkbox" id="cfg-video-muted" />
+                Videos ko Mute rakhein (Aawaz band)
+              </label>
+            </div>
+          </div>
+          <button class="btn btn-yellow" id="btn-save-config">💾 Save Display Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ==========================
+  // IndexedDB Setup
+  // ==========================
+  const DB_NAME = 'CashCounterMenuPlayerDB';
+  const DB_VERSION = 1;
+  let db = null;
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const database = e.target.result;
+        if (!database.objectStoreNames.contains('slides')) {
+          database.createObjectStore('slides', { keyPath: 'id' });
+        }
+        if (!database.objectStoreNames.contains('settings')) {
+          database.createObjectStore('settings', { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = (e) => {
+        db = e.target.result;
+        resolve(db);
+      };
+      req.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  function dbGetAll(storeName) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const req = tx.objectStore(storeName).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function dbPut(storeName, obj) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const req = tx.objectStore(storeName).put(obj);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function dbDelete(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const req = tx.objectStore(storeName).delete(key);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // ==========================
+  // App State
+  // ==========================
+  let slides = [];
+  let config = {
+    id: 'main_config',
+    tickerEnabled: true,
+    tickerText: "🔥 WELCOME! Aaj ka Special Combo: Veg Burger + Fries + Cold Drink sirf ₹149 mein! | Order at Cash Counter 🔥",
+    tickerBg: '#b91c1c',
+    fitMode: 'contain',
+    videoMuted: false,
+    screenRotation: 0
+  };
+
+  let currentIndex = 0;
+  let isPaused = false;
+  let slideTimer = null;
+  let activeObjectUrls = new Map();
+  let editingMenuSlideId = null;
+  let tempMenuCategories = [];
+
+  // DOM Elements
+  const appRoot = document.getElementById('app-root');
+  const stage = document.getElementById('stage');
+  const tickerBar = document.getElementById('ticker-bar');
+  const tickerText = document.getElementById('ticker-text');
+  const controlsOverlay = document.getElementById('controls-overlay');
+  const settingsModal = document.getElementById('settings-modal');
+  const toastEl = document.getElementById('toast');
+  const btnRotateScreen = document.getElementById('btn-rotate-screen');
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.style.display = 'block';
+    clearTimeout(toastEl._timer);
+    toastEl._timer = setTimeout(() => { toastEl.style.display = 'none'; }, 3500);
+  }
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ==========================
+  // Default Demo Slide
+  // ==========================
+  function createDefaultDemoSlide() {
+    return {
+      id: 'slide_' + Date.now(),
+      order: 1,
+      type: 'menu',
+      title: 'Sample Restaurant Menu',
+      duration: 12,
+      menuData: {
+        title: "TODAY'S SPECIAL MENU",
+        subtitle: 'Freshly Prepared • Order at Cash Counter',
+        theme: 'dark',
+        categories: [
+          {
+            name: 'Burgers & Snacks',
+            items: [
+              { name: 'Classic Veg Burger', price: '₹70' },
+              { name: 'Cheese Paneer Burger', price: '₹110' },
+              { name: 'Crispy French Fries', price: '₹80' },
+              { name: 'Grilled Club Sandwich', price: '₹120' }
+            ]
+          },
+          {
+            name: 'Beverages & Shakes',
+            items: [
+              { name: 'Cold Coffee with Ice Cream', price: '₹99' },
+              { name: 'Oreo Thick Shake', price: '₹129' },
+              { name: 'Fresh Lime Soda', price: '₹50' },
+              { name: 'Masala Chai', price: '₹25' }
+            ]
+          },
+          {
+            name: 'Combo Offers',
+            items: [
+              { name: 'Burger + Fries + Coke', price: '₹159' },
+              { name: 'Sandwich + Cold Coffee', price: '₹189' },
+              { name: 'Family Pizza Meal', price: '₹499' }
+            ]
+          }
+        ]
+      }
+    };
+  }
+
+  // ==========================
+  // Load Data & Apply Settings
+  // ==========================
+  async function loadAppData() {
+    await openDB();
+    const allSettings = await dbGetAll('settings');
+    const savedConfig = allSettings.find(s => s.id === 'main_config');
+    if (savedConfig) {
+      config = { ...config, ...savedConfig };
+    } else {
+      await dbPut('settings', config);
+    }
+
+    slides = await dbGetAll('slides');
+    slides.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    if (slides.length === 0) {
+      const demo = createDefaultDemoSlide();
+      await dbPut('slides', demo);
+      slides.push(demo);
+    }
+
+    applyConfig();
+    renderPlaylistSettings();
+    startPlayback(0);
+  }
+
+  function applyConfig() {
+    // Global Screen Rotation
+    const rot = Number(config.screenRotation) || 0;
+    appRoot.classList.remove('rot-90', 'rot-180', 'rot-270');
+    if (rot === 90 || rot === 180 || rot === 270) {
+      appRoot.classList.add('rot-' + rot);
+    }
+    btnRotateScreen.textContent = `🔄 Rotate: ${rot}°`;
+
+    // Ticker
+    if (config.tickerEnabled && config.tickerText.trim() !== '') {
+      tickerBar.classList.remove('hidden');
+      tickerBar.style.backgroundColor = config.tickerBg || '#b91c1c';
+      tickerText.textContent = config.tickerText;
+      tickerText.style.animation = 'none';
+      tickerText.offsetHeight;
+      tickerText.style.animation = '';
+    } else {
+      tickerBar.classList.add('hidden');
+    }
+
+    // Populate Settings Form
+    document.getElementById('cfg-screen-rotation').value = String(rot);
+    document.getElementById('cfg-ticker-enabled').checked = !!config.tickerEnabled;
+    document.getElementById('cfg-ticker-text').value = config.tickerText || '';
+    document.getElementById('cfg-ticker-bg').value = config.tickerBg || '#b91c1c';
+    document.getElementById('cfg-fit-mode').value = config.fitMode || 'contain';
+    document.getElementById('cfg-video-muted').checked = !!config.videoMuted;
+
+    requestAnimationFrame(adjustActiveMediaRotation);
+  }
+
+  // ==========================
+  // Per-Slide Media Rotation Sizing
+  // ==========================
+  function applyMediaRotationStyle(mediaEl, rot) {
+    const r = Number(rot) || 0;
+    if (r === 90 || r === 270) {
+      const sw = stage.clientWidth || 100;
+      const sh = stage.clientHeight || 100;
+      mediaEl.style.position = 'absolute';
+      mediaEl.style.top = '50%';
+      mediaEl.style.left = '50%';
+      mediaEl.style.width = sh + 'px';
+      mediaEl.style.height = sw + 'px';
+      mediaEl.style.transform = `translate(-50%, -50%) rotate(${r}deg)`;
+    } else if (r === 180) {
+      mediaEl.style.position = '';
+      mediaEl.style.top = '';
+      mediaEl.style.left = '';
+      mediaEl.style.width = '100%';
+      mediaEl.style.height = '100%';
+      mediaEl.style.transform = 'rotate(180deg)';
+    } else {
+      mediaEl.style.position = '';
+      mediaEl.style.top = '';
+      mediaEl.style.left = '';
+      mediaEl.style.width = '100%';
+      mediaEl.style.height = '100%';
+      mediaEl.style.transform = '';
+    }
+  }
+
+  function adjustActiveMediaRotation() {
+    const activeSlideEl = stage.querySelector('.slide-item.active');
+    if (!activeSlideEl) return;
+    const mediaEl = activeSlideEl.querySelector('img, video');
+    const slide = slides[currentIndex];
+    if (mediaEl && slide) {
+      applyMediaRotationStyle(mediaEl, slide.rotation || 0);
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    requestAnimationFrame(adjustActiveMediaRotation);
+  });
+
+  // ==========================
+  // Player Engine
+  // ==========================
+  function clearStage() {
+    clearTimeout(slideTimer);
+    const oldVideos = stage.querySelectorAll('video');
+    oldVideos.forEach(v => {
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
+    });
+    stage.innerHTML = '';
+  }
+
+  function getMediaUrl(slide) {
+    if (activeObjectUrls.has(slide.id)) {
+      return activeObjectUrls.get(slide.id);
+    }
+    if (slide.blob) {
+      const url = URL.createObjectURL(slide.blob);
+      activeObjectUrls.set(slide.id, url);
+      return url;
+    }
+    return '';
+  }
+
+  function startPlayback(index) {
+    clearTimeout(slideTimer);
+    if (slides.length === 0) {
+      clearStage();
+      stage.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px;"><h2>Playlist Khali Hai</h2><p style="margin-top:8px;">Upar Settings button par click karke Menu, Video ya Image add karein.</p></div>';
+      return;
+    }
+
+    if (index >= slides.length) index = 0;
+    if (index < 0) index = slides.length - 1;
+    currentIndex = index;
+
+    renderSlide(slides[currentIndex]);
+  }
+
+  function renderSlide(slide) {
+    const existingSlides = Array.from(stage.querySelectorAll('.slide-item'));
+    existingSlides.forEach(el => {
+      const v = el.querySelector('video');
+      if (v) v.pause();
+    });
+
+    const el = document.createElement('div');
+    el.className = 'slide-item ' + (config.fitMode === 'cover' ? 'cover' : '');
+
+    if (slide.type === 'image') {
+      const img = document.createElement('img');
+      img.src = getMediaUrl(slide);
+      applyMediaRotationStyle(img, slide.rotation || 0);
+      el.appendChild(img);
+      stage.appendChild(el);
+      requestAnimationFrame(() => {
+        applyMediaRotationStyle(img, slide.rotation || 0);
+        el.classList.add('active');
+      });
+
+      if (!isPaused && slides.length > 1) {
+        const durMs = Math.max(2, Number(slide.duration) || 10) * 1000;
+        slideTimer = setTimeout(() => nextSlide(), durMs);
+      }
+    }
+    else if (slide.type === 'video') {
+      const video = document.createElement('video');
+      video.src = getMediaUrl(slide);
+      video.playsInline = true;
+      video.muted = !!config.videoMuted;
+      video.autoplay = true;
+      applyMediaRotationStyle(video, slide.rotation || 0);
+
+      video.onended = () => {
+        if (slides.length === 1) {
+          video.currentTime = 0;
+          video.play().catch(() => {});
+        } else if (!isPaused) {
+          nextSlide();
+        }
+      };
+
+      video.onerror = () => {
+        showToast('Video play karne mein problem aayi, agle slide par ja rahe hain...');
+        if (slides.length > 1 && !isPaused) {
+          slideTimer = setTimeout(() => nextSlide(), 2000);
+        }
+      };
+
+      el.appendChild(video);
+      stage.appendChild(el);
+      requestAnimationFrame(() => {
+        applyMediaRotationStyle(video, slide.rotation || 0);
+        el.classList.add('active');
+      });
+
+      if (!isPaused) {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            video.muted = true;
+            video.play().catch(() => {});
+            showToast('🔊 Video aawaz ke liye screen par ek baar click karein.');
+          });
+        }
+      }
+    }
+    else if (slide.type === 'menu') {
+      const md = slide.menuData || { title: 'MENU', subtitle: '', theme: 'dark', categories: [] };
+      const board = document.createElement('div');
+      board.className = 'menu-board theme-' + (md.theme || 'dark');
+
+      let html = `
+        <div class="menu-header">
+          <h1>${escapeHtml(md.title)}</h1>
+          ${md.subtitle ? `<p>${escapeHtml(md.subtitle)}</p>` : ''}
+        </div>
+        <div class="menu-grid">
+      `;
+
+      (md.categories || []).forEach(cat => {
+        html += `<div class="menu-category"><h2>${escapeHtml(cat.name)}</h2>`;
+        (cat.items || []).forEach(item => {
+          html += `
+            <div class="menu-row">
+              <span class="menu-item-name">${escapeHtml(item.name)}</span>
+              <span class="menu-item-price">${escapeHtml(item.price)}</span>
+            </div>
+          `;
+        });
+        html += `</div>`;
+      });
+
+      html += `</div>`;
+      board.innerHTML = html;
+      el.appendChild(board);
+      stage.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('active'));
+
+      if (!isPaused && slides.length > 1) {
+        const durMs = Math.max(3, Number(slide.duration) || 12) * 1000;
+        slideTimer = setTimeout(() => nextSlide(), durMs);
+      }
+    }
+
+    setTimeout(() => {
+      existingSlides.forEach(old => {
+        if (old.parentNode === stage) stage.removeChild(old);
+      });
+    }, 650);
+  }
+
+  function nextSlide() {
+    if (slides.length <= 1) return;
+    startPlayback((currentIndex + 1) % slides.length);
+  }
+
+  function prevSlide() {
+    if (slides.length <= 1) return;
+    startPlayback((currentIndex - 1 + slides.length) % slides.length);
+  }
+
+  function togglePause() {
+    isPaused = !isPaused;
+    const btn = document.getElementById('btn-playpause');
+    btn.textContent = isPaused ? '▶ Play' : '⏸ Pause';
+
+    const currentVideo = stage.querySelector('.slide-item.active video');
+    if (isPaused) {
+      clearTimeout(slideTimer);
+      if (currentVideo) currentVideo.pause();
+    } else {
+      if (currentVideo) {
+        currentVideo.play().catch(() => {});
+      } else {
+        startPlayback(currentIndex);
+      }
+    }
+  }
+
+  // ==========================
+  // Controls & Idle Cursor Hide
+  // ==========================
+  let idleTimer = null;
+  function resetIdleTimer() {
+    controlsOverlay.classList.remove('idle');
+    document.body.classList.remove('cursor-hidden');
+    clearTimeout(idleTimer);
+    if (!settingsModal.classList.contains('open')) {
+      idleTimer = setTimeout(() => {
+        controlsOverlay.classList.add('idle');
+        document.body.classList.add('cursor-hidden');
+      }, 3000);
+    }
+  }
+
+  document.addEventListener('mousemove', resetIdleTimer);
+  document.addEventListener('touchstart', resetIdleTimer);
+  document.addEventListener('keydown', (e) => {
+    resetIdleTimer();
+    if (settingsModal.classList.contains('open')) return;
+    if (e.key === 'ArrowRight') nextSlide();
+    if (e.key === 'ArrowLeft') prevSlide();
+    if (e.key === ' ') { e.preventDefault(); togglePause(); }
+  });
+
+  stage.addEventListener('click', () => {
+    const v = stage.querySelector('.slide-item.active video');
+    if (v && v.muted && !config.videoMuted) {
+      v.muted = false;
+      showToast('🔊 Sound On');
+    }
+  });
+
+  document.getElementById('btn-prev').onclick = prevSlide;
+  document.getElementById('btn-next').onclick = nextSlide;
+  document.getElementById('btn-playpause').onclick = togglePause;
+
+  // Quick Screen Rotate Button
+  btnRotateScreen.onclick = async () => {
+    config.screenRotation = ((Number(config.screenRotation) || 0) + 90) % 360;
+    await dbPut('settings', config);
+    applyConfig();
+    showToast(`🔄 Screen Rotate: ${config.screenRotation}°`);
+  };
+
+  document.getElementById('btn-fullscreen').onclick = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {
+        showToast('Full screen ke liye keyboard par F11 dabayein.');
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  // ==========================
+  // Settings Modal Logic
+  // ==========================
+  document.getElementById('btn-open-settings').onclick = () => {
+    clearTimeout(slideTimer);
+    const v = stage.querySelector('video');
+    if (v) v.pause();
+    settingsModal.classList.add('open');
+    renderPlaylistSettings();
+  };
+
+  document.getElementById('btn-close-settings').onclick = () => {
+    settingsModal.classList.remove('open');
+    closeMenuEditor();
+    isPaused = false;
+    document.getElementById('btn-playpause').textContent = '⏸ Pause';
+    startPlayback(currentIndex);
+    resetIdleTimer();
+  };
+
+  // Add Images
+  document.getElementById('btn-add-image').onclick = () => {
+    document.getElementById('file-image-input').click();
+  };
+
+  document.getElementById('file-image-input').onchange = async (e) => {
+    const files = Array.from(e.target.files);
+    for (const file of files) {
+      const slide = {
+        id: 'slide_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        order: slides.length ? Math.max(...slides.map(s => s.order || 0)) + 1 : 1,
+        type: 'image',
+        title: file.name,
+        duration: 10,
+        rotation: 0,
+        blob: file
+      };
+      await dbPut('slides', slide);
+      slides.push(slide);
+    }
+    e.target.value = '';
+    renderPlaylistSettings();
+    showToast('✅ Image add ho gayi!');
+  };
+
+  // Add Videos
+  document.getElementById('btn-add-video').onclick = () => {
+    document.getElementById('file-video-input').click();
+  };
+
+  document.getElementById('file-video-input').onchange = async (e) => {
+    const files = Array.from(e.target.files);
+    for (const file of files) {
+      const slide = {
+        id: 'slide_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        order: slides.length ? Math.max(...slides.map(s => s.order || 0)) + 1 : 1,
+        type: 'video',
+        title: file.name,
+        duration: 0,
+        rotation: 0,
+        blob: file
+      };
+      await dbPut('slides', slide);
+      slides.push(slide);
+    }
+    e.target.value = '';
+    renderPlaylistSettings();
+    showToast('✅ Video add ho gaya!');
+  };
+
+  // ==========================
+  // Digital Menu Editor Logic
+  // ==========================
+  const menuEditorBox = document.getElementById('menu-editor-box');
+  const meCatsContainer = document.getElementById('me-categories-container');
+
+  function openMenuEditor(slideToEdit = null) {
+    if (slideToEdit) {
+      editingMenuSlideId = slideToEdit.id;
+      const md = slideToEdit.menuData || {};
+      document.getElementById('me-title').value = md.title || 'OUR MENU';
+      document.getElementById('me-subtitle').value = md.subtitle || '';
+      document.getElementById('me-duration').value = slideToEdit.duration || 15;
+      document.getElementById('me-theme').value = md.theme || 'dark';
+      tempMenuCategories = JSON.parse(JSON.stringify(md.categories || []));
+    } else {
+      editingMenuSlideId = null;
+      document.getElementById('me-title').value = 'OUR MENU';
+      document.getElementById('me-subtitle').value = 'Fresh & Hygienic Food';
+      document.getElementById('me-duration').value = 15;
+      document.getElementById('me-theme').value = 'dark';
+      tempMenuCategories = [
+        { name: 'Snacks', items: [{ name: 'Samosa', price: '₹20' }, { name: 'Sandwich', price: '₹60' }] }
+      ];
+    }
+    renderMenuEditorCategories();
+    menuEditorBox.classList.add('open');
+  }
+
+  function closeMenuEditor() {
+    menuEditorBox.classList.remove('open');
+    editingMenuSlideId = null;
+  }
+
+  function renderMenuEditorCategories() {
+    meCatsContainer.innerHTML = '';
+    tempMenuCategories.forEach((cat, cIdx) => {
+      const block = document.createElement('div');
+      block.className = 'cat-editor-block';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.gap = '8px';
+      header.style.alignItems = 'center';
+
+      const catInput = document.createElement('input');
+      catInput.type = 'text';
+      catInput.className = 'input-field';
+      catInput.style.flex = '1';
+      catInput.placeholder = 'Category Name (e.g. Fast Food)';
+      catInput.value = cat.name;
+      catInput.oninput = (e) => { tempMenuCategories[cIdx].name = e.target.value; };
+
+      const addItemBtn = document.createElement('button');
+      addItemBtn.className = 'btn btn-blue btn-sm';
+      addItemBtn.textContent = '+ Add Item';
+      addItemBtn.onclick = () => {
+        tempMenuCategories[cIdx].items.push({ name: '', price: '₹' });
+        renderMenuEditorCategories();
+      };
+
+      const delCatBtn = document.createElement('button');
+      delCatBtn.className = 'btn btn-red btn-sm';
+      delCatBtn.textContent = '🗑';
+      delCatBtn.onclick = () => {
+        tempMenuCategories.splice(cIdx, 1);
+        renderMenuEditorCategories();
+      };
+
+      header.append(catInput, addItemBtn, delCatBtn);
+      block.appendChild(header);
+
+      cat.items.forEach((item, iIdx) => {
+        const row = document.createElement('div');
+        row.className = 'item-editor-row';
+
+        const nameIn = document.createElement('input');
+        nameIn.type = 'text';
+        nameIn.className = 'input-field';
+        nameIn.style.flex = '2';
+        nameIn.placeholder = 'Item Name (e.g. Cheese Pizza)';
+        nameIn.value = item.name;
+        nameIn.oninput = (e) => { tempMenuCategories[cIdx].items[iIdx].name = e.target.value; };
+
+        const priceIn = document.createElement('input');
+        priceIn.type = 'text';
+        priceIn.className = 'input-field';
+        priceIn.style.flex = '1';
+        priceIn.placeholder = 'Price (e.g. ₹150)';
+        priceIn.value = item.price;
+        priceIn.oninput = (e) => { tempMenuCategories[cIdx].items[iIdx].price = e.target.value; };
+
+        const delItemBtn = document.createElement('button');
+        delItemBtn.className = 'btn btn-gray btn-sm';
+        delItemBtn.textContent = '✖';
+        delItemBtn.onclick = () => {
+          tempMenuCategories[cIdx].items.splice(iIdx, 1);
+          renderMenuEditorCategories();
+        };
+
+        row.append(nameIn, priceIn, delItemBtn);
+        block.appendChild(row);
+      });
+
+      meCatsContainer.appendChild(block);
+    });
+  }
+
+  document.getElementById('btn-add-menu').onclick = () => openMenuEditor(null);
+  document.getElementById('btn-me-cancel').onclick = closeMenuEditor;
+  document.getElementById('btn-me-add-cat').onclick = () => {
+    tempMenuCategories.push({ name: 'New Category', items: [{ name: 'New Item', price: '₹50' }] });
+    renderMenuEditorCategories();
+  };
+
+  document.getElementById('btn-me-save').onclick = async () => {
+    const titleVal = document.getElementById('me-title').value.trim() || 'MENU';
+    const subVal = document.getElementById('me-subtitle').value.trim();
+    const durVal = Math.max(3, parseInt(document.getElementById('me-duration').value) || 15);
+    const themeVal = document.getElementById('me-theme').value;
+
+    const menuData = {
+      title: titleVal,
+      subtitle: subVal,
+      theme: themeVal,
+      categories: tempMenuCategories
+    };
+
+    if (editingMenuSlideId) {
+      const idx = slides.findIndex(s => s.id === editingMenuSlideId);
+      if (idx !== -1) {
+        slides[idx].title = titleVal;
+        slides[idx].duration = durVal;
+        slides[idx].menuData = menuData;
+        await dbPut('slides', slides[idx]);
+      }
+    } else {
+      const slide = {
+        id: 'slide_' + Date.now(),
+        order: slides.length ? Math.max(...slides.map(s => s.order || 0)) + 1 : 1,
+        type: 'menu',
+        title: titleVal,
+        duration: durVal,
+        menuData
+      };
+      await dbPut('slides', slide);
+      slides.push(slide);
+    }
+
+    closeMenuEditor();
+    renderPlaylistSettings();
+    showToast('✅ Digital Menu save ho gaya!');
+  };
+
+  // ==========================
+  // Playlist List Rendering
+  // ==========================
+  function renderPlaylistSettings() {
+    const container = document.getElementById('playlist-container');
+    container.innerHTML = '';
+
+    if (slides.length === 0) {
+      container.innerHTML = '<p style="color:#a1a1aa;">Abhi koi slide nahi hai. Upar wale buttons se Image, Video ya Menu add karein.</p>';
+      return;
+    }
+
+    slides.forEach((slide, idx) => {
+      const row = document.createElement('div');
+      row.className = 'playlist-item';
+
+      const info = document.createElement('div');
+      info.className = 'playlist-info';
+
+      const badge = document.createElement('span');
+      badge.className = 'badge badge-' + slide.type;
+      badge.textContent = slide.type;
+
+      const title = document.createElement('span');
+      title.className = 'playlist-title';
+      title.textContent = slide.title || 'Untitled';
+
+      info.append(badge, title);
+
+      const actions = document.createElement('div');
+      actions.className = 'playlist-actions';
+
+      if (slide.type === 'image' || slide.type === 'menu') {
+        const durLabel = document.createElement('span');
+        durLabel.style.fontSize = '12px';
+        durLabel.style.color = '#a1a1aa';
+        durLabel.textContent = 'Sec:';
+
+        const durInput = document.createElement('input');
+        durInput.type = 'number';
+        durInput.min = '2';
+        durInput.className = 'input-field input-sm';
+        durInput.value = slide.duration || 10;
+        durInput.onchange = async (e) => {
+          slide.duration = Math.max(2, parseInt(e.target.value) || 10);
+          await dbPut('slides', slide);
+        };
+        actions.append(durLabel, durInput);
+      } else {
+        const vLabel = document.createElement('span');
+        vLabel.style.fontSize = '12px';
+        vLabel.style.color = '#a1a1aa';
+        vLabel.textContent = '(Poora Video)';
+        actions.append(vLabel);
+      }
+
+      if (slide.type === 'image' || slide.type === 'video') {
+        const rotBtn = document.createElement('button');
+        rotBtn.className = 'btn btn-gray btn-sm';
+        rotBtn.title = 'Sirf is photo/video ko rotate karein';
+        rotBtn.textContent = `🔄 ${slide.rotation || 0}°`;
+        rotBtn.onclick = async () => {
+          slide.rotation = ((Number(slide.rotation) || 0) + 90) % 360;
+          await dbPut('slides', slide);
+          renderPlaylistSettings();
+        };
+        actions.append(rotBtn);
+      }
+
+      if (slide.type === 'menu') {
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-green btn-sm';
+        editBtn.textContent = '✏ Edit Menu';
+        editBtn.onclick = () => openMenuEditor(slide);
+        actions.append(editBtn);
+      }
+
+      const upBtn = document.createElement('button');
+      upBtn.className = 'btn btn-gray btn-sm';
+      upBtn.textContent = '⬆';
+      upBtn.disabled = idx === 0;
+      upBtn.onclick = () => moveSlide(idx, -1);
+
+      const downBtn = document.createElement('button');
+      downBtn.className = 'btn btn-gray btn-sm';
+      downBtn.textContent = '⬇';
+      downBtn.disabled = idx === slides.length - 1;
+      downBtn.onclick = () => moveSlide(idx, 1);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-red btn-sm';
+      delBtn.textContent = '🗑';
+      delBtn.onclick = async () => {
+        if (activeObjectUrls.has(slide.id)) {
+          URL.revokeObjectURL(activeObjectUrls.get(slide.id));
+          activeObjectUrls.delete(slide.id);
+        }
+        await dbDelete('slides', slide.id);
+        slides.splice(idx, 1);
+        if (currentIndex >= slides.length) currentIndex = 0;
+        renderPlaylistSettings();
+      };
+
+      actions.append(upBtn, downBtn, delBtn);
+      row.append(info, actions);
+      container.appendChild(row);
+    });
+  }
+
+  async function moveSlide(index, dir) {
+    const newIndex = index + dir;
+    if (newIndex < 0 || newIndex >= slides.length) return;
+    const temp = slides[index];
+    slides[index] = slides[newIndex];
+    slides[newIndex] = temp;
+
+    for (let i = 0; i < slides.length; i++) {
+      slides[i].order = i + 1;
+      await dbPut('slides', slides[i]);
+    }
+    renderPlaylistSettings();
+  }
+
+  // Save Config
+  document.getElementById('btn-save-config').onclick = async () => {
+    config.screenRotation = Number(document.getElementById('cfg-screen-rotation').value) || 0;
+    config.tickerEnabled = document.getElementById('cfg-ticker-enabled').checked;
+    config.tickerText = document.getElementById('cfg-ticker-text').value;
+    config.tickerBg = document.getElementById('cfg-ticker-bg').value;
+    config.fitMode = document.getElementById('cfg-fit-mode').value;
+    config.videoMuted = document.getElementById('cfg-video-muted').checked;
+
+    await dbPut('settings', config);
+    applyConfig();
+    showToast('✅ Display Settings save ho gayi!');
+  };
+
+  // Start App
+  loadAppData().catch(err => {
+    console.error(err);
+    showToast('Database start karne mein error aaya.');
+  });
+})();
+</script>
+</body>
+</html>
