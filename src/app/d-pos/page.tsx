@@ -11165,8 +11165,8 @@ onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
                     required 
                     autoFocus
                     placeholder="उदा: प्रिंटर पेपर ख़त्म था / आइटम बदलना है..." 
-                    value={securityReason} 
-                    onChange={e => setSecurityReason(e.target.value)} 
+                   value={securityReason} 
+onChange={handleTitleCaseChange(setSecurityReason)}
                     className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-red-500" 
                   />
                 </div>
