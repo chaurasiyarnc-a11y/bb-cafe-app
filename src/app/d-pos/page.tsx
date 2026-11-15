@@ -6630,7 +6630,7 @@ onChange={handleTitleCaseChange(setSearchQuery)}
                     type="text" 
                     placeholder="Search menu by item name, category or code..." 
                     value={inventorySearchQuery}
-                    onChange={e => setInventorySearchQuery(e.target.value)}
+onChange={handleTitleCaseChange(setInventorySearchQuery)}
                     className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold outline-none"
                   />
                 </div>
