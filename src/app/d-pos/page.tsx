@@ -9429,7 +9429,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
 
                 <div className="space-y-1">
                    <label className="text-[10px] font-black uppercase text-neutral-500">Address (Optional)</label>
-                   <textarea rows={2} placeholder="Full Delivery Address..." value={custFormAddress} onChange={e => setCustFormAddress(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs resize-none" />
+                   <textarea rows={2} placeholder="Full Delivery Address..." value={custFormAddress} onChange={handleTitleCaseChange(setCustFormAddress)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs resize-none" />
                 </div>
 
                 {/* 👉 NEW: CUSTOMER NOTES & SPECIAL DATES */}
