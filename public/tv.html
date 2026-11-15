@@ -374,6 +374,7 @@
   .btn-green { background: #16a34a; color: #fff; }
   .btn-red { background: #dc2626; color: #fff; }
   .btn-gray { background: #3f3f46; color: #fff; }
+  .btn-cyan { background: #06b6d4; color: #000; }
   .btn-sm { padding: 5px 10px; font-size: 12px; }
 
   .playlist-item {
@@ -431,6 +432,7 @@
     padding: 8px 10px;
     border-radius: 6px;
     font-size: 14px;
+    width: 100%;
   }
 
   .input-sm {
@@ -457,6 +459,16 @@
     color: #a1a1aa;
   }
 
+  /* Link Editor Box */
+  #link-editor-box {
+    display: none;
+    background: #0f172a;
+    border: 1px solid #3b82f6;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 12px;
+  }
+
   /* Menu Editor Sub-box */
   #menu-editor-box {
     display: none;
@@ -465,10 +477,6 @@
     border-radius: 8px;
     padding: 16px;
     margin-top: 12px;
-  }
-
-  #menu-editor-box.open {
-    display: block;
   }
 
   .cat-editor-block {
@@ -535,14 +543,37 @@
         <div class="section-card">
           <h3>1. Naya Menu, Video ya Image Ad Add Karein</h3>
           <div class="action-row">
-            <button class="btn btn-blue" id="btn-add-image">🖼 + Image</button>
-            <button class="btn btn-yellow" id="btn-add-video">🎬 + Video</button>
+            <button class="btn btn-blue" id="btn-add-image">🖼 + Image File</button>
+            <button class="btn btn-yellow" id="btn-add-video">🎬 + Video File</button>
             <button class="btn btn-red" id="btn-add-pdf">📄 + Import PDF Menu</button>
-            <button class="btn btn-green" id="btn-add-menu">📋 + Digital Menu</button>
+            <button class="btn btn-cyan" id="btn-add-link">🔗 + Add Web Link (URL)</button>
+            <button class="btn btn-green" id="btn-add-menu">📋 + Design Menu</button>
           </div>
           <input type="file" id="file-image-input" accept="image/*" multiple style="display:none" />
           <input type="file" id="file-video-input" accept="video/mp4,video/webm,video/ogg" multiple style="display:none" />
           <input type="file" id="file-pdf-input" accept="application/pdf" style="display:none" />
+
+          <!-- Web Link Editor Box -->
+          <div id="link-editor-box">
+            <h4 style="color:#38bdf8; margin-bottom:10px;">🔗 Add Media via Web Link (URL)</h4>
+            <div class="form-grid">
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Paste Image or Video Direct Link here</label>
+                <input type="url" id="link-url" class="input-field" placeholder="e.g. https://example.com/photo.jpg or video.mp4" />
+              </div>
+              <div class="form-group">
+                <label>Media Type</label>
+                <select id="link-type" class="input-field">
+                  <option value="image">Image / Photo</option>
+                  <option value="video">Video (MP4/WebM)</option>
+                </select>
+              </div>
+            </div>
+            <div class="action-row" style="margin-top:10px;">
+              <button class="btn btn-blue" id="btn-link-save">💾 Save Link</button>
+              <button class="btn btn-red btn-sm" id="btn-link-cancel">Cancel</button>
+            </div>
+          </div>
 
           <!-- Digital Menu Editor -->
           <div id="menu-editor-box">
@@ -720,6 +751,8 @@
   const settingsModal = document.getElementById('settings-modal');
   const toastEl = document.getElementById('toast');
   const btnRotateScreen = document.getElementById('btn-rotate-screen');
+  const linkEditorBox = document.getElementById('link-editor-box');
+  const menuEditorBox = document.getElementById('menu-editor-box');
 
   function showToast(msg) {
     toastEl.textContent = msg;
@@ -895,6 +928,9 @@
   }
 
   function getMediaUrl(slide) {
+    if (slide.url) {
+      return slide.url; // Web URL handler
+    }
     if (activeObjectUrls.has(slide.id)) {
       return activeObjectUrls.get(slide.id);
     }
@@ -1063,7 +1099,7 @@
   }
 
   // ==========================
-  // Controls & Fullscreen 
+  // Controls & Fullscreen (Universal Fix)
   // ==========================
   let idleTimer = null;
   function resetIdleTimer() {
@@ -1107,7 +1143,6 @@
     showToast(`🔄 Screen Rotate: ${config.screenRotation}°`);
   };
 
-  // Universal Full Screen Logic (Fixed)
   const btnFullScreen = document.getElementById('btn-fullscreen');
   btnFullScreen.onclick = () => {
     const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
@@ -1143,16 +1178,15 @@
   document.getElementById('btn-close-settings').onclick = () => {
     settingsModal.classList.remove('open');
     closeMenuEditor();
+    linkEditorBox.style.display = 'none';
     isPaused = false;
     document.getElementById('btn-playpause').textContent = '⏸ Pause';
     startPlayback(currentIndex);
     resetIdleTimer();
   };
 
-  // Add Images
-  document.getElementById('btn-add-image').onclick = () => {
-    document.getElementById('file-image-input').click();
-  };
+  // 1. Add Image File
+  document.getElementById('btn-add-image').onclick = () => { document.getElementById('file-image-input').click(); };
   document.getElementById('file-image-input').onchange = async (e) => {
     const files = Array.from(e.target.files);
     for (const file of files) {
@@ -1173,10 +1207,8 @@
     showToast('✅ Image add ho gayi!');
   };
 
-  // Add Videos
-  document.getElementById('btn-add-video').onclick = () => {
-    document.getElementById('file-video-input').click();
-  };
+  // 2. Add Video File
+  document.getElementById('btn-add-video').onclick = () => { document.getElementById('file-video-input').click(); };
   document.getElementById('file-video-input').onchange = async (e) => {
     const files = Array.from(e.target.files);
     for (const file of files) {
@@ -1197,11 +1229,8 @@
     showToast('✅ Video add ho gaya!');
   };
 
-  // Add PDF Logic
-  document.getElementById('btn-add-pdf').onclick = () => {
-    document.getElementById('file-pdf-input').click();
-  };
-
+  // 3. Add PDF File
+  document.getElementById('btn-add-pdf').onclick = () => { document.getElementById('file-pdf-input').click(); };
   document.getElementById('file-pdf-input').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1238,24 +1267,60 @@
         await dbPut('slides', slide);
         slides.push(slide);
       }
-      
       renderPlaylistSettings();
       showToast('✅ PDF Menu successfully add ho gaya!');
     } catch (err) {
       console.error('PDF Error:', err);
       showToast('❌ PDF load karne mein error aayi!');
     }
-    
     e.target.value = '';
+  };
+
+  // 4. Add Web Link (URL) Logic
+  document.getElementById('btn-add-link').onclick = () => {
+    document.getElementById('link-url').value = '';
+    linkEditorBox.style.display = 'block';
+    menuEditorBox.classList.remove('open');
+  };
+
+  document.getElementById('btn-link-cancel').onclick = () => {
+    linkEditorBox.style.display = 'none';
+  };
+
+  document.getElementById('btn-link-save').onclick = async () => {
+    const urlVal = document.getElementById('link-url').value.trim();
+    const typeVal = document.getElementById('link-type').value;
+    
+    if (!urlVal) {
+      showToast('❌ Kripya sahi URL daalein!');
+      return;
+    }
+
+    const slide = {
+      id: 'slide_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      order: slides.length ? Math.max(...slides.map(s => s.order || 0)) + 1 : 1,
+      type: typeVal,
+      title: 'Web Link (' + typeVal + ')',
+      duration: typeVal === 'image' ? 10 : 0,
+      rotation: 0,
+      url: urlVal
+    };
+
+    await dbPut('slides', slide);
+    slides.push(slide);
+    
+    linkEditorBox.style.display = 'none';
+    renderPlaylistSettings();
+    showToast(`✅ ${typeVal} link successfully add ho gaya!`);
   };
 
   // ==========================
   // Digital Menu Editor Logic
   // ==========================
-  const menuEditorBox = document.getElementById('menu-editor-box');
   const meCatsContainer = document.getElementById('me-categories-container');
 
   function openMenuEditor(slideToEdit = null) {
+    linkEditorBox.style.display = 'none';
     if (slideToEdit) {
       editingMenuSlideId = slideToEdit.id;
       const md = slideToEdit.menuData || {};
@@ -1329,7 +1394,7 @@
         nameIn.type = 'text';
         nameIn.className = 'input-field';
         nameIn.style.flex = '2';
-        nameIn.placeholder = 'Item Name (e.g. Cheese Pizza)';
+        nameIn.placeholder = 'Item Name';
         nameIn.value = item.name;
         nameIn.oninput = (e) => { tempMenuCategories[cIdx].items[iIdx].name = e.target.value; };
 
@@ -1337,7 +1402,7 @@
         priceIn.type = 'text';
         priceIn.className = 'input-field';
         priceIn.style.flex = '1';
-        priceIn.placeholder = 'Price (e.g. ₹150)';
+        priceIn.placeholder = 'Price';
         priceIn.value = item.price;
         priceIn.oninput = (e) => { tempMenuCategories[cIdx].items[iIdx].price = e.target.value; };
 
@@ -1352,7 +1417,6 @@
         row.append(nameIn, priceIn, delItemBtn);
         block.appendChild(row);
       });
-
       meCatsContainer.appendChild(block);
     });
   }
@@ -1397,7 +1461,6 @@
       await dbPut('slides', slide);
       slides.push(slide);
     }
-
     closeMenuEditor();
     renderPlaylistSettings();
     showToast('✅ Digital Menu save ho gaya!');
@@ -1411,7 +1474,7 @@
     container.innerHTML = '';
 
     if (slides.length === 0) {
-      container.innerHTML = '<p style="color:#a1a1aa;">Abhi koi slide nahi hai. Upar wale buttons se Image, Video, PDF ya Menu add karein.</p>';
+      container.innerHTML = '<p style="color:#a1a1aa;">Abhi koi slide nahi hai. Upar wale buttons se Image, Video, PDF, Link ya Menu add karein.</p>';
       return;
     }
 
