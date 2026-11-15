@@ -10735,7 +10735,7 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                     type="text" 
                     placeholder="माल या वेंडर खोजें..." 
                     value={purchaseHistorySearch} 
-                    onChange={e => setPurchaseHistorySearch(e.target.value)} 
+onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
                     className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl pl-8 pr-3 py-1.5 text-xs font-bold outline-none" 
                   />
                 </div>
