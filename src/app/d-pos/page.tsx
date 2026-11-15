@@ -5631,8 +5631,8 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                         ref={searchInputRef}
                         type="text" 
                         placeholder="Search item / Type Code or Qty*Code (e.g. 101 or 3*101) & hit [Enter]... [F2]" 
-                        value={searchQuery} 
-                        onChange={e => setSearchQuery(e.target.value)}
+                       value={searchQuery} 
+onChange={handleTitleCaseChange(setSearchQuery)}
                         onKeyDown={handleSearchInputKeyDown} 
                         className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-neutral-900 dark:text-white outline-none focus:border-orange-500 shadow-sm" 
                         autoFocus
