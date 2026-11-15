@@ -11450,8 +11450,8 @@ onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
                       <input 
                         type="text" 
                         placeholder="कच्चा माल खोजें..." 
-                        value={auditSearchQuery} 
-                        onChange={e => setAuditSearchQuery(e.target.value)} 
+                       value={auditSearchQuery} 
+onChange={handleTitleCaseChange(setAuditSearchQuery)}
                         className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg pl-8 pr-3 py-1 text-xs font-bold outline-none" 
                       />
                     </div>
