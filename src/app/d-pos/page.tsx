@@ -1565,10 +1565,10 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     const toastId = toast.loading("Saving customer...");
     try {
       const userRef = doc(db, "customer_points", cleanPhone);
-     const payload = {
-        name: custFormName.trim(),
+    const payload = {
+        name: toTitleCase(custFormName.trim()),
         phone: cleanPhone,
-       address: custFormAddress.trim(),
+        address: toTitleCase(custFormAddress.trim()),
         points: Number(custFormPoints) || 0,
         walletBalance: Number(custFormWalletBalance) || 0, // 👉 NEW: Save Wallet Balance
         note: custFormNote.trim(), // 👉 NEW: कस्टमर की पसंद का नोट
