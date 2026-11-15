@@ -9168,13 +9168,12 @@ onChange={handleTitleCaseChange(setItemNoteInput)}
                         type="text"
                         placeholder="New Category Name..."
                         value={newCustomCategoryName}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setNewCustomCategoryName(val);
-                          if (val.trim()) {
-                            setItemCodeInput(generateNextCategoryCode(val, products, editingItemObj?.id));
-                          }
-                        }}
+onChange={e => handleTitleCaseInput(e, (val) => {
+  setNewCustomCategoryName(val);
+  if (val.trim()) {
+    setItemCodeInput(generateNextCategoryCode(val, products, editingItemObj?.id));
+  }
+})}
                         className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500"
                         autoFocus
                       />
