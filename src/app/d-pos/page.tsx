@@ -10316,11 +10316,11 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                       type="text" 
                       placeholder="🔍 कच्चा माल खोजें / चुनें..." 
                       value={purchaseSearchTerm}
-                      onChange={e => {
-                        setPurchaseSearchTerm(e.target.value);
-                        setShowPurchaseDropdown(true);
-                        setPurchaseItemId(''); 
-                      }}
+onChange={e => handleTitleCaseInput(e, (val) => {
+  setPurchaseSearchTerm(val);
+  setShowPurchaseDropdown(true);
+  setPurchaseItemId(''); 
+})}
                       onFocus={() => setShowPurchaseDropdown(true)}
                       onBlur={() => setTimeout(() => setShowPurchaseDropdown(false), 200)}
                       className="w-full bg-white dark:bg-neutral-900 border border-blue-200 dark:border-blue-700/50 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-blue-500"
