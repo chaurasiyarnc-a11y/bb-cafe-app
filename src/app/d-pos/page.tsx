@@ -5951,8 +5951,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                         </div>
                       )}
 
-                      {/* NEW CUSTOMER REGISTRATION FORM */}
-                      {/* NEW CUSTOMER REGISTRATION FORM */}
+                     {/* NEW CUSTOMER REGISTRATION FORM */}
                       {showNewCustForm && (
                         <div className="space-y-1.5 pt-1 border-t border-neutral-200 dark:border-neutral-800">
                           <p className="text-[10px] text-amber-600 font-black uppercase">नया ग्राहक! नाम लिखकर [Enter] दबाएँ:</p>
@@ -5961,7 +5960,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             type="text" 
                             placeholder="Customer Name *" 
                             value={newCustNameInput} 
-                            onChange={e => setNewCustNameInput(e.target.value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '))}
+                            onChange={handleTitleCaseChange(setNewCustNameInput)}
                             onKeyDown={e => e.key === 'Enter' && newCustAddressRef.current?.focus()}
                             className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1.5 text-xs outline-none" 
                           />
@@ -5970,7 +5969,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             type="text" 
                             placeholder="Address (Optional)" 
                             value={newCustAddressInput} 
-                            onChange={e => setNewCustAddressInput(e.target.value)} 
+                            onChange={handleTitleCaseChange(setNewCustAddressInput)} 
                             onKeyDown={e => e.key === 'Enter' && handleSaveNewCustomerQuick()}
                             className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1.5 text-xs outline-none" 
                           />
