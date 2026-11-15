@@ -9125,7 +9125,7 @@ onChange={handleTitleCaseChange(setItemNoteInput)}
               <form onSubmit={handleSaveItemToFirestore} className="space-y-3 text-xs">
                 
                 {/* Item Name */}
-                <input type="text" required placeholder="Item Name *" value={itemNameInput} onChange={e => setItemNameInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500" autoFocus />
+                <input type="text" required placeholder="Item Name *"value={itemNameInput} onChange={handleTitleCaseChange(setItemNameInput)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500" autoFocus />
                 
                {/* Price & Code */}
                 <div className="grid grid-cols-2 gap-3">
