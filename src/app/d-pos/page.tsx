@@ -10492,10 +10492,10 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                      <input 
                        type="text" 
                        value={purchaseVendorName} 
-                       onChange={e => {
-                         setPurchaseVendorName(e.target.value);
+                       onChange={e => handleTitleCaseInput(e, (val) => {
+                         setPurchaseVendorName(val);
                          setShowVendorDropdown(true);
-                       }} 
+                       })} 
                        onFocus={() => setShowVendorDropdown(true)}
                        onBlur={() => setTimeout(() => setShowVendorDropdown(false), 250)}
                        placeholder="🔍 नाम लिखें या लिस्ट से चुनें..." 
