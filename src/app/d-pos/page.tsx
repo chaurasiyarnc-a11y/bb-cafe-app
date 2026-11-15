@@ -9406,11 +9406,10 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
               </div>
               <form onSubmit={handleSaveCustomerProfile} className="space-y-3">
                 
-                <div className="space-y-1">
+               <div className="space-y-1">
                    <label className="text-[10px] font-black uppercase text-neutral-500">Customer Name *</label>
-                   <input type="text" required placeholder="e.g. Rahul Kumar" value={custFormName} onChange={e => setCustFormName(e.target.value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" autoFocus />
+                   <input type="text" required placeholder="e.g. Rahul Kumar" value={custFormName} onChange={handleTitleCaseChange(setCustFormName)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" autoFocus />
                 </div>
-
                 <div className="space-y-1">
                    <label className="text-[10px] font-black uppercase text-neutral-500">Phone Number (10 Digits) *</label>
                    <input type="tel" maxLength={10} required disabled={!!editingCustProfile} placeholder="e.g. 9876543210" value={custFormPhone} onChange={e => setCustFormPhone(e.target.value.replace(/\D/g, ''))} className={`w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none text-xs ${editingCustProfile ? 'opacity-60 cursor-not-allowed' : 'focus:border-orange-500'}`} />
