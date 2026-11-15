@@ -11068,7 +11068,7 @@ onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
                 
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-neutral-500">Staff Name (नाम)</label>
-                  <input type="text" required value={staffFormName} onChange={e=>setStaffFormName(e.target.value)} placeholder="e.g. Rahul Waiter" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-green-500" />
+                  <input type="text" required value={staffFormName} onChange={handleTitleCaseChange(setStaffFormName)} placeholder="e.g. Rahul Waiter" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-green-500" />
                 </div>
 
                 <div className="space-y-1">
