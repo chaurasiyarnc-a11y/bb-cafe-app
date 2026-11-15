@@ -7196,7 +7196,7 @@ onChange={handleTitleCaseChange(setVendorSearchQuery)}
                       type="text" 
                       placeholder="Type Bill No (e.g. 201), Customer Name or Phone..." 
                       value={receiptSearchQuery} 
-                      onChange={e => setReceiptSearchQuery(e.target.value)} 
+onChange={handleTitleCaseChange(setReceiptSearchQuery)}
                       className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2 pl-10 pr-4 text-xs outline-none font-bold" 
                     />
                   </div>
