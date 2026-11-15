@@ -2668,15 +2668,16 @@ const generateNextCategoryCode = (catName: string, currentList = products, exclu
   };
 
 // 🚀 SAVE NEW CUSTOMER (ONLINE + OFFLINE)
-  const handleSaveNewCustomerQuick = async () => {
+ const handleSaveNewCustomerQuick = async () => {
     const cleanPhone = getSanitizedPhone(customerPhone);
-    const nameTrim = newCustNameInput.trim();
+    const nameTrim = toTitleCase(newCustNameInput.trim());
+    const addressTrim = toTitleCase(newCustAddressInput.trim());
     if (!nameTrim) return toast.error("Enter customer name!");
     if (cleanPhone.length !== 10) return toast.error("Enter valid 10-digit phone!");
 
     const toastId = toast.loading("Saving customer...");
     const newCustObj = {
-      name: nameTrim, phone: cleanPhone, address: newCustAddressInput.trim(),
+      name: nameTrim, phone: cleanPhone, address: addressTrim,
       points: 0, gamePoints: 0, lastActive: new Date().toISOString()
     };
 
@@ -2692,7 +2693,7 @@ const generateNextCategoryCode = (catName: string, currentList = products, exclu
       setAllCustomers(prev => [{ id: cleanPhone, ...newCustObj }, ...prev]);
       
       setCustomerName(nameTrim); setCartCustSearchInput(`${nameTrim} - ${cleanPhone}`); 
-      setAddress(newCustAddressInput.trim()); setCustomerPoints(0);
+      setAddress(addressTrim); setCustomerPoints(0);
       setShowNewCustForm(false); setNewCustNameInput(''); setNewCustAddressInput('');
       
       toast.dismiss(toastId);
