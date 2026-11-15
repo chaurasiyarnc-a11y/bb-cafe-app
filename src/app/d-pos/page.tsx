@@ -5777,7 +5777,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                             type="text"
                             placeholder="ग्राहक का नाम या मोबाइल नंबर..." 
                             value={cartCustSearchInput} 
-                            onChange={e => handleCustomerSearchChange(e.target.value)} 
+                            onChange={handleCustomerSearchChange}
                             onFocus={() => { 
                               // 👉 Focus होने पर अगर इनपुट खाली है, तो Recent लिस्ट खोलें
                               if (!cartCustSearchInput && recentCartCustomers.length > 0) {
