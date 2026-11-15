@@ -2523,38 +2523,37 @@ const generateNextCategoryCode = (catName: string, currentList = products, exclu
     return () => unsubCoupons();
   }, [isLoggedIn]);
 
- const handleCustomerSearchChange = (val: string) => {
-    const formattedVal = toTitleCase(val);
-    setCartCustSearchInput(formattedVal);
-    setCustomerPhone(formattedVal.replace(/\D/g, '').slice(0, 10)); // बैकग्राउंड के लिए सिर्फ नंबर अलग करें
+const handleCustomerSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleTitleCaseInput(e, (formattedVal) => {
+      setCartCustSearchInput(formattedVal);
+      setCustomerPhone(formattedVal.replace(/\D/g, '').slice(0, 10)); // बैकग्राउंड के लिए सिर्फ नंबर अलग करें
 
-    if (formattedVal.length >= 3) {
-      const lowerVal = formattedVal.toLowerCase();
-      const matches = allCustomers.filter(c => 
-        (c.phone && c.phone.includes(lowerVal)) || 
-        (c.name && c.name.toLowerCase().includes(lowerVal))
-      ).slice(0, 6);
-      
-      setCustSuggestions(matches);
-      setShowCustDropdown(true);
-    } else if (formattedVal.length === 0) {
-      
-      // 👉 NEW: जब इनपुट खाली हो, तो ड्रॉपडाउन में Recent 10 Customers दिखाएँ
-      const enrichedRecents = recentCartCustomers.map(rc => {
-        // पॉइंट्स और लेटेस्ट डेटा के लिए Main लिस्ट से मैच करें
-        const fullCust = allCustomers.find(c => c.phone === rc.phone || c.id === rc.phone);
-        return fullCust || rc; 
-      });
-      setCustSuggestions(enrichedRecents);
-      if (enrichedRecents.length > 0) setShowCustDropdown(true);
-    } else {
-      setShowCustDropdown(false);
-      setCustSuggestions([]);
-      setCustomerName('');
-      setCustomerPoints(0);
-      setAddress('');
-      setShowNewCustForm(false);
-    }
+      if (formattedVal.length >= 3) {
+        const lowerVal = formattedVal.toLowerCase();
+        const matches = allCustomers.filter(c =>
+          (c.phone && c.phone.includes(lowerVal)) ||
+          (c.name && c.name.toLowerCase().includes(lowerVal))
+        ).slice(0, 6);
+
+        setCustSuggestions(matches);
+        setShowCustDropdown(true);
+      } else if (formattedVal.length === 0) {
+        // 👉 NEW: जब इनपुट खाली हो, तो ड्रॉपडाउन में Recent 10 Customers दिखाएँ
+        const enrichedRecents = recentCartCustomers.map(rc => {
+          const fullCust = allCustomers.find(c => c.phone === rc.phone || c.id === rc.phone);
+          return fullCust || rc;
+        });
+        setCustSuggestions(enrichedRecents);
+        if (enrichedRecents.length > 0) setShowCustDropdown(true);
+      } else {
+        setShowCustDropdown(false);
+        setCustSuggestions([]);
+        setCustomerName('');
+        setCustomerPoints(0);
+        setAddress('');
+        setShowNewCustForm(false);
+      }
+    });
   };
   // 👉 NEW: स्मार्ट उधार चेकर और अलर्ट पॉपअप
   const checkAndAlertUdhari = async (phone: string, custName: string) => {
