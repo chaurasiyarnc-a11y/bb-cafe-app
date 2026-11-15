@@ -10399,14 +10399,13 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                             <input 
                               type="text" 
                               value={item.name} 
-                              onChange={(e) => {
-                                const val = e.target.value;
+                              onChange={(e) => handleTitleCaseInput(e, (val) => {
                                 setPurchaseItemList(prev => {
                                   const next = [...prev];
                                   next[idx].name = val;
                                   return next;
                                 });
-                              }}
+                              })}
                               className="bg-transparent border-b border-transparent hover:border-neutral-300 focus:border-blue-500 outline-none w-full font-bold text-xs"
                             />
                           </td>
