@@ -9441,7 +9441,7 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                 {/* 👉 NEW: CUSTOMER NOTES & SPECIAL DATES */}
                 <div className="space-y-1 pt-2 border-t border-neutral-200 dark:border-neutral-800">
                    <label className="text-[10px] font-black uppercase text-neutral-500">📝 Customer Note (Preference)</label>
-                   <input type="text" placeholder="e.g. Jain Food, Less Spicy, No Mayo..." value={custFormNote} onChange={e => setCustFormNote(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" />
+                   <input type="text" placeholder="e.g. Jain Food, Less Spicy, No Mayo..." value={custFormNote} onChange={handleTitleCaseChange(setCustFormNote)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" />
                 </div>
 
                 <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-800">
