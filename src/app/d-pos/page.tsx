@@ -2879,15 +2879,17 @@ const handleCustomerSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!itemNameInput.trim()) return toast.error("Item name required!");
     const toastId = toast.loading("Saving menu item...");
 
-    const finalCategory = isAddingNewCatInput && newCustomCategoryName.trim() 
-      ? newCustomCategoryName.trim() 
-      : itemCatInput.trim() || 'Burgers';
+    const finalCategory = toTitleCase(
+  isAddingNewCatInput && newCustomCategoryName.trim()
+    ? newCustomCategoryName.trim()
+    : itemCatInput.trim() || 'Burgers'
+);
 
-    try {
-      const cleanVariants = (hasVariants && Object.keys(itemVariantsList).length > 0) ? itemVariantsList : null;
+try {
+  const cleanVariants = (hasVariants && Object.keys(itemVariantsList).length > 0) ? itemVariantsList : null;
 
-      const itemData: any = {
-        name: itemNameInput.trim(),
+  const itemData: any = {
+    name: toTitleCase(itemNameInput.trim()),
         itemCode: itemCodeInput.trim(),
         price: Number(itemPriceInput) || 0,
         category: finalCategory,
