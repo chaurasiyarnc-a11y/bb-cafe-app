@@ -9268,12 +9268,12 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                       <input 
                         type="text" 
                         placeholder="🔍 कच्चा माल खोजें / चुनें..." 
-                        value={recipeSearchTerm}
-                        onChange={e => {
-                          setRecipeSearchTerm(e.target.value);
-                          setShowRawDropdown(true);
-                          setSelectedRawId(''); // टाइप करने पर पुरानी सेलेक्शन हटा दें
-                        }}
+                       value={recipeSearchTerm}
+onChange={e => handleTitleCaseInput(e, (val) => {
+  setRecipeSearchTerm(val);
+  setShowRawDropdown(true);
+  setSelectedRawId(''); // टाइप करने पर पुरानी सेलेक्शन हटा दें
+})}
                         onFocus={() => setShowRawDropdown(true)}
                         onBlur={() => setTimeout(() => setShowRawDropdown(false), 200)}
                         className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none focus:border-green-500"
