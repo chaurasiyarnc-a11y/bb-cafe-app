@@ -1571,7 +1571,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
         address: toTitleCase(custFormAddress.trim()),
         points: Number(custFormPoints) || 0,
         walletBalance: Number(custFormWalletBalance) || 0, // 👉 NEW: Save Wallet Balance
-        note: custFormNote.trim(), // 👉 NEW: कस्टमर की पसंद का नोट
+        note: toTitleCase(custFormNote.trim()), // 👉 NEW: कस्टमर की पसंद का नोट
         specialDates: custFormSpecialDates, // 👉 NEW: बच्चों या फॅमिली के बर्थडे
         lastActive: editingCustProfile ? editingCustProfile.lastActive : new Date()
       };
