@@ -1115,15 +1115,31 @@
     showToast(`🔄 Screen Rotate: ${config.screenRotation}°`);
   };
 
-  document.getElementById('btn-fullscreen').onclick = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {
-        showToast('Full screen ke liye keyboard par F11 dabayein.');
-      });
+ // Universal Full Screen Logic
+  const btnFullScreen = document.getElementById('btn-fullscreen');
+  
+  btnFullScreen.onclick = () => {
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+    
+    if (!isFullscreen) {
+      const docEl = document.documentElement;
+      if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => showToast('F11 dabayein.'));
+      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+      else if (docEl.mozRequestFullScreen) docEl.mozRequestFullScreen();
+      else if (docEl.msRequestFullscreen) docEl.msRequestFullscreen();
     } else {
-      document.exitFullscreen();
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+      else if (document.msExitFullscreen) document.msExitFullscreen();
     }
   };
+
+  // Button text automatically update karega
+  document.addEventListener('fullscreenchange', () => {
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+    btnFullScreen.textContent = isFullscreen ? '⛶ Exit Full Screen' : '⛶ Full Screen';
+  });
 
   // ==========================
   // Settings Modal Logic
