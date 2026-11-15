@@ -9097,7 +9097,7 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                   type="text" 
                   placeholder="Cooking Note (Optional)" 
                   value={itemNoteInput} 
-                  onChange={e => setItemNoteInput(e.target.value)} 
+onChange={handleTitleCaseChange(setItemNoteInput)}
                   className="w-full bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-3 py-2 text-xs outline-none font-bold" 
                 />
               </div>
