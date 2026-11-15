@@ -9379,7 +9379,7 @@ onChange={e => handleTitleCaseInput(e, (val) => {
 
                       {/* Add New Custom Variant */}
                       <div className="flex gap-2 items-center pt-2">
-                        <input type="text" placeholder="Name (e.g. Plate)" value={newVariantName} onChange={e => setNewVariantName(e.target.value)} className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg p-2 outline-none focus:border-orange-500" />
+                        <input type="text" placeholder="Name (e.g. Plate)" value={newVariantName} onChange={handleTitleCaseChange(setNewVariantName)} className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg p-2 outline-none focus:border-orange-500" />
                         <input type="number" min={0} placeholder="Price (₹)" value={newVariantPrice} onChange={e => setNewVariantPrice(e.target.value === '' ? '' : Number(e.target.value))} className="w-20 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg p-2 font-mono outline-none focus:border-orange-500" />
                         <button type="button" onClick={handleAddVariantRow} className="bg-neutral-800 dark:bg-neutral-700 text-white px-3 py-2 rounded-lg font-black text-[10px] uppercase hover:bg-neutral-900">Add</button>
                       </div>
