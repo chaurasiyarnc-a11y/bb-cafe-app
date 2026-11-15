@@ -9520,7 +9520,7 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                 <button onClick={() => setIsExpenseModalOpen(false)}><X size={18} /></button>
               </div>
               <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
-                <input type="text" required placeholder="Expense Title (e.g. Milk 5L)" value={expenseTitle} onChange={e => setExpenseTitle(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-bold outline-none" autoFocus />
+                <input type="text" required placeholder="Expense Title (e.g. Milk 5L)" value={expenseTitle} onChange={handleTitleCaseChange(setExpenseTitle)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-bold outline-none" autoFocus />
                 <input type="number" required min={1} placeholder="Amount (₹)" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-mono text-sm outline-none font-bold" />
                 <button type="submit" className="w-full py-2.5 bg-red-600 text-white font-black uppercase text-xs rounded-xl shadow">Save Expense</button>
               </form>
