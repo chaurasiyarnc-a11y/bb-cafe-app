@@ -109,7 +109,7 @@
     object-fit: cover;
   }
 
-  /* Built-in Digital Menu Board Styling (vmin scales cleanly in both Landscape & Portrait) */
+  /* Built-in Digital Menu Board Styling */
   .menu-board {
     width: 100%;
     height: 100%;
@@ -120,15 +120,9 @@
     background: radial-gradient(circle at top right, #1f1a17, #0d0b0a);
   }
 
-  .menu-board.theme-red {
-    background: radial-gradient(circle at top right, #4a0e0e, #1a0404);
-  }
-  .menu-board.theme-green {
-    background: radial-gradient(circle at top right, #0f3822, #05170d);
-  }
-  .menu-board.theme-blue {
-    background: radial-gradient(circle at top right, #0f2547, #050d1a);
-  }
+  .menu-board.theme-red { background: radial-gradient(circle at top right, #4a0e0e, #1a0404); }
+  .menu-board.theme-green { background: radial-gradient(circle at top right, #0f3822, #05170d); }
+  .menu-board.theme-blue { background: radial-gradient(circle at top right, #0f2547, #050d1a); }
 
   .menu-header {
     text-align: center;
@@ -268,9 +262,7 @@
     font-weight: 600;
   }
 
-  .ctrl-btn:hover {
-    background: #3f3f46;
-  }
+  .ctrl-btn:hover { background: #3f3f46; }
 
   .ctrl-btn.primary {
     background: #eab308;
@@ -542,7 +534,7 @@
         <!-- Add Content Section -->
         <div class="section-card">
           <h3>1. Naya Menu, Video ya Image Ad Add Karein</h3>
-         <div class="action-row">
+          <div class="action-row">
             <button class="btn btn-blue" id="btn-add-image">🖼 + Image</button>
             <button class="btn btn-yellow" id="btn-add-video">🎬 + Video</button>
             <button class="btn btn-red" id="btn-add-pdf">📄 + Import PDF Menu</button>
@@ -818,7 +810,6 @@
   }
 
   function applyConfig() {
-    // Global Screen Rotation
     const rot = Number(config.screenRotation) || 0;
     appRoot.classList.remove('rot-90', 'rot-180', 'rot-270');
     if (rot === 90 || rot === 180 || rot === 270) {
@@ -826,7 +817,6 @@
     }
     btnRotateScreen.textContent = `🔄 Rotate: ${rot}°`;
 
-    // Ticker
     if (config.tickerEnabled && config.tickerText.trim() !== '') {
       tickerBar.classList.remove('hidden');
       tickerBar.style.backgroundColor = config.tickerBg || '#b91c1c';
@@ -838,7 +828,6 @@
       tickerBar.classList.add('hidden');
     }
 
-    // Populate Settings Form
     document.getElementById('cfg-screen-rotation').value = String(rot);
     document.getElementById('cfg-ticker-enabled').checked = !!config.tickerEnabled;
     document.getElementById('cfg-ticker-text').value = config.tickerText || '';
@@ -849,9 +838,6 @@
     requestAnimationFrame(adjustActiveMediaRotation);
   }
 
-  // ==========================
-  // Per-Slide Media Rotation Sizing
-  // ==========================
   function applyMediaRotationStyle(mediaEl, rot) {
     const r = Number(rot) || 0;
     if (r === 90 || r === 270) {
@@ -1077,7 +1063,7 @@
   }
 
   // ==========================
-  // Controls & Idle Cursor Hide
+  // Controls & Fullscreen 
   // ==========================
   let idleTimer = null;
   function resetIdleTimer() {
@@ -1114,7 +1100,6 @@
   document.getElementById('btn-next').onclick = nextSlide;
   document.getElementById('btn-playpause').onclick = togglePause;
 
-  // Quick Screen Rotate Button
   btnRotateScreen.onclick = async () => {
     config.screenRotation = ((Number(config.screenRotation) || 0) + 90) % 360;
     await dbPut('settings', config);
@@ -1122,12 +1107,10 @@
     showToast(`🔄 Screen Rotate: ${config.screenRotation}°`);
   };
 
- // Universal Full Screen Logic
+  // Universal Full Screen Logic (Fixed)
   const btnFullScreen = document.getElementById('btn-fullscreen');
-  
   btnFullScreen.onclick = () => {
     const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
-    
     if (!isFullscreen) {
       const docEl = document.documentElement;
       if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => showToast('F11 dabayein.'));
@@ -1141,8 +1124,6 @@
       else if (document.msExitFullscreen) document.msExitFullscreen();
     }
   };
-
-  // Button text automatically update karega
   document.addEventListener('fullscreenchange', () => {
     const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
     btnFullScreen.textContent = isFullscreen ? '⛶ Exit Full Screen' : '⛶ Full Screen';
@@ -1172,7 +1153,6 @@
   document.getElementById('btn-add-image').onclick = () => {
     document.getElementById('file-image-input').click();
   };
-
   document.getElementById('file-image-input').onchange = async (e) => {
     const files = Array.from(e.target.files);
     for (const file of files) {
@@ -1197,7 +1177,6 @@
   document.getElementById('btn-add-video').onclick = () => {
     document.getElementById('file-video-input').click();
   };
-
   document.getElementById('file-video-input').onchange = async (e) => {
     const files = Array.from(e.target.files);
     for (const file of files) {
@@ -1213,7 +1192,12 @@
       await dbPut('slides', slide);
       slides.push(slide);
     }
-   // Add PDF Logic
+    e.target.value = '';
+    renderPlaylistSettings();
+    showToast('✅ Video add ho gaya!');
+  };
+
+  // Add PDF Logic
   document.getElementById('btn-add-pdf').onclick = () => {
     document.getElementById('file-pdf-input').click();
   };
@@ -1228,10 +1212,9 @@
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
-      // PDF के हर पेज को अलग-अलग हाई-क्वालिटी इमेज में बदलें
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2.0 }); // HD Quality for TV
+        const viewport = page.getViewport({ scale: 2.0 }); 
         
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -1245,7 +1228,7 @@
         const slide = {
           id: 'slide_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
           order: slides.length ? Math.max(...slides.map(s => s.order || 0)) + 1 : 1,
-          type: 'image', // TV पर बेहतरीन सपोर्ट के लिए इसे इमेज के रूप में सेव किया गया है
+          type: 'image', 
           title: `${file.name} (Page ${pageNum})`,
           duration: 12,
           rotation: 0,
@@ -1428,7 +1411,7 @@
     container.innerHTML = '';
 
     if (slides.length === 0) {
-      container.innerHTML = '<p style="color:#a1a1aa;">Abhi koi slide nahi hai. Upar wale buttons se Image, Video ya Menu add karein.</p>';
+      container.innerHTML = '<p style="color:#a1a1aa;">Abhi koi slide nahi hai. Upar wale buttons se Image, Video, PDF ya Menu add karein.</p>';
       return;
     }
 
