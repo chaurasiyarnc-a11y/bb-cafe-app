@@ -9456,7 +9456,7 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                             <option value="Birthday">Birthday</option>
                             <option value="Anniversary">Anniversary</option>
                           </select>
-                          <input type="text" placeholder="Name (Self/Kid)" value={item.name} onChange={e => { const newArr = [...custFormSpecialDates]; newArr[index].name = e.target.value; setCustFormSpecialDates(newArr); }} className="w-20 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded p-1 text-[10px] outline-none" />
+                          <input type="text" placeholder="Name (Self/Kid)" value={item.name} onChange={e => handleTitleCaseInput(e, (val) => { const newArr = [...custFormSpecialDates]; newArr[index].name = val; setCustFormSpecialDates(newArr); })} className="w-20 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded p-1 text-[10px] outline-none" />
                           <input type="date" value={item.date} onChange={e => { const newArr = [...custFormSpecialDates]; newArr[index].date = e.target.value; setCustFormSpecialDates(newArr); }} className="flex-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded p-1 text-[10px] outline-none" />
                           <button type="button" onClick={() => setCustFormSpecialDates(custFormSpecialDates.filter((_, i) => i !== index))} className="text-red-500 hover:bg-red-100 p-1 rounded"><X size={14}/></button>
                        </div>
