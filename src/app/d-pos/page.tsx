@@ -6955,7 +6955,7 @@ onChange={handleTitleCaseChange(setRawSearchQuery)}
                         type="text" 
                         placeholder="व्यापारी या फ़ोन नंबर खोजें..." 
                         value={vendorSearchQuery} 
-                        onChange={e => setVendorSearchQuery(e.target.value)} 
+onChange={handleTitleCaseChange(setVendorSearchQuery)}
                         className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl pl-8 pr-3 py-1.5 text-xs font-bold outline-none" 
                       />
                     </div>
