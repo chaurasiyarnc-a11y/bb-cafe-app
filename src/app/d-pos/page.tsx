@@ -7880,7 +7880,7 @@ onChange={handleTitleCaseChange(setUdhariSearchQuery)}
                     type="text" 
                     placeholder="Search customer by Name, Phone Number or Address..." 
                     value={customerTabSearch} 
-                    onChange={e => setCustomerTabSearch(e.target.value)} 
+onChange={handleTitleCaseChange(setCustomerTabSearch)}
                     className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none font-bold shadow-sm focus:border-orange-500 transition-colors" 
                   />
                 </div>
