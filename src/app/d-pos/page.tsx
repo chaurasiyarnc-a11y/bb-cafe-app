@@ -4610,7 +4610,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
     const toastId = toast.loading("Saving expense...");
     
     const expObj = {
-      title: expenseTitle.trim(),
+     title: toTitleCase(expenseTitle.trim()),
       amount: amt,
       category: expenseCategory,
       timestamp: new Date(),
