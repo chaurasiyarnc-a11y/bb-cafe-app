@@ -10124,7 +10124,7 @@ onChange={e => handleTitleCaseInput(e, (val) => {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 
-                const trimmedName = rawFormName.trim();
+                const trimmedName = toTitleCase(rawFormName.trim());
                 if (!trimmedName) return toast.error("नाम डालना अनिवार्य है!");
 
                 const isDuplicate = rawMaterials.some(r => r.name.toLowerCase() === trimmedName.toLowerCase() && r.id !== editRawId);
