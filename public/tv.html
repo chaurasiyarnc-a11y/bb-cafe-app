@@ -542,13 +542,15 @@
         <!-- Add Content Section -->
         <div class="section-card">
           <h3>1. Naya Menu, Video ya Image Ad Add Karein</h3>
-          <div class="action-row">
-            <button class="btn btn-blue" id="btn-add-image">🖼 + Add Image / Menu Photo</button>
-            <button class="btn btn-yellow" id="btn-add-video">🎬 + Add Video Ad (MP4/WebM)</button>
-            <button class="btn btn-green" id="btn-add-menu">📋 + Create Editable Digital Menu</button>
+         <div class="action-row">
+            <button class="btn btn-blue" id="btn-add-image">🖼 + Image</button>
+            <button class="btn btn-yellow" id="btn-add-video">🎬 + Video</button>
+            <button class="btn btn-red" id="btn-add-pdf">📄 + Import PDF Menu</button>
+            <button class="btn btn-green" id="btn-add-menu">📋 + Digital Menu</button>
           </div>
           <input type="file" id="file-image-input" accept="image/*" multiple style="display:none" />
           <input type="file" id="file-video-input" accept="video/mp4,video/webm,video/ogg" multiple style="display:none" />
+          <input type="file" id="file-pdf-input" accept="application/pdf" style="display:none" />
 
           <!-- Digital Menu Editor -->
           <div id="menu-editor-box">
