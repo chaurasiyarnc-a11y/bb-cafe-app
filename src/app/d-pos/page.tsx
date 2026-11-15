@@ -2518,10 +2518,7 @@ const generateNextCategoryCode = (catName: string, currentList = products, exclu
   }, [isLoggedIn]);
 
  const handleCustomerSearchChange = (val: string) => {
-    const formattedVal = val
-      .split(' ')
-      .map(word => (word ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
-      .join(' ');
+    const formattedVal = toTitleCase(val);
     setCartCustSearchInput(formattedVal);
     setCustomerPhone(formattedVal.replace(/\D/g, '').slice(0, 10)); // बैकग्राउंड के लिए सिर्फ नंबर अलग करें
 
