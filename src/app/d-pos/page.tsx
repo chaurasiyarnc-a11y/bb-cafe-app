@@ -8905,8 +8905,8 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                       <div className="space-y-3">
                         <p className="text-xs font-bold uppercase text-neutral-500">Store Identity (बिल पर छपने वाला नाम व पता):</p>
                         <div className="flex flex-col gap-3">
-                          <input type="text" value={storeNameConfig} onChange={e => setStoreNameConfig(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-4 py-2.5 text-sm font-black outline-none" />
-                          <textarea rows={2} value={storeAddressConfig} onChange={e => setStoreAddressConfig(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-4 py-2.5 text-xs font-bold outline-none resize-none" />
+                         <input type="text" value={storeNameConfig} onChange={handleTitleCaseChange(setStoreNameConfig)} className="w-full bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-4 py-2.5 text-sm font-black outline-none" />
+<textarea rows={2} value={storeAddressConfig} onChange={handleTitleCaseChange(setStoreAddressConfig)} className="w-full bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-4 py-2.5 text-xs font-bold outline-none resize-none" />
                           <div className="flex gap-2">
                             <input type="text" value={storePhoneConfig} onChange={e => setStorePhoneConfig(e.target.value)} className="flex-1 bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-4 py-2.5 text-sm font-mono font-bold outline-none" />
                             <button onClick={() => { localStorage.setItem("bb_pos_store_name", storeNameConfig); localStorage.setItem("bb_pos_store_address", storeAddressConfig); localStorage.setItem("bb_pos_store_phone", storePhoneConfig); toast.success("Saved! ✅"); }} className="bg-blue-600 text-white px-6 rounded-xl text-xs font-black uppercase">Update</button>
