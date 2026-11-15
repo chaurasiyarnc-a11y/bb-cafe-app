@@ -10184,7 +10184,7 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1 col-span-2">
                     <label className="text-[10px] font-black uppercase text-neutral-500">Material Name *</label>
-                    <input type="text" required value={rawFormName} onChange={e=>setRawFormName(e.target.value)} placeholder="e.g. Nirma Powder" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-green-500" />
+                    <input type="text" required value={rawFormName} onChange={handleTitleCaseChange(setRawFormName)} placeholder="e.g. Nirma Powder" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-green-500" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-neutral-500">Unit (इकाई)</label>
