@@ -204,6 +204,8 @@ export default function BbCafeHome() {
   const [, setLastPlacedOrder] = useState<any>(null);
   const [confettiActive, setConfettiActive] = useState(false);
   const [shareCount, setShareCount] = useState<number>(0);
+  const [shareRewardClaimed, setShareRewardClaimed] = useState<boolean>(false);
+  const [lastShareTime, setLastShareTime] = useState<number>(0);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
