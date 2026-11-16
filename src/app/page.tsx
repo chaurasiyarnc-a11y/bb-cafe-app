@@ -1955,7 +1955,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
             className="space-y-0.5"
           >
             <h1 className="text-base font-black tracking-wide text-yellow-300 font-sans block leading-none mb-1">
-              {isHindi ? "बम बम कैफ़े" : "Bum Bum Cafe"}
+              {storeName}
             </h1>
             <p className="text-[9px] text-gray-300 font-bold">
               {isHindi ? "पिज्जा, स्पेशल सैंडविच और पनीर डिलाइट्स तुरंत आदेश करें!" : "Order Pizza, Special Sandwich & Paneer Delights instantly!"}
