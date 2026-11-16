@@ -3662,16 +3662,18 @@ const handleFinalCheckoutAndPrintBill = async () => {
     const discountAmt = getCalculatedDiscountAmount();
     const cleanPhone = getSanitizedPhone(customerPhone);
     
-    // 👉 FIX 1: पुराना टोकन नंबर सुरक्षित रखें
-    const token = activeEditingPreviousOrder?.tokenNumber || getDailyTokenNumber();
-    
-    // 👉 FIX 2: 10 अंकों का नंबर होने पर ही पॉइंट्स दें
+  // 👉 FIX 2: 10 अंकों का नंबर होने पर ही पॉइंट्स दें
     let earned = cleanPhone.length === 10 ? Math.floor(finalTotal / 100) : 0;
     const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
 
     try {
-      let billNumber: number = activeEditingBillNumber || getNextBillNumber(); 
-
+      let billNumber: number | string = activeEditingBillNumber || '';
+      let token: number | string = activeEditingPreviousOrder?.tokenNumber || '';
+      if (!billNumber || !token) {
+        const generated = await getNextBillAndTokenAtomic();
+        if (!billNumber) billNumber = generated.billNumber;
+        if (!token) token = generated.tokenNumber;
+      }
       // 👉 Offline के लिए लॉजिक
       let gamePtsDeductedOffline = Math.min(redeemed, customerGamePoints);
       let loyPtsDeductedOffline = redeemed - gamePtsDeductedOffline;
