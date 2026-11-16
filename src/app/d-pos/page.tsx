@@ -1294,7 +1294,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     const qrImageLink = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiString)}`;
 
     // शानदार WhatsApp मैसेज तैयार करें (UPI ID और QR लिंक के साथ)
-    const msg = `*☕ BUM BUM CAFE - Payment Reminder*\n------------------------------\nHello ${targetOrder.customerName || 'Customer'},\n\nआपका हमारे कैफे में कुछ पिछला बकाया (Udhari) है। कृपया समय निकालकर इसे जमा करा दें। 🙏\n\n*कुल बकाया राशि (Total Due): ₹${totalDue}*\n\n*बिलों का विवरण (${customerBills.length} Bills):*\n${billDetails}\n\n------------------------------\n*📱 ऑनलाइन पेमेंट के लिए:*\n👉 *UPI ID:* ${upiIdConfig}\n\n*QR Code स्कैन करने के लिए नीचे दिए गए लिंक पर क्लिक करें:*\n${qrImageLink}\n------------------------------\nThank you! 💛`;
+    const msg = `*☕ ${(storeNameConfig || 'BUM BUM CAFE').toUpperCase()} - Payment Reminder*\n------------------------------\nHello ${targetOrder.customerName || 'Customer'},\n\nआपका हमारे कैफे में कुछ पिछला बकाया (Udhari) है। कृपया समय निकालकर इसे जमा करा दें। 🙏\n\n*कुल बकाया राशि (Total Due): ₹${totalDue}*\n\n*बिलों का विवरण (${customerBills.length} Bills):*\n${billDetails}\n\n------------------------------\n*📱 ऑनलाइन पेमेंट के लिए:*\n👉 *UPI ID:* ${upiIdConfig}\n\n*QR Code स्कैन करने के लिए नीचे दिए गए लिंक पर क्लिक करें:*\n${qrImageLink}\n------------------------------\nThank you! 💛`;
     
     // मैसेज को एन्कोड करके WhatsApp पर भेजें
     window.open(`https://wa.me/91${targetCleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
