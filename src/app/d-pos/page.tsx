@@ -1814,8 +1814,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   const [tableNumber, setTableNumber] = useState('Table 1');
   
   // Track Active Editing Table Order & Previous Items for KOT Delta
-  const [activeEditingOrderId, setActiveEditingOrderId] = useState<string | null>(null);
-  const [activeEditingBillNumber, setActiveEditingBillNumber] = useState<number | null>(null);
+ const [activeEditingOrderId, setActiveEditingOrderId] = useState<string | null>(null);
+  const [activeEditingBillNumber, setActiveEditingBillNumber] = useState<number | string | null>(null);
   const [activeEditingOriginalItems, setActiveEditingOriginalItems] = useState<PosCartItem[]>([]);
   const [activeEditingPreviousOrder, setActiveEditingPreviousOrder] = useState<any>(null); // 👈 पुराने बिल का हिसाब याद रखने के लिए
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
