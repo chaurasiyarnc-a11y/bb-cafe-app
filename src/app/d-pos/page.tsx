@@ -5817,18 +5817,22 @@ onChange={handleTitleCaseChange(setSearchQuery)}
                         autoFocus
                       />
                     </div>
-                    <button 
-                      onClick={() => setIsCatManagerModalOpen(true)} 
-                      className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shrink-0"
-                    >
-                      <ArrowLeftRight size={14} className="text-orange-500" /> Reorder Cats
-                    </button>
-                    <button 
-                      onClick={() => handleOpenItemEditor(null)} 
-                      className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow shrink-0"
-                    >
-                      <SafePlus size={15} /> Add Item
-                    </button>
+                    {currentUser?.role !== 'captain' && currentUser?.role !== 'delivery' && (
+                      <>
+                        <button 
+                          onClick={() => setIsCatManagerModalOpen(true)} 
+                          className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shrink-0"
+                        >
+                          <ArrowLeftRight size={14} className="text-orange-500" /> Reorder Cats
+                        </button>
+                        <button 
+                          onClick={() => handleOpenItemEditor(null)} 
+                          className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow shrink-0"
+                        >
+                          <SafePlus size={15} /> Add Item
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {/* CATEGORIES BAR */}
