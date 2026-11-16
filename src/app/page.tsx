@@ -1218,7 +1218,7 @@ export default function BbCafeHome() {
       ? "Cafe Wallet 💳"
       : "UPI Online Payment 📱";
 
-      let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n`;
+      let msg = `🔥 *${storeName.toUpperCase()} - NEW ORDER*\n\n`;
       msg += `*Bill No:* #${formattedBillStr}\n`;
       msg += `*Token No:* #${tokenNumber}\n`;
       msg += `*Customer:* ${customerDetails.name}\n`;
