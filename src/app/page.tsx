@@ -1430,10 +1430,15 @@ export default function BbCafeHome() {
       console.error(err);
     }
   };
-  const handleCustomerRedeem = (ruleId: string, rewardName: string, pointsCost: number) => {
+ const handleCustomerRedeem = (ruleId: string, rewardName: string, pointsCost: number) => {
     triggerHaptic();
     if (!customerDetails?.phone) {
       toast.error(isHindi ? "कृपया पहले प्रोफाइल बनाएं!" : "Please create profile first!");
+      return;
+    }
+    const inCartCost = cart.reduce((acc: number, i: any) => acc + ((i.pointsCost || 0) * (i.quantity || 1)), 0);
+    if ((customerPoints - inCartCost) < pointsCost) {
+      toast.error(isHindi ? "आपके पास पर्याप्त पॉइंट्स नहीं हैं!" : "Not enough points!");
       return;
     }
     
