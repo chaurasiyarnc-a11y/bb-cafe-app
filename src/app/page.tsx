@@ -2134,7 +2134,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
               <p className="text-[9px] text-neutral-700 dark:text-gray-400 font-sans font-bold leading-tight">
                 {distanceKm > 15 
                   ? (isHindi ? `दूरी ${distanceKm} KM दिख रही है! अगर आप पास में हैं, तो कृपया कार्ट में जाकर सही लोकेशन डालें।` : `Distance shows ${distanceKm} KM. If incorrect, please use "Detect Location" in your cart.`)
-                  : (isHindi ? `आप बम बम कैफे से लगभग ${distanceKm} KM की दूरी पर हैं।` : `You are approximately ${distanceKm} KM away from Bum Bum Cafe.`)}
+                  : (isHindi ? `आप ${storeName} से लगभग ${distanceKm} KM की दूरी पर हैं।` : `You are approximately ${distanceKm} KM away from ${storeName}.`)}
               </p>
             </div>
           </div>
