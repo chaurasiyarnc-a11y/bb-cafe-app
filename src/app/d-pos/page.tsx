@@ -127,7 +127,7 @@ const COOKING_TAGS = ['🌶️ Less Spicy', '🧅 No Onion/Garlic', '📦 Parcel
 
 const PROMO_COUPONS: { [code: string]: { type: 'percent' | 'flat', value: number } } = {
   'CAFE10': { type: 'percent', value: 10 },
-  'BUM50': { type: 'flat', value: 50 },
+  'SAVE50': { type: 'flat', value: 50 },
   'WELCOME': { type: 'percent', value: 15 },
   'FLAT100': { type: 'flat', value: 100 }
 };
