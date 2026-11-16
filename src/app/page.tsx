@@ -1560,13 +1560,13 @@ export default function BbCafeHome() {
     toast.success(isHindi ? "आइटम कार्ट में जोड़ा गया!" : "Item added to cart!");
   };
 
- // --- Real-time Watchers ---
+// --- Real-time Watchers ---
   useEffect(() => {
     if (!customerDetails?.phone) {
       setCustomerPoints(0);
       setWalletBalance(0);
       setShareCount(0);
-      setShareRewardClaimed(false);
+      setLastShareRewardAt(0);
       setPointsHistory([]);
       setLiveOrder(null);
       return;
@@ -1580,7 +1580,13 @@ export default function BbCafeHome() {
         setCustomerPoints(data.points || 0);
         setWalletBalance(data.walletBalance || 0);
         setShareCount(data.shareCount || 0);
-        setShareRewardClaimed(Boolean(data.shareRewardClaimed));
+
+        const rawRewardAt = data.lastShareRewardAt;
+        if (rawRewardAt) {
+          setLastShareRewardAt(rawRewardAt.toMillis ? rawRewardAt.toMillis() : (Number(rawRewardAt) || 0));
+        } else if (!snap.metadata.hasPendingWrites) {
+          setLastShareRewardAt(0);
+        }
       }
     }, (error) => console.warn("Points live check subscription bypassed:", error));
 
