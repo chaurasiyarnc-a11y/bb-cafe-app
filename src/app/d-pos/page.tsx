@@ -4018,11 +4018,17 @@ const handleFinalCheckoutAndPrintBill = async () => {
   };
 
  // Quick Settle Action (From Daily Bills Tab)
-  const handleQuickSettleOrder = async (orderId: string, pMethod: 'cash' | 'upi' | 'due' | 'split') => {
-    
-    // 👉 FIX 3: डबल-क्लिक रोकने का लॉजिक
+ const handleQuickSettleOrder = async (orderId: string, pMethod: 'cash' | 'upi' | 'due' | 'split') => {
     const checkOrder = liveOrders.find(o => o.id === orderId);
     if (checkOrder && checkOrder.paymentSettled) return toast.error("यह बिल पहले ही सेटल हो चुका है!");
+
+    // 👉 Multi-User Check: ऑनलाइन होने पर ताज़ा स्टेटस चेक करें
+    if (navigator.onLine) {
+      const freshSnap = await getDoc(doc(db, "orders", orderId));
+      if (freshSnap.exists() && freshSnap.data().paymentSettled) {
+        return toast.error("⚠️ यह बिल दूसरे काउंटर से पहले ही सेटल हो चुका है!");
+      }
+    }
 
     triggerBeep('tap');
     const toastId = toast.loading(`Settling bill via ${pMethod.toUpperCase()}...`);
@@ -4031,7 +4037,10 @@ const handleFinalCheckoutAndPrintBill = async () => {
         status: 'completed',
         paymentSettled: true,
         paymentMethod: pMethod,
-        settledAt: new Date()
+        settledAt: new Date(),
+        settledById: currentUser?.id || currentUser?.pin || 'staff',
+        settledByName: currentUser?.name || 'Staff',
+        settledTerminalId: terminalId
       };
       
       const orderToSettle = liveOrders.find(o => o.id === orderId);
