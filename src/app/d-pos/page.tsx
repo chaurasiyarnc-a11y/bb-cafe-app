@@ -7509,9 +7509,10 @@ onChange={handleTitleCaseChange(setReceiptSearchQuery)}
                     </button>
                     <button 
                       onClick={() => {
-                        const newCount = tableCount + 1;
+                       const newCount = tableCount + 1;
                         setTableCount(newCount);
                         localStorage.setItem("bb_pos_table_count_pc", String(newCount));
+                        updateGlobalPosConfig({ tableCount: newCount });
                         toast.success(`नयी टेबल जोड़ दी गई! 🪑 अब कुल ${newCount} टेबल्स हैं।`);
                       }}
                       className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase shadow-sm"
