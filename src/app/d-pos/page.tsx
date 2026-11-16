@@ -4757,7 +4757,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
         try {
           await navigator.share({
             title: `${storeNameConfig || 'Bum Bum Cafe'} EOD Report`,
-            text: `*☕ BUM BUM CAFE - EOD SUMMARY*\nDate: ${todayDate}\nTotal Sales: ₹${reportSummary.totalSale}\n\nपूरी डिटेल के लिए PDF चेक करें 👇`,
+            text: `*☕ ${(storeNameConfig || 'BUM BUM CAFE').toUpperCase()} - EOD SUMMARY*\nDate: ${todayDate}\nTotal Sales: ₹${reportSummary.totalSale}\n\nपूरी डिटेल के लिए PDF चेक करें 👇`,
             files: [pdfFile]
           });
           toast.success("रिपोर्ट शेयर कर दी गई! ✅");
@@ -4776,7 +4776,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
 
       toast.success("PDF डाउनलोड हो गई है! कृपया WhatsApp Web पर अटैच करें।", { duration: 6000 });
 
-      const msg = `*☕ BUM BUM CAFE - EOD SUMMARY*%0A------------------------------%0A*Date:* ${todayDate}%0A*Total Sales:* ₹${reportSummary.totalSale}%0A*Net Cash in Drawer:* ₹${reportSummary.netCashInDrawer}%0A------------------------------%0A_(⚠️ कृपया अभी डाउनलोड हुई EOD PDF फाइल यहाँ अटैच करें)_`;
+      const msg = `*☕ ${(storeNameConfig || 'BUM BUM CAFE').toUpperCase()} - EOD SUMMARY*%0A------------------------------%0A*Date:* ${todayDate}%0A*Total Sales:* ₹${reportSummary.totalSale}%0A*Net Cash in Drawer:* ₹${reportSummary.netCashInDrawer}%0A------------------------------%0A_(⚠️ कृपया अभी डाउनलोड हुई EOD PDF फाइल यहाँ अटैच करें)_`;
       
       setTimeout(() => {
         window.open(`https://wa.me/${cleanOwner}?text=${msg}`, '_blank');
