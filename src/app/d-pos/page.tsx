@@ -7665,7 +7665,7 @@ onChange={handleTitleCaseChange(setReceiptSearchQuery)}
                                 Bill #{order.billNumber}
                               </span>
                             )}
-                            <span className="bg-orange-500/15 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
+                           <span className="bg-orange-500/15 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType || order.orderType || 'Online'}{order.tableNumber ? ` (${order.tableNumber})` : ''}</span>
                           </div>
                           <p className="text-xs font-bold">👤 {order.customerName} ({order.customerPhone || 'Walk-in'})</p>
                           <div className="space-y-1 py-2 border-t border-dashed border-neutral-300 dark:border-neutral-800 my-2 max-h-36 overflow-y-auto">
