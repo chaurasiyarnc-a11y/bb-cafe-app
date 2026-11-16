@@ -4747,7 +4747,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
       const cleanOwner = getSanitizedPhone(ownerPhoneConfig);
 
       const pdfBlob = doc.output('blob');
-      const fileName = `BBCafe_EOD_${todayDate.replace(/\//g, '-')}.pdf`;
+      const fileName = `${(storeNameConfig || 'BBCafe').replace(/\s+/g, '_')}_EOD_${todayDate.replace(/\//g, '-')}.pdf`;
       const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
 
       toast.dismiss(toastId);
