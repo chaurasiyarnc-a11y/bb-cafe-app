@@ -503,12 +503,12 @@ export default function BbCafeHome() {
     }
 
     const customerName = customerDetails?.name ? customerDetails.name : "";
-    if (customerName) {
-      return `Namaste ${customerName} ji, ${timeGreeting}! What can Bum Bum Cafe make for you today? 😊`;
+   if (customerName) {
+      return `Namaste ${customerName} ji, ${timeGreeting}! What can ${storeName} make for you today? 😊`;
     } else {
-      return `Namaste, ${timeGreeting}! What can Bum Bum Cafe make for you today? 😊`;
+      return `Namaste, ${timeGreeting}! What can ${storeName} make for you today? 😊`;
     }
-  }, [customerDetails]);
+  }, [customerDetails, storeName]);
 
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
