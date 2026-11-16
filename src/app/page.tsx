@@ -2038,7 +2038,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
             <div className="flex items-center gap-2.5">
               <span className="text-xl">📲</span>
               <div className="pr-4">
-                <h4 className="text-xs font-black text-white font-sans">Bum Bum Cafe App</h4>
+               <h4 className="text-xs font-black text-white font-sans">{storeName} App</h4>
                 <p className="text-[9px] text-orange-100 font-bold">{isHindi ? "बिना प्ले स्टोर के सीधे अपने phone में इंस्टॉल करें!" : "Install directly on your phone without Play Store!"}</p>
               </div>
             </div>
