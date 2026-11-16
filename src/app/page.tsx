@@ -31,11 +31,7 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
   "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
-const DELIVERY_AREAS = [
-  { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
-  { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
-  { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
-];
+
 
 const HINGLISH_DICT: { [key: string]: string } = {
   "piza": "pizza", "pizaa": "pizza", "panir": "paneer", "tali": "thali", "thaly": "thali",
