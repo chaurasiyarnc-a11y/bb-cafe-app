@@ -9102,7 +9102,7 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
 <textarea rows={2} value={storeAddressConfig} onChange={handleTitleCaseChange(setStoreAddressConfig)} className="w-full bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-4 py-2.5 text-xs font-bold outline-none resize-none" />
                           <div className="flex gap-2">
                             <input type="text" value={storePhoneConfig} onChange={e => setStorePhoneConfig(e.target.value)} className="flex-1 bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-4 py-2.5 text-sm font-mono font-bold outline-none" />
-                            <button onClick={() => { localStorage.setItem("bb_pos_store_name", storeNameConfig); localStorage.setItem("bb_pos_store_address", storeAddressConfig); localStorage.setItem("bb_pos_store_phone", storePhoneConfig); toast.success("Saved! ✅"); }} className="bg-blue-600 text-white px-6 rounded-xl text-xs font-black uppercase">Update</button>
+                            <button onClick={() => { localStorage.setItem("bb_pos_store_name", storeNameConfig); localStorage.setItem("bb_pos_store_address", storeAddressConfig); localStorage.setItem("bb_pos_store_phone", storePhoneConfig); updateGlobalPosConfig({ storeNameConfig, storeAddressConfig, storePhoneConfig }); toast.success("Store Profile Synced! ✅"); }} className="bg-blue-600 text-white px-6 rounded-xl text-xs font-black uppercase">Update</button>
                           </div>
                         </div>
                       </div>
