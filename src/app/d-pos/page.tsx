@@ -7500,6 +7500,7 @@ onChange={handleTitleCaseChange(setReceiptSearchQuery)}
                         const newCount = tableCount - 1;
                         setTableCount(newCount);
                         localStorage.setItem("bb_pos_table_count_pc", String(newCount));
+                        updateGlobalPosConfig({ tableCount: newCount });
                         toast.success(`टेबल कम कर दी गई! अब ${newCount} टेबल्स हैं।`);
                       }}
                       className="px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl text-[10px] font-black uppercase shadow-sm border border-red-200 dark:border-red-800"
