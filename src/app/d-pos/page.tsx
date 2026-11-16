@@ -4729,7 +4729,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
     const toastId = toast.loading("PDF रिपोर्ट बनाई जा रही है...");
     try {
       const { doc, todayDate } = generateProfessionalPDF();
-      doc.save(`BBCafe_EOD_${todayDate.replace(/\//g, '-')}.pdf`);
+      doc.save(`${(storeNameConfig || 'BBCafe').replace(/\s+/g, '_')}_EOD_${todayDate.replace(/\//g, '-')}.pdf`);
       toast.dismiss(toastId);
       toast.success("EOD रिपोर्ट सफलतापूर्वक डाउनलोड हो गई! 📥");
     } catch (error) {
