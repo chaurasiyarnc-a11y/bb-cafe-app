@@ -1078,7 +1078,7 @@ export default function BbCafeHome() {
       const finalTotal = getTotalBillPrice();
       
       const pointsEarned = Math.floor(finalTotal / 100);
-      const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+    const totalPointsCost = cart.reduce((acc: number, i: any) => acc + ((i.pointsCost || 0) * (i.quantity || 1)), 0);
 
       let screenshotUrl = "";
       if (paymentMethod === "upi" && paymentScreenshot) {
