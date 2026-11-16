@@ -3063,7 +3063,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
                 </p>
                 <p className="flex items-start gap-2">
                   <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</span>
-                  <span>अब **'Install'** बटन दबाएं।  बम बम कैफ़े ऐप आपके phone की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
+                 <span>अब **'Install'** बटन दबाएं। {storeName} ऐप आपके phone की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
                 </p>
               </div>
 
