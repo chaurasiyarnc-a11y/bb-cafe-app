@@ -1830,7 +1830,9 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  if (!mounted) {
+ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRewardAt) < FIVE_DAYS_MS;
+  const shareDaysLeft = isShareCooldownActive ? Math.ceil((FIVE_DAYS_MS - (Date.now() - lastShareRewardAt)) / (24 * 60 * 60 * 1000)) : 0;
+  const displayShareCount = isShareCooldownActive ? 5 : (shareCount >= 5 ? 0 : shareCount);
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
         <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
