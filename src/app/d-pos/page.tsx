@@ -860,7 +860,7 @@ const [tableCount, setTableCount] = useState(6);
     const cleanPhone = (vendor.phone || '').replace(/\D/g, '').slice(-10);
     if (cleanPhone.length !== 10) return toast.error("पहले वेंडर का 10 अंकों का मोबाइल नंबर जोड़ें!");
 
-    const msg = `*☕ BUM BUM CAFE - VENDOR KHATA STATEMENT*%0A------------------------------%0A*Vendor:* ${vendor.name}%0A*Total Purchases:* ₹${Number(vendor.totalPurchased || 0).toFixed(2)}%0A*Total Paid:* ₹${Number(vendor.totalPaid || 0).toFixed(2)}%0A*Pending Due (कुल उधारी):* ₹${Number(vendor.totalDue || 0).toFixed(2)}%0A------------------------------%0A_Sent via Bum Bum Cafe POS_ 🙏`;
+    const msg = `*☕ ${(storeNameConfig || 'BUM BUM CAFE').toUpperCase()} - VENDOR KHATA STATEMENT*%0A------------------------------%0A*Vendor:* ${vendor.name}%0A*Total Purchases:* ₹${Number(vendor.totalPurchased || 0).toFixed(2)}%0A*Total Paid:* ₹${Number(vendor.totalPaid || 0).toFixed(2)}%0A*Pending Due (कुल उधारी):* ₹${Number(vendor.totalDue || 0).toFixed(2)}%0A------------------------------%0A_Sent via ${storeNameConfig || 'Bum Bum Cafe'} POS_ 🙏`;
 
     window.open(`https://wa.me/91${cleanPhone}?text=${msg}`, '_blank');
   };
