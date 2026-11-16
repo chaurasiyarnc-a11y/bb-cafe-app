@@ -1404,7 +1404,7 @@ export default function BbCafeHome() {
         const rawRewardAt = currentData.lastShareRewardAt;
         const lastRewardMs = rawRewardAt?.toMillis ? rawRewardAt.toMillis() : (Number(rawRewardAt) || 0);
 
-        if (lastRewardMs > 0 && (now - lastRewardMs) < FIVE_DAYS_MS) {
+        if (lastRewardMs > 0 && (now - lastRewardMs) < THREE_HOURS_MS) {
           updatedCount = 5;
           return;
         }
