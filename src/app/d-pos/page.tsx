@@ -9149,7 +9149,7 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                                  <p className="text-xs text-neutral-500 py-6 text-center font-bold">कोई भी पॉइंट्स खतरे में नहीं हैं।</p>
                                ) : (
                                  fomoCustomers.slice(0, 10).map((c, idx) => {
-                                   const msg = `Hi ${c.name}, आपके Bum Bum Cafe के ⭐ ${c.points || c.gamePoints} Points एक्सपायर होने वाले हैं! 😱 आज ही आएं और अपना बिल कम करवाएं या फ्री आइटम पाएं।`;
+                                   const msg = `Hi ${c.name}, आपके ${storeNameConfig || 'Bum Bum Cafe'} के ⭐ ${c.points || c.gamePoints} Points एक्सपायर होने वाले हैं! 😱 आज ही आएं और अपना बिल कम करवाएं या फ्री आइटम पाएं।`;
                                    return (
                                      <div key={idx} className="flex justify-between items-center bg-white dark:bg-neutral-800 p-2.5 rounded-xl border border-red-100 dark:border-red-900/30 shadow-sm">
                                        <div>
