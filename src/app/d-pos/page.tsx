@@ -3542,8 +3542,12 @@ try {
       localStorage.removeItem("bb_pos_saved_cart_pc");
       setTimeout(() => searchInputRef.current?.focus(), 60);
 
-    } catch (err) {
-      toast.error("Failed to save table order");
+   } catch (err: any) {
+      if (err?.message === "ALREADY_SETTLED") {
+        toast.error("⚠️ यह टेबल बिल दूसरे काउंटर से पहले ही Settle हो चुका है!");
+      } else {
+        toast.error("Failed to save table order");
+      }
     } finally {
       setIsSubmittingOrder(false);
     }
