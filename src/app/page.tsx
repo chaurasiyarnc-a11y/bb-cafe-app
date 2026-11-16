@@ -1103,7 +1103,7 @@ export default function BbCafeHome() {
         }
       }
 
-      const orderObj = {
+     const orderObj = {
         billNumber, 
         tokenNumber, 
         deliveryPin, 
@@ -1127,54 +1127,60 @@ export default function BbCafeHome() {
         tableNumber: fulfillmentType === "table" ? tableNumber : "", 
         paymentMethod,
         paymentScreenshot: paymentScreenshot || "",
-        screenshotUrl: screenshotUrl || ""
+        screenshotUrl: screenshotUrl || "",
+        pointsEarnedPending: pointsEarned,
+        pointsCredited: false
       };
 
-      const phoneClean = customerDetails.phone.replace("+91", "");
+      const phoneClean = customerDetails.phone.replace("+91", "").trim();
 
-      // 👉 100% SAFE & FAST DIRECT FIREBASE SAVE
+      // 👉 100% SAFE & ATOMIC TRANSACTION SAVE
       try {
-        // 1. आर्डर सेव करें
-        await addDoc(collection(db, "orders"), orderObj);
-        
-        // 2. कस्टमर के पॉइंट्स अपडेट करें
         if (phoneClean && phoneClean.length === 10) {
           const userRef = doc(db, "customer_points", phoneClean);
-          const userSnap = await getDoc(userRef);
-          
-         let prevPoints = 0; let prevSpent = 0; let prevVisits = 0; let prevWalletBalance = 0;
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            prevPoints = Number(data.points) || 0;
-            prevSpent = Number(data.totalSpent) || 0;
-            prevVisits = Number(data.totalVisits) || 0;
-            prevWalletBalance = Number(data.walletBalance) || 0;
-          }
+          await runTransaction(db, async (transaction) => {
+            const userSnap = await transaction.get(userRef);
+            const data = userSnap.exists() ? userSnap.data() : {};
 
-          const newSpent = prevSpent + finalTotal;
-          const remainingPts = Math.max(0, prevPoints - totalPointsCost) + pointsEarned;
-          
-          let newWalletBalance = prevWalletBalance;
-          if (paymentMethod === "wallet") {
-            newWalletBalance = Math.max(0, newWalletBalance - finalTotal);
-          }
+            const prevPoints = Number(data.points) || 0;
+            const prevSpent = Number(data.totalSpent) || 0;
+            const prevVisits = Number(data.totalVisits) || 0;
+            const prevWalletBalance = Number(data.walletBalance) || 0;
 
-          await setDoc(userRef, {
-            name: customerDetails.name || "Walk-in Guest",
-            points: remainingPts,
-            walletBalance: newWalletBalance,
-            totalSpent: newSpent,
-            totalVisits: prevVisits + 1,
-            lastBillNumber: billNumber,
-            lastBillAmount: finalTotal,
-            lastActive: new Date()
-          }, { merge: true });
+            if (totalPointsCost > 0 && prevPoints < totalPointsCost) {
+              throw new Error("INSUFFICIENT_POINTS");
+            }
+            if (paymentMethod === "wallet" && prevWalletBalance < finalTotal) {
+              throw new Error("INSUFFICIENT_WALLET");
+            }
+
+            const remainingPts = prevPoints - totalPointsCost;
+            const newWalletBalance = paymentMethod === "wallet" ? (prevWalletBalance - finalTotal) : prevWalletBalance;
+
+            transaction.set(userRef, {
+              name: customerDetails.name || "Walk-in Guest",
+              points: remainingPts,
+              walletBalance: newWalletBalance,
+              totalSpent: prevSpent + finalTotal,
+              totalVisits: prevVisits + 1,
+              lastBillNumber: billNumber,
+              lastBillAmount: finalTotal,
+              lastActive: new Date()
+            }, { merge: true });
+          });
         }
-      } catch(dbError) {
 
-
-        console.error("DB Save Error:", dbError);
-        toast.error(isHindi ? "ऑर्डर सेव करने में समस्या आई! (Network Error)" : "Failed to save order to database!");
+        // 2. ट्रांज़ैक्शन पास होने के बाद ही आर्डर सेव करें
+        await addDoc(collection(db, "orders"), orderObj);
+      } catch(dbError: any) {
+        if (dbError?.message === "INSUFFICIENT_POINTS") {
+          toast.error(isHindi ? "आपके पास इन रिवॉर्ड आइटम्स के लिए पर्याप्त पॉइंट्स नहीं हैं!" : "Insufficient loyalty points for reward items!");
+        } else if (dbError?.message === "INSUFFICIENT_WALLET") {
+          toast.error(isHindi ? "आपके वॉलेट में पर्याप्त बैलेंस नहीं है!" : "Insufficient wallet balance!");
+        } else {
+          console.error("DB Save Error:", dbError);
+          toast.error(isHindi ? "ऑर्डर सेव करने में समस्या आई! (Network Error)" : "Failed to save order to database!");
+        }
         setIsSubmittingOrder(false);
         return;
       }
