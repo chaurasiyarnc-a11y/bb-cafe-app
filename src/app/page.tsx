@@ -1347,8 +1347,8 @@ export default function BbCafeHome() {
  const handleShareApp = async () => {
     triggerHaptic();
     const shareText = isHindi 
-      ? `बम बम कैफ़े से स्वादिष्ट भोजन आर्डर करें! मेरा इनवाइट कोड इस्तेमाल करें: ${getReferralCode()} 🍕` 
-      : `Order delicious food from Bum Bum Cafe! Use my invite code: ${getReferralCode()} 🍕`;
+      ? `${storeName} से स्वादिष्ट भोजन आर्डर करें! मेरा इनवाइट कोड इस्तेमाल करें: ${getReferralCode()} 🍕` 
+      : `Order delicious food from ${storeName}! Use my invite code: ${getReferralCode()} 🍕`;
     
     const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://bbcafe.in';
 
