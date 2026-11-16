@@ -1788,9 +1788,20 @@ export default function BbCafeHome() {
           if (storeData.latitude && storeData.longitude) {
             setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
           }
-          if (storeData.timingHindi) setStoreTimingHindi(storeData.timingHindi);
+         if (storeData.timingHindi) setStoreTimingHindi(storeData.timingHindi);
           if (storeData.timingEnglish) setStoreTimingEnglish(storeData.timingEnglish);
           if (storeData.closingMinutesLeft !== undefined) setClosingMinutesLeft(storeData.closingMinutesLeft);
+        }
+
+        const posCfgSnap = await getDoc(doc(db, "settings", "pos_config"));
+        if (posCfgSnap.exists() && posCfgSnap.data().storeNameConfig) {
+          const dynamicName = posCfgSnap.data().storeNameConfig;
+          setStoreName(dynamicName);
+          localStorage.setItem('bb_cached_store_name', dynamicName);
+        } else if (storeSnap.exists() && storeSnap.data().storeName) {
+          const dynamicName = storeSnap.data().storeName;
+          setStoreName(dynamicName);
+          localStorage.setItem('bb_cached_store_name', dynamicName);
         }
 
         const productsSnap = await getDocs(collection(db, "products"));
