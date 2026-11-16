@@ -6508,7 +6508,7 @@ onChange={handleTitleCaseChange(setSearchQuery)}
                       </div>
                     </div>
 
-                    {/* ACTION BUTTONS */}
+                   {/* ACTION BUTTONS */}
                     {fulfillmentType === 'table' ? (
                       <div className="space-y-1.5 pt-2 shrink-0">
                         <button 
@@ -6519,25 +6519,33 @@ onChange={handleTitleCaseChange(setSearchQuery)}
                           <Printer size={15} />
                           <span>{activeEditingOrderId ? `Update ${tableNumber} (केवल नए आइटम की KOT)` : `Save on ${tableNumber} & Print KOT`}</span>
                         </button>
-                        <button 
-                          onClick={handleFinalCheckoutAndPrintBill} 
-                          disabled={cart.length === 0 || isSubmittingOrder} 
-                          className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl"
-                        >
-                          <Receipt size={15} />
-                          <span>Settle & Print Final Bill (केवल पूरा बिल) [F9]</span>
-                        </button>
+                        {(currentUser?.role === 'admin' || currentUser?.role === 'cashier') && (
+                          <button 
+                            onClick={handleFinalCheckoutAndPrintBill} 
+                            disabled={cart.length === 0 || isSubmittingOrder} 
+                            className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl"
+                          >
+                            <Receipt size={15} />
+                            <span>Settle & Print Final Bill (केवल पूरा बिल) [F9]</span>
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="pt-2 shrink-0">
-                        <button 
-                          onClick={handleFinalCheckoutAndPrintBill} 
-                          disabled={cart.length === 0 || isSubmittingOrder} 
-                          className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl"
-                        >
-                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <Receipt size={15} />}
-                          <span>Print Bill (₹{getTotalBillPrice()}) [F9]</span>
-                        </button>
+                        {currentUser?.role === 'captain' ? (
+                          <div className="p-2.5 bg-amber-500/15 border border-amber-500/30 rounded-xl text-center text-[10px] font-black text-amber-600 uppercase">
+                            Captain केवल Table Order ले सकते हैं (Pickup/Delivery बिल Counter से कटेंगे)
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={handleFinalCheckoutAndPrintBill} 
+                            disabled={cart.length === 0 || isSubmittingOrder} 
+                            className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl"
+                          >
+                            {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <Receipt size={15} />}
+                            <span>Print Bill (₹{getTotalBillPrice()}) [F9]</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
