@@ -2006,7 +2006,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
       {!storeOpen && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
           <span className="animate-pulse">⚠️</span>
-          <span>{isHindi ? "बम बम कैफ़े अभी बंद है।  आप केवल हमारा मेनू देख सकते हैं।" : "Bum Bum Cafe is closed now. You can only view our menu."}</span>
+          <span>{isHindi ? `${storeName} अभी बंद है। आप केवल हमारा मेनू देख सकते हैं।` : `${storeName} is closed now. You can only view our menu.`}</span>
         </div>
       )}
 
