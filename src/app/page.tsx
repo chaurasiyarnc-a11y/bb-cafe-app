@@ -1532,10 +1532,13 @@ export default function BbCafeHome() {
     toast.success(isHindi ? "आइटम कार्ट में जोड़ा गया!" : "Item added to cart!");
   };
 
-  // --- Real-time Watchers ---
+ // --- Real-time Watchers ---
   useEffect(() => {
     if (!customerDetails?.phone) {
       setCustomerPoints(0);
+      setWalletBalance(0);
+      setShareCount(0);
+      setShareRewardClaimed(false);
       setPointsHistory([]);
       setLiveOrder(null);
       return;
@@ -1543,14 +1546,15 @@ export default function BbCafeHome() {
     
     const phoneClean = customerDetails.phone.replace("+91", "").trim();
     
-   const unsubPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
+    const unsubPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setCustomerPoints(data.points || 0);
         setWalletBalance(data.walletBalance || 0);
+        setShareCount(data.shareCount || 0);
+        setShareRewardClaimed(Boolean(data.shareRewardClaimed));
       }
     }, (error) => console.warn("Points live check subscription bypassed:", error));
-
 
     const unsubHistory = onSnapshot(
       query(collection(db, "customer_points", phoneClean, "history"), orderBy("timestamp", "desc")),
