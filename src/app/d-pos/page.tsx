@@ -2398,7 +2398,10 @@ const toTitleCase = (val: string) =>
         if (d.gstRate !== undefined) setGstRate(Number(d.gstRate));
         if (d.upiIdConfig) setUpiIdConfig(d.upiIdConfig);
         if (d.ownerPhoneConfig) setOwnerPhoneConfig(d.ownerPhoneConfig);
-        if (d.storeNameConfig) setStoreNameConfig(d.storeNameConfig);
+       if (d.storeNameConfig) {
+  setStoreNameConfig(d.storeNameConfig);
+  localStorage.setItem("bb_pos_store_name", d.storeNameConfig);
+}
         if (d.storeAddressConfig) setStoreAddressConfig(d.storeAddressConfig);
         if (d.storePhoneConfig) setStorePhoneConfig(d.storePhoneConfig);
         if (Array.isArray(d.categoryOrder)) {
