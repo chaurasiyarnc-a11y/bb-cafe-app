@@ -156,11 +156,13 @@ const queueOfflineUpdate = (coll: string, id: string, data: any, action = 'updat
 };
 
 export default function BbCafeDesktopPos() {
+  const [storeNameConfig, setStoreNameConfig] = useState<string>('BUM BUM CAFE');
+
   const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
     { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
-    { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
+    { name: `Within 5 KM (${storeNameConfig || 'Bum Bum Cafe'} से 5km के दायरे में)`, fee: 50, minFree: 499, range: "2-5 KM" },
     { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
-  ], []);
+  ], [storeNameConfig]);
 
  // System States
   const [isOnline, setIsOnline] = useState<boolean>(true);
