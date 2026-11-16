@@ -74,6 +74,14 @@ const SOCIAL_LINKS = [
 ];
 
 export default function BbCafeHome() {
+  const [storeName, setStoreName] = useState("Bum Bum Cafe");
+
+  const DELIVERY_AREAS = useMemo(() => [
+    { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
+    { name: `Within 5 KM (${storeName} से 5km के दायरे में)`, fee: 50, minFree: 499, range: "2-5 KM" },
+    { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
+  ], [storeName]);
+
   const store = useCartStore() as any;
   const cart = store?.items || [];
   const addItem = store?.addItem || (() => {});
