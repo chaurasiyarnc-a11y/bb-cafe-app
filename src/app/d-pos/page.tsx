@@ -9086,7 +9086,7 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                         <p className="text-xs font-bold uppercase text-neutral-500">Dynamic UPI ID (QR Code):</p>
                         <div className="flex gap-2">
                           <input type="text" value={upiIdConfig} onChange={e => setUpiIdConfig(e.target.value)} className="flex-1 bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-3 py-2.5 text-sm font-mono outline-none" />
-                          <button onClick={() => { localStorage.setItem("bb_pos_upi_id", upiIdConfig); toast.success("UPI ID Saved!"); }} className="bg-blue-600 text-white px-5 rounded-xl text-xs font-black uppercase">Save</button>
+                         <button onClick={() => { localStorage.setItem("bb_pos_upi_id", upiIdConfig); updateGlobalPosConfig({ upiIdConfig }); toast.success("UPI ID Synced Across All Devices!"); }} className="bg-blue-600 text-white px-5 rounded-xl text-xs font-black uppercase">Save</button>
                         </div>
                       </div>
                     </div>
