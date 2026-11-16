@@ -1236,7 +1236,7 @@ export default function BbCafeHome() {
       }
       
       msg += `*Invite Code:* ${refCode}\n`;
-      msg += `*Points Earned:* +${pointsEarned} Pts\n`;
+     msg += `*Points on Completion:* +${pointsEarned} Pts\n`;
       if (totalPointsCost > 0) {
         msg += `*Points Redeemed:* -${totalPointsCost} Pts\n`;
       }
