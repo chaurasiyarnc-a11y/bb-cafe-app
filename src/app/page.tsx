@@ -607,8 +607,8 @@ export default function BbCafeHome() {
   const handleLaunchUpiPay = (platform: string) => {
     triggerHaptic();
     const amount = getTotalBillPrice();
-    const merchantName = "Bum Bum Cafe";
-    const transactionNote = `BumBumCafe Order`;
+    const merchantName = storeName;
+    const transactionNote = `${storeName} Order`;
     
     try {
       navigator.clipboard.writeText(upiId);
