@@ -203,8 +203,9 @@ export default function BbCafeHome() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [, setLastPlacedOrder] = useState<any>(null);
   const [confettiActive, setConfettiActive] = useState(false);
+ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
   const [shareCount, setShareCount] = useState<number>(0);
-  const [shareRewardClaimed, setShareRewardClaimed] = useState<boolean>(false);
+  const [lastShareRewardAt, setLastShareRewardAt] = useState<number>(0);
   const [lastShareTime, setLastShareTime] = useState<number>(0);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
