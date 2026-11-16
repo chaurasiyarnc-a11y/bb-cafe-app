@@ -1732,7 +1732,10 @@ export default function BbCafeHome() {
       window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     }
 
-    try {
+   try {
+      const cachedStoreName = localStorage.getItem('bb_cached_store_name');
+      if (cachedStoreName) setStoreName(cachedStoreName);
+
       const cachedMenu = localStorage.getItem('bb_cached_menu');
       if (cachedMenu) setMenu(JSON.parse(cachedMenu));
 
