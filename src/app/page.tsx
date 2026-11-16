@@ -1437,7 +1437,7 @@ export default function BbCafeHome() {
           description: `Shared app 5 times! (3-Hour Bonus) 🎁`,
           timestamp: new Date()
         });
-        toast.success(isHindi ? "मुफ़्त +1 पॉइंट आपके अकाउंट में जोड़ा गया! (अगला बोनस 5 दिन बाद)" : "Free +1 point added! (Next bonus in 5 days)");
+        toast.success(isHindi ? "मुफ़्त +1 पॉइंट आपके अकाउंट में जोड़ा गया! (अगला बोनस 3 घंटे बाद)" : "Free +1 point added! (Next bonus in 3 hours)");
       }
     } catch (err) {
       console.error(err);
