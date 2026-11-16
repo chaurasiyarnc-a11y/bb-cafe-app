@@ -9059,7 +9059,7 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                         <p className="text-xs font-bold uppercase text-neutral-500">Next Bill / Invoice Number:</p>
                         <div className="flex gap-2">
                           <input type="number" value={manualInvoiceCounterInput} onChange={e => setManualInvoiceCounterInput(e.target.value)} className="flex-1 bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-3 py-2.5 text-sm font-mono outline-none" />
-                          <button onClick={() => { const num = parseInt(manualInvoiceCounterInput, 10); if (!isNaN(num) && num >= 1) { localStorage.setItem("bb_pos_local_bill_counter_pc", String(num - 1)); toast.success(`Next Invoice will be #${num}! ✅`); } }} className="bg-orange-600 text-white px-5 rounded-xl text-xs font-black uppercase">Set</button>
+                         <button onClick={async () => { const num = parseInt(manualInvoiceCounterInput, 10); if (!isNaN(num) && num >= 1) { await setDoc(doc(db, "settings", "counters"), { lastBillNumber: num - 1 }, { merge: true }); toast.success(`सभी डिवाइस पर अगला बिल #${num} से शुरू होगा! ✅`); } }} className="bg-orange-600 text-white px-5 rounded-xl text-xs font-black uppercase">Set</button>
                         </div>
                       </div>
                       <div className="space-y-3 pt-2">
