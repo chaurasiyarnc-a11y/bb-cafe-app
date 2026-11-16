@@ -228,7 +228,7 @@ const [tableCount, setTableCount] = useState(6);
  const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919714293759');
   
   // 👉 NEW: Store Details Config (बिल पर छपने वाला नाम और पता)
-  const [storeNameConfig, setStoreNameConfig] = useState<string>('BUM BUM CAFE');
+  
   const [storeAddressConfig, setStoreAddressConfig] = useState<string>('न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने, जिला पन्ना, मध्य प्रदेश - 488442');
   const [storePhoneConfig, setStorePhoneConfig] = useState<string>('9714293759');
   const [manualInvoiceCounterInput, setManualInvoiceCounterInput] = useState<string>('200');
