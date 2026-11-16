@@ -2798,8 +2798,8 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
                   <div className="pt-1.5 flex flex-col gap-2 font-sans">
                       <div className="flex justify-between items-center text-[9px]">
                         <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">{isHindi ? "शेयर प्रोग्रेस:" : "Share Progress:"}</span>
-                        <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-300 dark:border-yellow-400/20 font-mono">
-                          {isShareCooldownActive ? `5/5 Claimed ✅ (${shareDaysLeft}d left)` : `${displayShareCount}/5 Shared`}
+                       <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-300 dark:border-yellow-400/20 font-mono">
+                          {isShareCooldownActive ? `5/5 Claimed ✅ (${shareTimeLeftText} left)` : `${displayShareCount}/5 Shared`}
                         </span>
                       </div>
                       <button
@@ -2812,7 +2812,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
                         }`}
                       >
                         {isShareCooldownActive
-                          ? (isHindi ? `${shareDaysLeft} दिन बाद फिर +1 पॉइंट मिलेगा ⏳ (शेयर करें)` : `Next +1 Pt in ${shareDaysLeft}d ⏳ (Share Again)`)
+                          ? (isHindi ? `${shareTimeLeftText} बाद फिर +1 पॉइंट मिलेगा ⏳ (शेयर करें)` : `Next +1 Pt in ${shareTimeLeftText} ⏳ (Share Again)`)
                           : (isHindi ? "5 बार शेयर करके मुफ्त +1 पॉइंट कमाएं! 🎁" : "Share 5 times to earn +1 free point! 🎁")}
                       </button>
                     </div>
