@@ -4594,7 +4594,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
     // --- 1. HEADER ---
     doc.setFontSize(24);
     doc.setTextColor(234, 88, 12); // Orange Theme
-    doc.text("BUM BUM CAFE", 105, 18, { align: "center" });
+    doc.text((storeNameConfig || "BUM BUM CAFE").toUpperCase(), 105, 18, { align: "center" });
     
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
