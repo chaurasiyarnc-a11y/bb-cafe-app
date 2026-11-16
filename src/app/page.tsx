@@ -2395,7 +2395,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
           </div>
 
           <div className="text-center text-[9px] text-neutral-500 dark:text-gray-400 font-bold tracking-widest pt-2 font-mono">
-            © 2026 BUM BUM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
+            © 2026 {storeName.toUpperCase()}. ALL RIGHTS RESERVED.
           </div>
         </footer>
       </main>
@@ -2496,7 +2496,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
                         <button 
                           onClick={() => {
                             triggerHaptic();
-                            const upiLink = `upi://pay?pa=${upiId}&pn=BumBumCafe&am=${pkg.pay}&cu=INR&tn=WalletRecharge_${customerDetails.phone.replace('+91','')}`;
+                            const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(storeName.replace(/\s+/g, ''))}&am=${pkg.pay}&cu=INR&tn=WalletRecharge_${customerDetails.phone.replace('+91','')}`;
                             const msg = `*WALLET RECHARGE REQUEST* 💳\n\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Paid:* ₹${pkg.pay}\n*Expected Wallet Balance:* ₹${pkg.get}\n\n_मैंने UPI से ₹${pkg.pay} भेज दिए हैं। कृपया चेक करके मेरे कैफे वॉलेट में ₹${pkg.get} क्रेडिट कर दें!_`;
                             
                             toast.success(isHindi ? "UPI ऐप खुल रहा है..." : "Opening UPI App...");
@@ -2778,7 +2778,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
 
                   <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-300 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 shadow-md">
                     <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
-                      <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase"><Gift size={12}/> <span>{isHindi ? "बम बम लॉयल्टी क्लब" : "Bum Bum Loyalty Club"}</span></div>
+                      <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase"><Gift size={12}/> <span>{isHindi ? `${storeName} लॉयल्टी क्लब` : `${storeName} Loyalty Club`}</span></div>
                       <span className="text-[8px] font-black border px-2 py-0.5 rounded-full border-yellow-500/30 bg-yellow-100/30 dark:text-yellow-400 dark:border-yellow-400/30 dark:bg-yellow-400/10">
                         {getCustomerTier(customerPoints).name}
                       </span>
