@@ -6618,6 +6618,11 @@ onChange={handleTitleCaseChange(setSearchQuery)}
                                 </span>
                               )}
                             </div>
+                            {(order.address || order.deliveryAddress || order.deliveryArea) && (
+                              <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 mt-1">
+                                📍 {order.address || order.deliveryAddress} {order.deliveryArea ? `(${order.deliveryArea})` : ''}
+                              </p>
+                            )}
                             <p className="text-[11px] text-neutral-500 font-mono mt-1">
                               {order.items?.map((it: any) => `${it.name} x${it.quantity}`).join(', ')}
                             </p>
