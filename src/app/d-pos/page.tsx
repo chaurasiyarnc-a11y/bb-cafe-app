@@ -3232,7 +3232,7 @@ try {
 
       if (!isKot) {
         try {
-          const upiString = `upi://pay?pa=${orderObj.upiId || upiIdConfig}&pn=BumBumCafe&am=${orderObj.total}&cu=INR&tn=Bill-${orderObj.billNumber || 'Order'}`;
+          const upiString = `upi://pay?pa=${orderObj.upiId || upiIdConfig}&pn=${encodeURIComponent((storeNameConfig || 'BumBumCafe').replace(/\s+/g, ''))}&am=${orderObj.total}&cu=INR&tn=Bill-${orderObj.billNumber || 'Order'}`;
           orderObj.offlineQrUrl = await generateOfflineQrCode(upiString); 
         } catch (e) {
           console.error("QR Error", e);
