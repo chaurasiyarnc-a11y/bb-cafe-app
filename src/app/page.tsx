@@ -264,7 +264,7 @@ export default function BbCafeHome() {
       });
       (window as any).L.marker([storeCoordinates.lat, storeCoordinates.lng], { icon: cafeIcon })
         .addTo(map)
-        .bindPopup('<b style="color:#ea580c; font-size:14px;">Bum Bum Cafe 🍕</b><br>हम यहाँ हैं!')
+        .bindPopup(`<b style="color:#ea580c; font-size:14px;">${storeName} 🍕</b><br>हम यहाँ हैं!`) 
         .openPopup();
 
       map.on('move', () => {
