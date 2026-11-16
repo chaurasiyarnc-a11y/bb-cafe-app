@@ -1693,7 +1693,7 @@ export default function BbCafeHome() {
       { text: "Ramesh from Mohandra recently ordered Special Thali! 🍛" },
       { text: "Pooja just added Paneer Special Pizza to her cart! 🍕" },
       { text: "5 people are looking at DIY Pizza right now! 🔥" },
-      { text: "Amit rated Bum Bum Cafe 5 stars! ⭐⭐⭐⭐⭐" },
+      { text: `Amit rated ${storeName} 5 stars! ⭐⭐⭐⭐⭐` },
       { text: "Sanjay from Mohandra Town just placed an order! 🛵" },
       { text: "Anjali is customizing her DIY Pizza! 🍕" }
     ];
@@ -1865,7 +1865,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
         <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
-        <span className="text-xs font-bold uppercase tracking-wider">Bum Bum Cafe Loading...</span>
+        <span className="text-xs font-bold uppercase tracking-wider">{storeName} Loading...</span>
       </div>
     );
   }
