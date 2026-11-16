@@ -162,11 +162,32 @@ export default function BbCafeDesktopPos() {
     { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
   ], []);
 
-  // System States
+ // System States
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
+  const [globalCategoryOrder, setGlobalCategoryOrder] = useState<string[] | null>(null);
+  const [terminalId] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'PC-1';
+    let id = localStorage.getItem('bb_pos_terminal_id');
+    if (!id) {
+      id = 'TERM-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+      localStorage.setItem('bb_pos_terminal_id', id);
+    }
+    return id;
+  });
+
+  // Global POS Config को Firestore में अपडेट करने का हेल्पर
+  const updateGlobalPosConfig = async (fields: Record<string, any>) => {
+    try {
+      if (navigator.onLine) {
+        await setDoc(doc(db, "settings", "pos_config"), fields, { merge: true });
+      }
+    } catch (e) {
+      console.error("Config sync failed", e);
+    }
+  };
  const [activeTab, setActiveTab] = useState<'dashboard' | 'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'udhari' | 'customers' | 'admin_portal'>('billing');
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
