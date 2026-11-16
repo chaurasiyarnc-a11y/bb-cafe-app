@@ -1371,11 +1371,16 @@ export default function BbCafeHome() {
     }
   };
 
-  const updateShareCount = async () => {
+ const updateShareCount = async () => {
     if (!customerDetails?.phone) return;
-    if (shareRewardClaimed || shareCount >= 5) return;
 
     const now = Date.now();
+    if (lastShareRewardAt > 0 && (now - lastShareRewardAt) < FIVE_DAYS_MS) {
+      const daysLeft = Math.ceil((FIVE_DAYS_MS - (now - lastShareRewardAt)) / (24 * 60 * 60 * 1000));
+      toast.error(isHindi ? `अगला शेयर बोनस ${daysLeft} दिन बाद मिलेगा!` : `Next share bonus available in ${daysLeft} day(s)!`);
+      return;
+    }
+
     if (now - lastShareTime < 5000) {
       toast.error(isHindi ? "कृपया अगले शेयर से पहले 5 सेकंड रुकें!" : "Please wait 5 seconds before next share!");
       return;
@@ -1387,25 +1392,29 @@ export default function BbCafeHome() {
 
     try {
       let rewardJustUnlocked = false;
-      let updatedCount = shareCount;
+      let updatedCount = 0;
 
       await runTransaction(db, async (transaction) => {
         const userSnap = await transaction.get(userDocRef);
         const currentData = userSnap.exists() ? userSnap.data() : {};
 
-        if (currentData.shareRewardClaimed === true || (currentData.shareCount || 0) >= 5) {
+        const rawRewardAt = currentData.lastShareRewardAt;
+        const lastRewardMs = rawRewardAt?.toMillis ? rawRewardAt.toMillis() : (Number(rawRewardAt) || 0);
+
+        if (lastRewardMs > 0 && (now - lastRewardMs) < FIVE_DAYS_MS) {
           updatedCount = 5;
           return;
         }
 
-        const newCount = Math.min(5, (currentData.shareCount || 0) + 1);
+        const prevCount = (currentData.shareCount || 0) >= 5 ? 0 : (currentData.shareCount || 0);
+        const newCount = prevCount + 1;
         updatedCount = newCount;
 
-        if (newCount === 5) {
+        if (newCount >= 5) {
           rewardJustUnlocked = true;
           transaction.set(userDocRef, {
             shareCount: 5,
-            shareRewardClaimed: true,
+            lastShareRewardAt: serverTimestamp(),
             points: increment(1)
           }, { merge: true });
         } else {
@@ -1418,14 +1427,14 @@ export default function BbCafeHome() {
       setShareCount(updatedCount);
 
       if (rewardJustUnlocked) {
-        setShareRewardClaimed(true);
+        setLastShareRewardAt(Date.now());
         await addDoc(collection(db, "customer_points", phoneClean, "history"), {
           type: 'earn',
           points: 1,
-          description: `Shared app 5 times! (One-time Bonus) 🎁`,
+          description: `Shared app 5 times! (5-Day Bonus) 🎁`,
           timestamp: new Date()
         });
-        toast.success(isHindi ? "मुफ़्त +1 पॉइंट आपके अकाउंट में जोड़ा गया!" : "Free +1 point added to your account!");
+        toast.success(isHindi ? "मुफ़्त +1 पॉइंट आपके अकाउंट में जोड़ा गया! (अगला बोनस 5 दिन बाद)" : "Free +1 point added! (Next bonus in 5 days)");
       }
     } catch (err) {
       console.error(err);
