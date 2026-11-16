@@ -1080,7 +1080,7 @@ const [tableCount, setTableCount] = useState(6);
       .map(it => `• *${it.name}*: ${it.suggestedBuy} ${it.unit} (बचा है: ${it.current} ${it.unit})`)
       .join('%0A');
 
-    const msg = `*📋 BUM BUM CAFE - RAW MATERIAL PURCHASE ORDER*%0A------------------------------%0A*Date:* ${auditDate}%0A*कृपया नीचे लिखा माल जल्द से जल्द भेजें:*%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Sent via Bum Bum Cafe POS_ ☕`;
+    const msg = `*📋 ${(storeNameConfig || 'BUM BUM CAFE').toUpperCase()} - RAW MATERIAL PURCHASE ORDER*%0A------------------------------%0A*Date:* ${auditDate}%0A*कृपया नीचे लिखा माल जल्द से जल्द भेजें:*%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Sent via ${storeNameConfig || 'Bum Bum Cafe'} POS_ ☕`;
 
     window.open(`https://wa.me/?text=${msg}`, '_blank');
   };
