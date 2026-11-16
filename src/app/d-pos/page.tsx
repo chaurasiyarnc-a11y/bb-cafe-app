@@ -2059,13 +2059,14 @@ const toTitleCase = (val: string) =>
     return diff > 0 ? diff : 0;
   }, [cashTendered, cart, discountValue, isRedeemingPoints, pointsToRedeem, applyDeliveryFee, customDeliveryFee]);
 
- // Active Orders (👉 सिर्फ ऑनलाइन वेब ऑर्डर्स के लिए)
+// Active Orders (👉 सभी ऑनलाइन वेब ऑर्डर्स के लिए)
   const activeLiveOrders = useMemo(() => 
     liveOrders.filter((o) => 
-      o.source !== 'PC_POS' && // 👈 यह लाइन काउंटर के ऑर्डर्स को हटा देगी (सिर्फ ऑनलाइन बचेंगे)
-      (o.fulfillmentType === 'delivery' || o.fulfillmentType === 'pickup') && 
+      o.source !== 'PC_POS' && // 👈 सिर्फ ऑनलाइन/वेब ऑर्डर्स दिखाएगा (काउंटर के नहीं)
       o.status !== 'completed' && 
-      o.status !== 'rejected'
+      o.status !== 'delivered' &&
+      o.status !== 'rejected' &&
+      o.status !== 'cancelled'
     ), 
   [liveOrders]);
   
