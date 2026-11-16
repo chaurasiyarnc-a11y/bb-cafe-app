@@ -773,14 +773,14 @@ export default function BbCafeHome() {
     });
   };
 
-  const handleSaveDetails = async (e: React.FormEvent) => {
+ const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
-    if (!tempName || !tempPhone || tempPhone.length !== 10 || !tempPin || tempPin.length !== 4) {
-      toast.error(isHindi ? "कृपया सभी सही विवरण दर्ज करें!" : "Please enter correct details!");
+    const phoneClean = tempPhone.trim();
+    if (!tempName.trim() || !/^\d{10}$/.test(phoneClean) || !/^\d{4}$/.test(tempPin)) {
+      toast.error(isHindi ? "कृपया सही नाम, 10 अंकों का नंबर और 4 अंकों का PIN दर्ज करें!" : "Please enter valid name, 10-digit phone & 4-digit PIN!");
       return;
     }
-    const phoneClean = tempPhone.trim();
     const formattedPhone = `+91${phoneClean}`;
     
     const customerObj = {
@@ -800,13 +800,20 @@ export default function BbCafeHome() {
           name: customerObj.name,
           phone: phoneClean,
           pin: customerObj.pin,
-          points: tempRefCode ? 5 : 0, 
+          points: 0,
+          referredBy: tempRefCode.trim().toUpperCase(),
           lastActive: new Date()
         });
       } else {
+        const existingData = userSnap.data();
+        if (existingData?.pin && existingData.pin !== tempPin) {
+          toast.dismiss(toastId);
+          toast.error(isHindi ? "यह नंबर पहले से रजिस्टर्ड है! अपना सही 4-अंकों का PIN डालें।" : "Number already registered! Enter your correct 4-digit PIN.");
+          return;
+        }
         await setDoc(userDocRef, {
           name: customerObj.name,
-          pin: customerObj.pin,
+          pin: existingData?.pin || customerObj.pin,
           lastActive: new Date()
         }, { merge: true });
       }
@@ -821,7 +828,6 @@ export default function BbCafeHome() {
       toast.error(isHindi ? "प्रोफाइल सहेजने में त्रुटि आई!" : "Error saving profile!");
     }
   };
-
   const handleClaimSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
