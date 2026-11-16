@@ -6611,6 +6611,11 @@ onChange={handleTitleCaseChange(setSearchQuery)}
                               }`}>
                                 {isSettled ? `✅ चुकता (${order.paymentMethod?.toUpperCase()})` : '🟡 भुगतान बाकी (Unsettled)'}
                               </span>
+                              {order.createdByName && (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+                                  👤 {order.createdByName}{order.settledByName && order.settledByName !== order.createdByName ? ` → 💵 ${order.settledByName}` : ''}
+                                </span>
+                              )}
                             </div>
                             <p className="text-[11px] text-neutral-500 font-mono mt-1">
                               {order.items?.map((it: any) => `${it.name} x${it.quantity}`).join(', ')}
