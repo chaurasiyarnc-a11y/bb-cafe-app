@@ -7644,110 +7644,246 @@ onChange={handleTitleCaseChange(setReceiptSearchQuery)}
               </div>
             )}
 
-            {/* TAB 6: LIVE ORDERS */}
+          {/* TAB 6: LIVE ORDERS */}
             {activeTab === 'orders' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
-                <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500 mb-4">Live Delivery & Pickup Orders ({activeLiveOrders.length})</h2>
-                <div className="grid grid-cols-3 gap-4">
+                <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500 mb-4">
+                  Live Delivery & Pickup Orders ({activeLiveOrders.length})
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {activeLiveOrders.length === 0 ? (
-                    <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active live orders.</div>
+                    <div className="col-span-full text-center py-24 text-neutral-500 font-bold">No active live orders.</div>
                   ) : (
-                    activeLiveOrders.map((order) => (
-                      <div key={order.id} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-2xl p-4 flex flex-col justify-between shadow-lg space-y-3">
-                        <div>
-                          <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-2 mb-2">
-                            {order.source !== 'PC_POS' ? (
-                              <span className="font-mono font-black text-xs bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                                🌐 WEB-{order.billNumber}
-                              </span>
-                            ) : (
-                              <span className="font-mono font-black text-amber-600 dark:text-yellow-400">
-                                Bill #{order.billNumber}
-                              </span>
-                            )}
-                           <span className="bg-orange-500/15 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType || order.orderType || 'Online'}{order.tableNumber ? ` (${order.tableNumber})` : ''}</span>
-                          </div>
-                          <p className="text-xs font-bold">👤 {order.customerName} ({order.customerPhone || 'Walk-in'})</p>
-                          <div className="space-y-1 py-2 border-t border-dashed border-neutral-300 dark:border-neutral-800 my-2 max-h-36 overflow-y-auto">
-                            {order.items?.map((it: any, idx: number) => (
-                              <div key={idx} className="flex justify-between text-xs font-medium">
-                                <span>{it.name}</span><span className="font-bold text-orange-600">x{it.quantity}</span>
+                    activeLiveOrders.map((order) => {
+                      const custName = order.customerName || order.name || 'Walk-in Guest';
+                      const custPhone = order.customerPhone || order.phone || order.mobile || '';
+                      const cleanPhone = String(custPhone).replace(/\D/g, '').slice(-10);
+                      const custAddress = order.address || order.deliveryAddress || order.customerAddress || '';
+                      const areaLandmark = [order.deliveryArea, order.landmark].filter(Boolean).join(' • ');
+                      const orderNote = order.note || order.instructions || '';
+                      const orderDate = order.timestamp?.toDate
+                        ? order.timestamp.toDate()
+                        : new Date(order.timestamp || Date.now());
+                      const mapUrl =
+                        order.mapLink ||
+                        (order.lat && order.lng ? `https://maps.google.com/?q=${order.lat},${order.lng}` : '');
+
+                      return (
+                        <div key={order.id} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-2xl p-4 flex flex-col justify-between shadow-lg space-y-3">
+                          <div className="space-y-2.5">
+                            {/* Top Bar: Bill No, Time & Order Type */}
+                            <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-2">
+                              <div className="flex items-center gap-2">
+                                {order.source !== 'PC_POS' ? (
+                                  <span className="font-mono font-black text-xs bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                    🌐 WEB-{order.billNumber || 'NEW'}
+                                  </span>
+                                ) : (
+                                  <span className="font-mono font-black text-amber-600 dark:text-yellow-400">
+                                    Bill #{order.billNumber}
+                                  </span>
+                                )}
+                                <span className="text-[10px] font-bold text-neutral-500">
+                                  ⏰ {orderDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
                               </div>
-                            ))}
+                              <span className="bg-orange-500/15 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 rounded">
+                                {order.fulfillmentType || order.orderType || 'Online'}
+                                {order.tableNumber ? ` (${order.tableNumber})` : ''}
+                              </span>
+                            </div>
+
+                            {/* Customer Details: Name, Mobile & Delivery Address */}
+                            <div className="bg-neutral-100 dark:bg-neutral-800/70 border border-neutral-200 dark:border-neutral-700 rounded-xl p-2.5 space-y-1.5">
+                              <div className="flex justify-between items-start gap-2">
+                                <p className="text-xs font-black text-neutral-900 dark:text-white">
+                                  👤 {custName}
+                                </p>
+                                {order.paymentMethod && (
+                                  <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                    order.paymentMethod === 'upi' || order.paymentMethod === 'online'
+                                      ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                                      : 'bg-green-500/15 text-green-700 dark:text-green-400'
+                                  }`}>
+                                    {order.paymentMethod}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs font-mono font-bold text-neutral-700 dark:text-neutral-300">
+                                  📞 {custPhone || 'मोबाइल नंबर नहीं है'}
+                                </p>
+                                {cleanPhone.length === 10 && (
+                                  <div className="flex gap-1.5">
+                                    <a
+                                      href={`tel:+91${cleanPhone}`}
+                                      className="px-2 py-0.5 bg-blue-600 text-white rounded text-[9px] font-black uppercase hover:bg-blue-500"
+                                    >
+                                      Call
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => window.open(`https://wa.me/91${cleanPhone}`, '_blank')}
+                                      className="px-2 py-0.5 bg-green-600 text-white rounded text-[9px] font-black uppercase hover:bg-green-500"
+                                    >
+                                      WA
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Delivery Address Box */}
+                              {(custAddress || areaLandmark || mapUrl) ? (
+                                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-2 mt-1 space-y-1">
+                                  <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400">
+                                    📍 डिलीवरी पता (Delivery Address):
+                                  </p>
+                                  {custAddress && (
+                                    <p className="text-xs font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+                                      {custAddress}
+                                    </p>
+                                  )}
+                                  {areaLandmark && (
+                                    <p className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                                      📌 {areaLandmark}
+                                    </p>
+                                  )}
+                                  {mapUrl && (
+                                    <a
+                                      href={mapUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-block text-[10px] font-black text-orange-600 underline mt-0.5"
+                                    >
+                                      🗺️ Google Map लोकेशन खोलें
+                                    </a>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-[10px] font-bold text-neutral-500 italic">
+                                  📍 {order.tableNumber ? `Table: ${order.tableNumber}` : 'Self Pickup / Counter Order (कोई एड्रेस नहीं)'}
+                                </p>
+                              )}
+
+                              {orderNote && (
+                                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-1 rounded">
+                                  📝 Note: {orderNote}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Order Items List */}
+                            <div className="space-y-1 py-2 border-t border-dashed border-neutral-300 dark:border-neutral-800 max-h-36 overflow-y-auto">
+                              {order.items?.map((it: any, idx: number) => (
+                                <div key={idx} className="flex justify-between text-xs font-medium">
+                                  <span className="pr-2">
+                                    {it.name}
+                                    {it.note && <span className="block text-[9px] text-neutral-500 italic">{it.note}</span>}
+                                  </span>
+                                  <span className="font-bold text-orange-600 shrink-0">x{it.quantity}</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex justify-between items-center pt-1">
+                              <span className="text-xs font-bold text-neutral-500">Grand Total</span>
+                              <p className="text-base font-black text-green-600 dark:text-green-400 font-mono">₹{order.total}</p>
+                            </div>
                           </div>
-                          <p className="text-sm font-black text-green-600 dark:text-green-400 font-mono">Total: ₹{order.total}</p>
+
+                          {/* Action Buttons */}
+                          <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-neutral-300 dark:border-neutral-800">
+                            <button
+                              onClick={() => handlePrintReceiptDirect(order, true)}
+                              className="py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1"
+                              title="किचन KOT प्रिंट करें"
+                            >
+                              <SafePrinter size={12} /> KOT
+                            </button>
+                            <button
+                              onClick={() => handlePrintReceiptDirect(order, false)}
+                              className="py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1"
+                              title="बिल प्रिंट करें"
+                            >
+                              <SafePrinter size={12} /> Bill
+                            </button>
+                            <button
+                              onClick={async () => {
+                                let extraUpdates: any = {};
+
+                                // 1. Stock Deduction
+                                if (order.items && !order.stockProcessed) {
+                                  await deductInventoryForItems(order.items, order.fulfillmentType);
+                                  extraUpdates.stockProcessed = true;
+                                }
+
+                                // 2. Loyalty Points
+                                if (custPhone && !order.pointsProcessed) {
+                                  if (cleanPhone.length === 10 && navigator.onLine) {
+                                    const userRef = doc(db, "customer_points", cleanPhone);
+                                    const userDoc = await getDoc(userRef);
+                                    let prevPoints = 0; let prevSpent = 0; let prevVisits = 0;
+                                    if (userDoc.exists()) {
+                                      const data = userDoc.data();
+                                      prevPoints = Number(data.points) || 0;
+                                      prevSpent = Number(data.totalSpent) || 0;
+                                      prevVisits = Number(data.totalVisits) || 0;
+                                    }
+                                    const finalTotal = Number(order.total) || 0;
+                                    const newSpent = prevSpent + finalTotal;
+                                    const earned = Math.floor(newSpent / 100) - Math.floor(prevSpent / 100);
+                                    const remainingPts = prevPoints + earned;
+
+                                    await setDoc(userRef, {
+                                      name: custName,
+                                      phone: cleanPhone,
+                                      points: remainingPts,
+                                      totalSpent: newSpent,
+                                      totalVisits: prevVisits + 1,
+                                      lastBillNumber: order.billNumber,
+                                      lastBillAmount: finalTotal,
+                                      lastActive: new Date().toISOString()
+                                    }, { merge: true });
+
+                                    extraUpdates.pointsEarned = earned;
+                                    extraUpdates.remainingPoints = remainingPts;
+                                    extraUpdates.pointsProcessed = true;
+                                    fetchAllCustomers();
+                                  }
+                                }
+
+                                await updateDoc(doc(db, "orders", order.id), {
+                                  status: 'completed',
+                                  paymentSettled: true,
+                                  settledAt: new Date(),
+                                  ...extraUpdates
+                                });
+                                toast.success("Order Completed & Points Added! ✅");
+                              }}
+                              className="py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1"
+                            >
+                              <Check size={12} /> Done
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm("क्या आप सच में यह ऑनलाइन ऑर्डर रिजेक्ट करना चाहते हैं?")) return;
+                                await updateDoc(doc(db, "orders", order.id), { status: 'rejected', rejectedAt: new Date() });
+                                setLiveOrders(prev => prev.filter(o => o.id !== order.id));
+                                toast.success("ऑर्डर रिजेक्ट कर दिया गया और हटा दिया गया! 🗑️");
+                              }}
+                              className="py-2 bg-red-500/15 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1"
+                            >
+                              <SafeX size={12} /> Reject
+                            </button>
+                          </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-neutral-300 dark:border-neutral-800">
-                          <button onClick={() => handlePrintReceiptDirect(order, false)} className="py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
-                            <SafePrinter size={13} /> Print
-                          </button>
-                         <button onClick={async () => {
-                            let extraUpdates: any = {};
-                            
-                            // 1. Stock Deduction
-                            if (order.items && !order.stockProcessed) {
-                              await deductInventoryForItems(order.items);
-                              extraUpdates.stockProcessed = true;
-                            }
-
-                            // 2. 👉 NEW: Loyalty Points
-                            if (order.customerPhone && !order.pointsProcessed) {
-                               const cleanPhone = String(order.customerPhone).replace(/\D/g, '').slice(-10);
-                               if (cleanPhone.length === 10 && navigator.onLine) {
-                                 const userRef = doc(db, "customer_points", cleanPhone);
-                                 const userDoc = await getDoc(userRef);
-                                 let prevPoints = 0; let prevSpent = 0; let prevVisits = 0;
-                                 if (userDoc.exists()) {
-                                   const data = userDoc.data();
-                                   prevPoints = Number(data.points) || 0;
-                                   prevSpent = Number(data.totalSpent) || 0;
-                                   prevVisits = Number(data.totalVisits) || 0;
-                                 }
-                                 const finalTotal = Number(order.total) || 0;
-                                 const newSpent = prevSpent + finalTotal;
-                                 const earned = Math.floor(newSpent / 100) - Math.floor(prevSpent / 100);
-                                 const remainingPts = prevPoints + earned;
-
-                                 await setDoc(userRef, {
-                                   name: order.customerName || "Walk-in Guest",
-                                   phone: cleanPhone,
-                                   points: remainingPts,
-                                   totalSpent: newSpent,
-                                   totalVisits: prevVisits + 1,
-                                   lastBillNumber: order.billNumber,
-                                   lastBillAmount: finalTotal,
-                                   lastActive: new Date().toISOString()
-                                 }, { merge: true });
-
-                                 extraUpdates.pointsEarned = earned;
-                                 extraUpdates.remainingPoints = remainingPts;
-                                 extraUpdates.pointsProcessed = true;
-                                 fetchAllCustomers();
-                               }
-                            }
-
-                            await updateDoc(doc(db, "orders", order.id), { status: 'completed', paymentSettled: true, settledAt: new Date(), ...extraUpdates });
-                            toast.success("Order Completed & Points Added! ✅");
-                          }} className="py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
-                            <Check size={13} /> Done
-                          </button>
-                          <button onClick={async () => {
-                            if (!window.confirm("क्या आप सच में यह ऑनलाइन ऑर्डर रिजेक्ट करना चाहते हैं?")) return;
-                            await updateDoc(doc(db, "orders", order.id), { status: 'rejected', rejectedAt: new Date() });
-                            setLiveOrders(prev => prev.filter(o => o.id !== order.id));
-                            toast.success("ऑर्डर रिजेक्ट कर दिया गया और हटा दिया गया! 🗑️");
-                          }} className="py-2 bg-red-500/15 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
-                            <SafeX size={13} /> Reject
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
-            )}
-
-            {/* TAB 8: UDHARI BOOK */}
+            )}            {/* TAB 8: UDHARI BOOK */}
             {activeTab === 'udhari' && (
               <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
                 <div className="flex justify-between items-center border-b pb-3 shrink-0">
