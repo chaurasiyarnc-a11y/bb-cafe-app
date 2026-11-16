@@ -1290,7 +1290,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     }).join('\n');
 
     // 👉 डायनामिक UPI पेमेंट स्ट्रिंग और QR Code लिंक बनाना (जिसमे अमाउंट फिक्स होगा)
-    const upiString = `upi://pay?pa=${upiIdConfig}&pn=Bum%20Bum%20Cafe&am=${totalDue}&cu=INR`;
+    const upiString = `upi://pay?pa=${upiIdConfig}&pn=${encodeURIComponent(storeNameConfig || 'Bum Bum Cafe')}&am=${totalDue}&cu=INR`;
     const qrImageLink = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiString)}`;
 
     // शानदार WhatsApp मैसेज तैयार करें (UPI ID और QR लिंक के साथ)
