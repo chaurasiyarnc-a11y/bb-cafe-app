@@ -9071,7 +9071,7 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                         </div>
                         {gstEnabled && (
                           <div className="flex gap-2">
-                            <input type="number" value={gstRate} onChange={e => { const rate = Number(e.target.value); setGstRate(rate); localStorage.setItem("bb_pos_gst_rate_pc", String(rate)); }} placeholder="GST %" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-3 py-2.5 text-sm font-mono outline-none" />
+                            <input type="number" value={gstRate} onChange={e => { const rate = Number(e.target.value); setGstRate(rate); localStorage.setItem("bb_pos_gst_rate_pc", String(rate)); updateGlobalPosConfig({ gstRate: rate }); }} placeholder="GST %" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-3 py-2.5 text-sm font-mono outline-none" />
                             <span className="bg-neutral-200 dark:bg-neutral-700 px-4 py-2.5 rounded-xl text-xs font-black uppercase">% Rate</span>
                           </div>
                         )}
