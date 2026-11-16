@@ -1838,7 +1838,9 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
   const shareHoursLeft = Math.floor(shareTotalMinsLeft / 60);
   const shareMinsLeft = shareTotalMinsLeft % 60;
   const shareTimeLeftText = shareHoursLeft > 0 ? (shareMinsLeft > 0 ? `${shareHoursLeft}h ${shareMinsLeft}m` : `${shareHoursLeft}h`) : `${shareMinsLeft}m`;
-  const displayShareCount = isShareCooldownActive ? 5 : (shareCount >= 5 ? 0 : shareCount);
+ const displayShareCount = isShareCooldownActive ? 5 : (shareCount >= 5 ? 0 : shareCount);
+
+  if (!mounted) {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
         <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
