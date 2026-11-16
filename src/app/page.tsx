@@ -1323,7 +1323,7 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  const handleShareApp = async () => {
+ const handleShareApp = async () => {
     triggerHaptic();
     const shareText = isHindi 
       ? `बम बम कैफ़े से स्वादिष्ट भोजन आर्डर करें! मेरा इनवाइट कोड इस्तेमाल करें: ${getReferralCode()} 🍕` 
@@ -1344,8 +1344,12 @@ export default function BbCafeHome() {
           text: shareText,
           url: shareUrl,
         });
-        updateShareCount();
-      } catch (err) {
+        await updateShareCount();
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          toast.error(isHindi ? "शेयर पूरा नहीं हुआ!" : "Share cancelled!");
+          return;
+        }
         performClipboardCopy();
       }
     } else {
@@ -1354,30 +1358,65 @@ export default function BbCafeHome() {
   };
 
   const updateShareCount = async () => {
-    const nextCount = shareCount + 1;
-    setShareCount(nextCount);
-    if (nextCount % 5 === 0 && customerDetails?.phone) {
-      const phoneClean = customerDetails.phone.replace("+91", "").trim();
-      const userDocRef = doc(db, "customer_points", phoneClean);
-      try {
-        await setDoc(userDocRef, {
-          points: increment(1)
-        }, { merge: true });
-        
+    if (!customerDetails?.phone) return;
+    if (shareRewardClaimed || shareCount >= 5) return;
+
+    const now = Date.now();
+    if (now - lastShareTime < 5000) {
+      toast.error(isHindi ? "कृपया अगले शेयर से पहले 5 सेकंड रुकें!" : "Please wait 5 seconds before next share!");
+      return;
+    }
+    setLastShareTime(now);
+
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    const userDocRef = doc(db, "customer_points", phoneClean);
+
+    try {
+      let rewardJustUnlocked = false;
+      let updatedCount = shareCount;
+
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userDocRef);
+        const currentData = userSnap.exists() ? userSnap.data() : {};
+
+        if (currentData.shareRewardClaimed === true || (currentData.shareCount || 0) >= 5) {
+          updatedCount = 5;
+          return;
+        }
+
+        const newCount = Math.min(5, (currentData.shareCount || 0) + 1);
+        updatedCount = newCount;
+
+        if (newCount === 5) {
+          rewardJustUnlocked = true;
+          transaction.set(userDocRef, {
+            shareCount: 5,
+            shareRewardClaimed: true,
+            points: increment(1)
+          }, { merge: true });
+        } else {
+          transaction.set(userDocRef, {
+            shareCount: newCount
+          }, { merge: true });
+        }
+      });
+
+      setShareCount(updatedCount);
+
+      if (rewardJustUnlocked) {
+        setShareRewardClaimed(true);
         await addDoc(collection(db, "customer_points", phoneClean, "history"), {
           type: 'earn',
           points: 1,
-          description: `Shared app 5 times! 🎁`,
+          description: `Shared app 5 times! (One-time Bonus) 🎁`,
           timestamp: new Date()
         });
-        setCustomerPoints(p => p + 1);
         toast.success(isHindi ? "मुफ़्त +1 पॉइंट आपके अकाउंट में जोड़ा गया!" : "Free +1 point added to your account!");
-      } catch (err) {
-        console.error(err);
       }
+    } catch (err) {
+      console.error(err);
     }
   };
-
   const handleCustomerRedeem = (ruleId: string, rewardName: string, pointsCost: number) => {
     triggerHaptic();
     if (!customerDetails?.phone) {
