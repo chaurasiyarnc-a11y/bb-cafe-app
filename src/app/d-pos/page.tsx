@@ -1934,19 +1934,50 @@ const toTitleCase = (val: string) =>
     (setter: React.Dispatch<React.SetStateAction<string>>) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       handleTitleCaseInput(e, setter);
-  // Invoice Number Generator
-  const getNextBillNumber = (): number => {
-    const saved = localStorage.getItem("bb_pos_local_bill_counter_pc");
-    let current = saved ? parseInt(saved, 10) : 199;
-    if (isNaN(current) || current < 199 || current >= 10000) {
-      current = 199;
-    }
-    const next = current + 1;
-    localStorage.setItem("bb_pos_local_bill_counter_pc", String(next));
-    setManualInvoiceCounterInput(String(next + 1));
-    return next;
-  };
+  // 👉 Multi-User Atomic Bill & Token Generator (सभी डिवाइस में हमेशा यूनिक नंबर)
+  const getNextBillAndTokenAtomic = async (): Promise<{ billNumber: number | string; tokenNumber: number | string }> => {
+    const todayStr = new Date().toISOString().split('T')[0];
 
+    if (!navigator.onLine) {
+      const offSeq = Number(localStorage.getItem("bb_pos_offline_seq") || "0") + 1;
+      localStorage.setItem("bb_pos_offline_seq", String(offSeq));
+      const shortTerm = terminalId.replace('TERM-', '').slice(0, 3);
+      return {
+        billNumber: `OFF-${shortTerm}-${offSeq}`,
+        tokenNumber: `OFF-${offSeq}`
+      };
+    }
+
+    const counterRef = doc(db, "settings", "counters");
+    const result = await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(counterRef);
+      let lastBill = 199;
+      let lastToken = 0;
+      let tokenDate = todayStr;
+
+      if (snap.exists()) {
+        const data = snap.data();
+        lastBill = Number(data.lastBillNumber) || 199;
+        lastToken = Number(data.lastTokenNumber) || 0;
+        tokenDate = data.tokenDate || todayStr;
+      }
+
+      const nextBill = lastBill + 1;
+      const nextToken = tokenDate === todayStr ? lastToken + 1 : 1;
+
+      transaction.set(counterRef, {
+        lastBillNumber: nextBill,
+        lastTokenNumber: nextToken,
+        tokenDate: todayStr,
+        updatedAt: new Date()
+      }, { merge: true });
+
+      return { billNumber: nextBill, tokenNumber: nextToken };
+    });
+
+    setManualInvoiceCounterInput(String(Number(result.billNumber) + 1));
+    return result;
+  };
   const triggerBeep = (type: 'tap' | 'success' | 'alarm') => {
     try {
       if (!globalAudioCtx) {
