@@ -2753,12 +2753,26 @@ export default function BbCafeHome() {
                       </div>
                     )}
 
-                    <div className="pt-1.5 flex flex-col gap-2 font-sans">
+                   <div className="pt-1.5 flex flex-col gap-2 font-sans">
                       <div className="flex justify-between items-center text-[9px]">
                         <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">{isHindi ? "शेयर प्रोग्रेस:" : "Share Progress:"}</span>
-                        <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-300 dark:border-yellow-400/20 font-mono">{shareCount}/5 Shared</span>
+                        <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-300 dark:border-yellow-400/20 font-mono">
+                          {shareRewardClaimed ? "5/5 Claimed ✅" : `${Math.min(shareCount, 5)}/5 Shared`}
+                        </span>
                       </div>
-                      <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all">{isHindi ? "5 बार शेयर करके मुफ्त +1 पॉइंट कमाएं! 🎁" : "Share 5 times to earn +1 free point! 🎁"}</button>
+                      <button
+                        type="button"
+                        onClick={handleShareApp}
+                        className={`w-full font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all ${
+                          shareRewardClaimed
+                            ? 'bg-neutral-200 dark:bg-white/10 text-neutral-700 dark:text-gray-300'
+                            : 'bg-green-600 text-white'
+                        }`}
+                      >
+                        {shareRewardClaimed
+                          ? (isHindi ? "रिवॉर्ड मिल चुका है ✅ (ऐप फिर से शेयर करें)" : "Reward Claimed ✅ (Share App Again)")
+                          : (isHindi ? "5 बार शेयर करके मुफ्त +1 पॉइंट कमाएं! 🎁" : "Share 5 times to earn +1 free point! 🎁")}
+                      </button>
                     </div>
 
                     <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800 flex justify-between items-center font-sans">
