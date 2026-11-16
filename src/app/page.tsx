@@ -986,9 +986,10 @@ export default function BbCafeHome() {
         const senderSnap = await transaction.get(senderDocRef);
         if (!senderSnap.exists()) throw new Error("Sender records not found.");
         
-        const currentSenderPoints = senderSnap.data().points || 0;
+       const senderData = senderSnap.data();
+        if (senderData.pin && senderData.pin !== giftSenderPin) throw new Error("Invalid security PIN.");
+        const currentSenderPoints = senderData.points || 0;
         if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance.");
-
         transaction.update(senderDocRef, { points: increment(-pointsToGift) });
         transaction.update(receiverDocRef, { points: increment(pointsToGift) });
       });
