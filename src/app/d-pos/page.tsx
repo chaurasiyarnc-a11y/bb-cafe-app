@@ -2330,24 +2330,23 @@ const toTitleCase = (val: string) =>
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
 
-  // Clean Categories
-  const normalizeCategoryList = (rawItems: any[]) => {
+// Clean Categories
+  const normalizeCategoryList = (rawItems: any[], customOrder: string[] | null = globalCategoryOrder) => {
     const cleaned = rawItems.map((i: any) => {
       const c = (i.category || 'Burgers').trim();
       return c.charAt(0).toUpperCase() + c.slice(1);
     });
     const unique = Array.from(new Set(cleaned.filter(Boolean))) as string[];
-    
-    const savedOrderStr = localStorage.getItem("bb_pos_category_order");
+
     let ordered = unique.sort();
-    if (savedOrderStr) {
-      try {
-        const savedOrder: string[] = JSON.parse(savedOrderStr);
-        ordered = [
-          ...savedOrder.filter(c => unique.includes(c)),
-          ...unique.filter(c => !savedOrder.includes(c))
-        ];
-      } catch (e) {}
+    const savedOrderStr = localStorage.getItem("bb_pos_category_order");
+    const orderSource = customOrder || (savedOrderStr ? (() => { try { return JSON.parse(savedOrderStr); } catch { return null; } })() : null);
+
+    if (orderSource && Array.isArray(orderSource)) {
+      ordered = [
+        ...orderSource.filter(c => unique.includes(c)),
+        ...unique.filter(c => !orderSource.includes(c))
+      ];
     }
     return ['All', ...ordered];
   };
@@ -2366,10 +2365,41 @@ const toTitleCase = (val: string) =>
     updated.splice(newIndex, 0, moved);
 
     localStorage.setItem("bb_pos_category_order", JSON.stringify(updated));
+    setGlobalCategoryOrder(updated);
     setCategories(['All', ...updated]);
-    toast.success(`Category "${catName}" moved!`);
+    updateGlobalPosConfig({ categoryOrder: updated });
+    toast.success(`Category "${catName}" moved on all devices!`);
   };
 
+  // 👉 Multi-User Live Settings & Counters Sync
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const unsubConfig = onSnapshot(doc(db, "settings", "pos_config"), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.tableCount !== undefined) setTableCount(Number(d.tableCount));
+        if (d.gstEnabled !== undefined) setGstEnabled(Boolean(d.gstEnabled));
+        if (d.gstRate !== undefined) setGstRate(Number(d.gstRate));
+        if (d.upiIdConfig) setUpiIdConfig(d.upiIdConfig);
+        if (d.ownerPhoneConfig) setOwnerPhoneConfig(d.ownerPhoneConfig);
+        if (d.storeNameConfig) setStoreNameConfig(d.storeNameConfig);
+        if (d.storeAddressConfig) setStoreAddressConfig(d.storeAddressConfig);
+        if (d.storePhoneConfig) setStorePhoneConfig(d.storePhoneConfig);
+        if (Array.isArray(d.categoryOrder)) {
+          setGlobalCategoryOrder(d.categoryOrder);
+          localStorage.setItem("bb_pos_category_order", JSON.stringify(d.categoryOrder));
+        }
+      }
+    });
+
+    const unsubCounters = onSnapshot(doc(db, "settings", "counters"), (snap) => {
+      if (snap.exists() && snap.data().lastBillNumber !== undefined) {
+        setManualInvoiceCounterInput(String(Number(snap.data().lastBillNumber) + 1));
+      }
+    });
+
+    return () => { unsubConfig(); unsubCounters(); };
+  }, [isLoggedIn]);
   const handleMergeCategories = async () => {
     if (!mergeSourceCat || !mergeTargetCat) return toast.error("Select both categories to merge!");
     if (mergeSourceCat === mergeTargetCat) return toast.error("Source and Target must be different!");
