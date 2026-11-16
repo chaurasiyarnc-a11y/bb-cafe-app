@@ -9110,7 +9110,7 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                         <p className="text-xs font-bold uppercase text-neutral-500">Owner WhatsApp (For EOD Report):</p>
                         <div className="flex gap-2">
                           <input type="text" value={ownerPhoneConfig} onChange={e => setOwnerPhoneConfig(e.target.value)} className="flex-1 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-xl px-4 py-2.5 text-sm font-mono outline-none" />
-                          <button onClick={() => { localStorage.setItem("bb_pos_owner_phone", ownerPhoneConfig); toast.success("Saved!"); }} className="bg-green-600 text-white px-5 rounded-xl text-xs font-black uppercase">Save</button>
+                         <button onClick={() => { localStorage.setItem("bb_pos_owner_phone", ownerPhoneConfig); updateGlobalPosConfig({ ownerPhoneConfig }); toast.success("Synced!"); }} className="bg-green-600 text-white px-5 rounded-xl text-xs font-black uppercase">Save</button>
                         </div>
                       </div>
                     </div>
