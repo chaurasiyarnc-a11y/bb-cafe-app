@@ -203,7 +203,7 @@ export default function BbCafeHome() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [, setLastPlacedOrder] = useState<any>(null);
   const [confettiActive, setConfettiActive] = useState(false);
- const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+ const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
   const [shareCount, setShareCount] = useState<number>(0);
   const [lastShareRewardAt, setLastShareRewardAt] = useState<number>(0);
   const [lastShareTime, setLastShareTime] = useState<number>(0);
