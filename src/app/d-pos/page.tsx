@@ -9065,7 +9065,7 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                       <div className="space-y-3 pt-2">
                         <div className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-xl border border-neutral-100 dark:border-neutral-800">
                           <p className="text-xs font-bold uppercase text-neutral-700 dark:text-neutral-300">Enable GST (टैक्स):</p>
-                          <button onClick={() => { const newVal = !gstEnabled; setGstEnabled(newVal); localStorage.setItem("bb_pos_gst_enabled_pc", String(newVal)); toast.success(newVal ? `GST Enabled!` : "GST Disabled!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${gstEnabled ? 'bg-green-500' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+                         <button onClick={() => { const newVal = !gstEnabled; setGstEnabled(newVal); localStorage.setItem("bb_pos_gst_enabled_pc", String(newVal)); updateGlobalPosConfig({ gstEnabled: newVal }); toast.success(newVal ? `GST Enabled!` : "GST Disabled!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${gstEnabled ? 'bg-green-500' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
                             <div className={`bg-white w-4 h-4 rounded-full transform transition-transform ${gstEnabled ? 'translate-x-6' : ''}`}></div>
                           </button>
                         </div>
