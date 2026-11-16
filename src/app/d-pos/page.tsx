@@ -2449,71 +2449,73 @@ const generateNextCategoryCode = (catName: string, currentList = products, exclu
     }
     return String(candidate);
   };
-  // Products Loading with guaranteed Name & Price fallback
+ // 👉 Real-Time Products Listener (एक डिवाइस पर बदलाव होते ही सभी पर अपडेट होगा)
   useEffect(() => {
     if (!isLoggedIn) return;
-    (async () => {
-      setLoading(true);
-      try {
-        let items: any[] = [];
-        if (navigator.onLine) {
-          const prodSnap = await getDocs(collection(db, "products"));
-          items = prodSnap.docs.map((d) => {
-            const data = d.data();
-            const cat = data.category || 'Burgers';
+    setLoading(true);
 
-            let resolvedPrice = Number(data.price);
-            if (isNaN(resolvedPrice) || resolvedPrice <= 0) {
-              if (data.variants && typeof data.variants === 'object') {
-                const vals = Object.values(data.variants);
-                if (vals.length > 0) resolvedPrice = Number(vals[0]) || 0;
-              }
+    const unsubProducts = onSnapshot(
+      collection(db, "products"),
+      (prodSnap) => {
+        let items = prodSnap.docs.map((d) => {
+          const data = d.data();
+          const cat = data.category || 'Burgers';
+          let resolvedPrice = Number(data.price);
+          if (isNaN(resolvedPrice) || resolvedPrice <= 0) {
+            if (data.variants && typeof data.variants === 'object') {
+              const vals = Object.values(data.variants);
+              if (vals.length > 0) resolvedPrice = Number(vals[0]) || 0;
             }
-            if (isNaN(resolvedPrice)) resolvedPrice = 0;
+          }
+          if (isNaN(resolvedPrice)) resolvedPrice = 0;
 
-            return {
-              id: d.id,
-              ...data,
-              name: data.name || data.title || data.itemName || 'Cafe Item',
-              price: resolvedPrice,
-              category: cat,
-              itemCode: data.itemCode ? String(data.itemCode).trim() : ''
-            };
-          });
+          return {
+            id: d.id,
+            ...data,
+            name: data.name || data.title || data.itemName || 'Cafe Item',
+            price: resolvedPrice,
+            category: cat,
+            itemCode: data.itemCode ? String(data.itemCode).trim() : ''
+          };
+        });
 
-          const catCountMap: { [cat: string]: number } = {};
-          items = items.map((item) => {
-            const cat = item.category;
-            const base = getCategoryBaseCode(cat);
-            if (!catCountMap[cat]) catCountMap[cat] = base === 1 ? 0 : base;
-            catCountMap[cat] += 1;
-            
-            if (!item.itemCode || isNaN(parseInt(item.itemCode, 10))) {
-              return { ...item, itemCode: String(catCountMap[cat]) };
-            }
-            return item;
-          });
+        const catCountMap: { [cat: string]: number } = {};
+        items = items.map((item) => {
+          const cat = item.category;
+          const base = getCategoryBaseCode(cat);
+          if (!catCountMap[cat]) catCountMap[cat] = base === 1 ? 0 : base;
+          catCountMap[cat] += 1;
+          if (!item.itemCode || isNaN(parseInt(item.itemCode, 10))) {
+            return { ...item, itemCode: String(catCountMap[cat]) };
+          }
+          return item;
+        });
 
-          localStorage.setItem("bb_pos_cached_products", JSON.stringify(items));
-        } else {
-          const cached = localStorage.getItem("bb_pos_cached_products");
-          if (cached) items = JSON.parse(cached);
-        }
+        localStorage.setItem("bb_pos_cached_products", JSON.stringify(items));
         setProducts(items);
         setCategories(normalizeCategoryList(items));
-      } catch (err) {
+        setLoading(false);
+      },
+      () => {
         const cached = localStorage.getItem("bb_pos_cached_products");
         if (cached) {
           const items = JSON.parse(cached);
           setProducts(items);
           setCategories(normalizeCategoryList(items));
         }
-      } finally {
         setLoading(false);
       }
-    })();
+    );
+
+    return () => unsubProducts();
   }, [isLoggedIn]);
 
+  // जब किसी दूसरे डिवाइस से categoryOrder अपडेट हो तो तुरंत री-सॉर्ट करें
+  useEffect(() => {
+    if (products.length > 0 && globalCategoryOrder) {
+      setCategories(normalizeCategoryList(products, globalCategoryOrder));
+    }
+  }, [globalCategoryOrder]);
 
  // 👉 NEW: Fetch Raw Materials, Vendors & Purchases (Real-Time Auto-Load)
   useEffect(() => {
