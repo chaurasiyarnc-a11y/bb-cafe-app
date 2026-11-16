@@ -5691,8 +5691,10 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   <SafeDatabase className="text-orange-500 shrink-0" size={22} />
                   {!isSidebarCollapsed && (
                     <div className="truncate">
-                      <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">Bum Bum Cafe</h1>
-                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v4.4</span>
+                     <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">{storeNameConfig || 'Bum Bum Cafe'}</h1>
+                      <span className="text-[9px] text-neutral-600 dark:text-neutral-400 font-bold block truncate">
+                        👤 {currentUser?.name || 'Staff'} • {terminalId}
+                      </span>
                     </div>
                   )}
                 </div>
