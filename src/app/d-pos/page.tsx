@@ -1832,26 +1832,39 @@ const handleSendUdhariReminder = (targetOrder: any) => {
   const [securityReason, setSecurityReason] = useState('');
   const [securityPin, setSecurityPin] = useState('');
 
-  const handleSecurityActionConfirm = async (e: React.FormEvent) => {
+ const handleSecurityActionConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 1. PIN Check
-    if (securityPin.trim() !== String(currentUser?.pin)) {
-      return toast.error("❌ गलत PIN! अनुमति नहीं है।");
-    }
-    // 2. Reason Check
     if (!securityReason.trim()) {
       return toast.error("❌ कृपया कारण (Reason) बताएं!");
     }
 
-    const toastId = toast.loading("प्रमाणित किया जा रहा है...");
+    const toastId = toast.loading("Admin PIN प्रमाणित किया जा रहा है...");
     try {
-      // 3. Log into Database (Audit Logs)
+      // 1. Verify Admin PIN from cafe_users (Self-PIN bypass बंद)
+      let approvedBy = '';
+      if (navigator.onLine) {
+        const adminSnap = await getDocs(
+          query(collection(db, "cafe_users"), where("pin", "==", securityPin.trim()), where("role", "==", "admin"))
+        );
+        if (adminSnap.empty) {
+          toast.dismiss(toastId);
+          return toast.error("❌ गलत Admin PIN! इसके लिए Admin की अनुमति ज़रूरी है।");
+        }
+        approvedBy = adminSnap.docs[0].data().name || 'Admin';
+      } else if (securityPin.trim() !== String(currentUser?.pin) || currentUser?.role !== 'admin') {
+        toast.dismiss(toastId);
+        return toast.error("❌ ऑफ़लाइन मोड में केवल Admin ही अनुमति दे सकते हैं!");
+      }
+
+      // 2. Log into Database (Audit Logs with Staff + Approver + Terminal)
       const logData = {
         orderId: securityTargetOrder.id,
         billNumber: securityTargetOrder.billNumber,
         action: securityAction,
         reason: securityReason,
         staffName: currentUser?.name || 'Unknown Staff',
+        approvedBy: approvedBy || currentUser?.name || 'Admin',
+        terminalId,
         timestamp: new Date().toISOString()
       };
 
