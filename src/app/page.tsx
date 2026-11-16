@@ -1374,10 +1374,13 @@ export default function BbCafeHome() {
  const updateShareCount = async () => {
     if (!customerDetails?.phone) return;
 
-    const now = Date.now();
-    if (lastShareRewardAt > 0 && (now - lastShareRewardAt) < FIVE_DAYS_MS) {
-      const daysLeft = Math.ceil((FIVE_DAYS_MS - (now - lastShareRewardAt)) / (24 * 60 * 60 * 1000));
-      toast.error(isHindi ? `अगला शेयर बोनस ${daysLeft} दिन बाद मिलेगा!` : `Next share bonus available in ${daysLeft} day(s)!`);
+   const now = Date.now();
+    if (lastShareRewardAt > 0 && (now - lastShareRewardAt) < THREE_HOURS_MS) {
+      const totalMinsLeft = Math.max(1, Math.ceil((THREE_HOURS_MS - (now - lastShareRewardAt)) / (60 * 1000)));
+      const hLeft = Math.floor(totalMinsLeft / 60);
+      const mLeft = totalMinsLeft % 60;
+      const waitText = hLeft > 0 ? (mLeft > 0 ? `${hLeft}h ${mLeft}m` : `${hLeft}h`) : `${mLeft}m`;
+      toast.error(isHindi ? `अगला शेयर बोनस ${waitText} बाद मिलेगा!` : `Next share bonus available in ${waitText}!`);
       return;
     }
 
