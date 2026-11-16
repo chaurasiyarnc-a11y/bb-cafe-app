@@ -953,8 +953,8 @@ export default function BbCafeHome() {
       toast.error(isHindi ? "आप स्वयं को पॉइंट्स गिफ्ट नहीं कर सकते!" : "You cannot gift points to yourself!");
       return;
     }
-    if (isNaN(pointsToGift) || pointsToGift <= 0) {
-      toast.error(isHindi ? "कृपया सही पॉइंट्स संख्या दर्ज करें!" : "Please enter a valid amount of points!");
+   if (!Number.isInteger(pointsToGift) || pointsToGift <= 0) {
+      toast.error(isHindi ? "कृपया सही पूर्ण संख्या (जैसे 1, 5, 10) दर्ज करें!" : "Please enter a valid whole number of points!");
       return;
     }
     if (customerPoints < pointsToGift) {
