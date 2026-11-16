@@ -1833,8 +1833,11 @@ export default function BbCafeHome() {
     };
   }, []);
 
- const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRewardAt) < FIVE_DAYS_MS;
-  const shareDaysLeft = isShareCooldownActive ? Math.ceil((FIVE_DAYS_MS - (Date.now() - lastShareRewardAt)) / (24 * 60 * 60 * 1000)) : 0;
+const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRewardAt) < THREE_HOURS_MS;
+  const shareTotalMinsLeft = isShareCooldownActive ? Math.max(1, Math.ceil((THREE_HOURS_MS - (Date.now() - lastShareRewardAt)) / (60 * 1000))) : 0;
+  const shareHoursLeft = Math.floor(shareTotalMinsLeft / 60);
+  const shareMinsLeft = shareTotalMinsLeft % 60;
+  const shareTimeLeftText = shareHoursLeft > 0 ? (shareMinsLeft > 0 ? `${shareHoursLeft}h ${shareMinsLeft}m` : `${shareHoursLeft}h`) : `${shareMinsLeft}m`;
   const displayShareCount = isShareCooldownActive ? 5 : (shareCount >= 5 ? 0 : shareCount);
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
