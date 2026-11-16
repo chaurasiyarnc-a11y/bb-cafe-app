@@ -3310,7 +3310,7 @@ try {
       }
     });
   };
-  // Running Table Order: Save & Print ONLY Newly Added Items in KOT
+ // Running Table Order: Multi-User Safe Transaction Merge & KOT Delta
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -3318,97 +3318,174 @@ try {
     const subtotal = getCartSubtotal();
     const finalTotal = getTotalBillPrice();
     const discountAmt = getCalculatedDiscountAmount();
-    const token = activeEditingPreviousOrder?.tokenNumber || getDailyTokenNumber();
 
     try {
-      let billNumber: number;
+      let billNumber: number | string = activeEditingBillNumber || '';
+      let token: number | string = activeEditingPreviousOrder?.tokenNumber || '';
 
       if (activeEditingOrderId) {
-        billNumber = activeEditingBillNumber || getNextBillNumber();
-        
-        const newlyAddedKotItems: PosCartItem[] = [];
+        if (!billNumber || !token) {
+          const gen = await getNextBillAndTokenAtomic();
+          if (!billNumber) billNumber = gen.billNumber;
+          if (!token) token = gen.tokenNumber;
+        }
+
+        // 1. इस डिवाइस पर हुए बदलाव (Delta) निकालें
+        const deltaMap: { [cartItemId: string]: { item: PosCartItem; diff: number } } = {};
         cart.forEach((currItem) => {
           const prevItem = activeEditingOriginalItems.find(
-            p => p.cartItemId === currItem.cartItemId || 
+            p => p.cartItemId === currItem.cartItemId ||
                  (p.name === currItem.name && p.size === currItem.size && p.note === currItem.note)
           );
-          const prevQty = prevItem ? prevItem.quantity : 0;
-          const diffQty = currItem.quantity - prevQty;
-          if (diffQty > 0) {
-            newlyAddedKotItems.push({
-              ...currItem,
-              quantity: diffQty
-            });
+          const diff = currItem.quantity - (prevItem ? prevItem.quantity : 0);
+          if (diff !== 0) deltaMap[currItem.cartItemId] = { item: currItem, diff };
+        });
+        activeEditingOriginalItems.forEach((prevItem) => {
+          const stillExists = cart.find(
+            c => c.cartItemId === prevItem.cartItemId ||
+                 (c.name === prevItem.name && c.size === prevItem.size && c.note === prevItem.note)
+          );
+          if (!stillExists) {
+            deltaMap[prevItem.cartItemId] = { item: prevItem, diff: -prevItem.quantity };
           }
         });
 
-        const orderRef = doc(db, "orders", activeEditingOrderId);
-        const updatedOrderObj = { 
-          items: cart, 
-          subtotal, 
-          discountType,
-          discountValue,
-          discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, 
-          gstAmount: getGstAmountCalculated(), 
-          total: finalTotal, 
-          tableNumber: tableNumber,
-          customerName: customerName || "Walk-in Guest",
-          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "",
-          upiId: upiIdConfig,
-          status: 'unsettled',
-          paymentSettled: false,
-         fulfillmentType: 'table',
-          lastUpdated: new Date(),
-          guests: {
-            men: Number(guestMen) || 0,
-            women: Number(guestWomen) || 0,
-            kids: Number(guestKids) || 0,
-            total: (Number(guestMen) || 0) + (Number(guestWomen) || 0) + (Number(guestKids) || 0)
-          }
-        };
+        let finalOrderForKot: any = null;
+        let newlyAddedKotItems: PosCartItem[] = [];
 
         if (navigator.onLine) {
-          await updateDoc(orderRef, updatedOrderObj);
+          const orderRef = doc(db, "orders", activeEditingOrderId);
+          const txResult = await runTransaction(db, async (transaction) => {
+            const freshSnap = await transaction.get(orderRef);
+            if (!freshSnap.exists()) throw new Error("ORDER_NOT_FOUND");
+            const freshData = freshSnap.data();
+
+            if (freshData.status === 'completed' || freshData.paymentSettled) {
+              throw new Error("ALREADY_SETTLED");
+            }
+
+            const serverItems: PosCartItem[] = [...(freshData.items || [])];
+            const kotList: PosCartItem[] = [];
+
+            Object.values(deltaMap).forEach(({ item, diff }) => {
+              const idx = serverItems.findIndex(
+                s => s.cartItemId === item.cartItemId ||
+                     (s.name === item.name && s.size === item.size && s.note === item.note)
+              );
+              if (idx > -1) {
+                const newQty = serverItems[idx].quantity + diff;
+                if (newQty > 0) serverItems[idx] = { ...serverItems[idx], quantity: newQty };
+                else serverItems.splice(idx, 1);
+              } else if (diff > 0) {
+                serverItems.push({ ...item, quantity: diff });
+              }
+              if (diff > 0) kotList.push({ ...item, quantity: diff });
+            });
+
+            const mergedSub = serverItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+            const mergedGst = gstEnabled ? Number(((mergedSub * gstRate) / 100).toFixed(2)) : 0;
+            const mergedTotal = Math.max(0, mergedSub + mergedGst - discountAmt - getRedemptionDiscount()) + getPackingCharge();
+
+            const updatePayload = {
+              items: serverItems,
+              subtotal: mergedSub,
+              discountType,
+              discountValue,
+              discountAmount: discountAmt,
+              gstRate: gstEnabled ? gstRate : 0,
+              gstAmount: mergedGst,
+              total: mergedTotal,
+              tableNumber,
+              customerName: customerName || freshData.customerName || "Walk-in Guest",
+              customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : (freshData.customerPhone || ""),
+              upiId: upiIdConfig,
+              status: 'unsettled',
+              paymentSettled: false,
+              fulfillmentType: 'table',
+              lastUpdated: new Date(),
+              lastUpdatedBy: currentUser?.name || 'Staff',
+              lastUpdatedTerminal: terminalId,
+              guests: {
+                men: Number(guestMen) || freshData.guests?.men || 0,
+                women: Number(guestWomen) || freshData.guests?.women || 0,
+                kids: Number(guestKids) || freshData.guests?.kids || 0,
+                total: (Number(guestMen) || freshData.guests?.men || 0) + (Number(guestWomen) || freshData.guests?.women || 0) + (Number(guestKids) || freshData.guests?.kids || 0)
+              }
+            };
+
+            transaction.update(orderRef, updatePayload);
+            return { updatePayload, kotList };
+          });
+
+          finalOrderForKot = txResult.updatePayload;
+          newlyAddedKotItems = txResult.kotList;
+        } else {
+          newlyAddedKotItems = Object.values(deltaMap).filter(d => d.diff > 0).map(d => ({ ...d.item, quantity: d.diff }));
+          finalOrderForKot = {
+            items: cart, subtotal, total: finalTotal, tableNumber,
+            customerName: customerName || "Walk-in Guest", lastUpdatedBy: currentUser?.name || 'Staff'
+          };
         }
-        setLiveOrders(prev => prev.map(o => o.id === activeEditingOrderId ? { ...o, ...updatedOrderObj } : o));
 
         triggerBeep('success');
-
         if (kotEnabled) {
           if (newlyAddedKotItems.length > 0) {
             toast.success(`टेबल ${tableNumber} अपडेट! केवल ${newlyAddedKotItems.length} नए आइटम की KOT प्रिंट हुई। 🪑`);
-            await handlePrintReceiptDirect({ ...updatedOrderObj, items: newlyAddedKotItems, billNumber, tokenNumber: token, fulfillmentType: 'table' }, true);
+            await handlePrintReceiptDirect({ ...finalOrderForKot, items: newlyAddedKotItems, billNumber, tokenNumber: token, fulfillmentType: 'table' }, true);
           } else {
             toast.success(`टेबल ${tableNumber} अपडेट! कोई नया आइटम नहीं जुड़ा।`);
           }
         }
       } else {
-        billNumber = getNextBillNumber();
+        // नया टेबल ऑर्डर: पहले चेक करें किसी दूसरे स्टाफ ने अभी-अभी इसी टेबल पर ऑर्डर तो नहीं बनाया
+        if (navigator.onLine) {
+          const existingSnap = await getDocs(
+            query(
+              collection(db, "orders"),
+              where("fulfillmentType", "==", "table"),
+              where("tableNumber", "==", tableNumber),
+              where("status", "==", "unsettled"),
+              limit(1)
+            )
+          );
+          if (!existingSnap.empty) {
+            toast.error(`⚠️ ${tableNumber} पर किसी अन्य स्टाफ ने अभी ऑर्डर शुरू किया है! कृपया Tables टैब से उसे खोलें।`);
+            setIsSubmittingOrder(false);
+            return;
+          }
+        }
 
-        const orderObj = { 
-          billNumber, 
-          tokenNumber: token, 
-          customerName: customerName || "Walk-in Guest", 
-          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "", 
-          items: cart, 
-          subtotal, 
-          discountType, 
-          discountValue, 
-          discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, 
-          gstAmount: getGstAmountCalculated(), 
-          deliveryFee: 0, 
-          total: finalTotal, 
-          timestamp: new Date(), 
-          status: 'unsettled', 
+        const generated = await getNextBillAndTokenAtomic();
+        billNumber = generated.billNumber;
+        token = generated.tokenNumber;
+
+        const orderObj = {
+          billNumber,
+          tokenNumber: token,
+          customerName: customerName || "Walk-in Guest",
+          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "",
+          items: cart,
+          subtotal,
+          discountType,
+          discountValue,
+          discountAmount: discountAmt,
+          gstRate: gstEnabled ? gstRate : 0,
+          gstAmount: getGstAmountCalculated(),
+          deliveryFee: 0,
+          total: finalTotal,
+          timestamp: new Date(),
+          status: 'unsettled',
           paymentSettled: false,
-          fulfillmentType: 'table', 
-          deliveryArea: "", 
-          tableNumber: tableNumber, 
-          paymentMethod, 
-          source: 'PC_POS', 
-         address: '',
+          fulfillmentType: 'table',
+          deliveryArea: "",
+          tableNumber: tableNumber,
+          paymentMethod,
+          source: 'PC_POS',
+          createdById: currentUser?.id || currentUser?.pin || 'staff',
+          createdByName: currentUser?.name || 'Staff',
+          lastUpdatedBy: currentUser?.name || 'Staff',
+          terminalId,
+          address: '',
           upiId: upiIdConfig,
           guests: {
             men: Number(guestMen) || 0,
