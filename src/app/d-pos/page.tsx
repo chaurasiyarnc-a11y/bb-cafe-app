@@ -11567,7 +11567,7 @@ onChange={handleTitleCaseChange(setSecurityReason)}
                       </div>
                       
                       <button 
-                        onClick={() => window.open(`https://wa.me/91${String(c.phone || c.id).replace(/\D/g,'')}?text=${encodeURIComponent(`Hi ${c.name || ''}, we have a special offer for you at Bum Bum Cafe! ☕`)}`, '_blank')} 
+                        onClick={() => window.open(`https://wa.me/91${String(c.phone || c.id).replace(/\D/g,'')}?text=${encodeURIComponent(`Hi ${c.name || ''}, we have a special offer for you at ${storeNameConfig || 'Bum Bum Cafe'}! ☕`)}`, '_blank')} 
                         className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-1 transition-colors"
                       >
                         <SafeSend size={12}/> Message
