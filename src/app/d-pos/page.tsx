@@ -3205,20 +3205,7 @@ try {
     }).filter(Boolean) as PosCartItem[]);
   };
 
-  const getDailyTokenNumber = () => {
-    const todayStr = new Date().toDateString();
-    let lastResetDate = localStorage.getItem("bb_pos_token_reset_date");
-    let currentTokenSeq = Number(localStorage.getItem("bb_pos_daily_token_seq") || "0");
-
-    if (lastResetDate !== todayStr) {
-      currentTokenSeq = 1;
-      localStorage.setItem("bb_pos_token_reset_date", todayStr);
-    } else {
-      currentTokenSeq += 1;
-    }
-    localStorage.setItem("bb_pos_daily_token_seq", String(currentTokenSeq));
-    return currentTokenSeq;
-  };
+ // (getNextBillAndTokenAtomic ऊपर जोड़ा जा चुका है)
 
 // 🚀 OFFLINE QR CODE GENERATOR 
   const generateOfflineQrCode = async (upiString: string): Promise<string> => {
