@@ -1706,8 +1706,8 @@ export default function BbCafeHome() {
       setTimeout(() => setShowSocialAlert(false), 5000);
     }, 24000);
 
-    return () => clearInterval(interval);
-  }, []);
+   return () => clearInterval(interval);
+  }, [storeName]);
 
   // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
   useEffect(() => {
@@ -2104,7 +2104,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
                     src={banners[bannerIndex]?.url} 
                     className="w-full h-full object-cover" 
                     onError={() => setBannerError(true)} 
-                    alt="BAM BAM CAFE Promo"
+                    alt={`${storeName} Promo`}
                     loading="lazy"
                   />
                 )}
@@ -2323,7 +2323,7 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
                               <img 
                                 src={banners[(bannerIndex + 1) % banners.length]?.url} 
                                 className="w-full h-full object-cover" 
-                                alt="BAM BAM CAFE Secondary Promo"
+                                alt={`${storeName} Secondary Promo`}
                                 loading="lazy"
                               />
                             )}
