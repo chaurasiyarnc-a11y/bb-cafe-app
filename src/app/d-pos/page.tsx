@@ -8040,7 +8040,7 @@ onChange={handleTitleCaseChange(setUdhariSearchQuery)}
                 {/* Admin Top Navbar */}
                 <div className="flex justify-between items-center bg-white dark:bg-[#0a0a0a] border-b border-neutral-200 dark:border-white/10 p-4 shrink-0 transition-colors duration-300">
                   <div>
-                     <h2 className="text-xl font-black italic uppercase text-orange-600 dark:text-orange-500">Bum Bum Cafe Admin</h2>
+                     <h2 className="text-xl font-black italic uppercase text-orange-600 dark:text-orange-500">{storeNameConfig || 'Bum Bum Cafe'} Admin</h2>
                      <p className="text-[10px] text-neutral-500 dark:text-neutral-400 font-bold tracking-widest uppercase">Web Control Center</p>
                   </div>
                   <div className="flex items-center gap-4">
