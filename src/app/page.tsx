@@ -1207,9 +1207,11 @@ export default function BbCafeHome() {
       const refCode = getReferralCode();
       
       const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
-      const payModeLabel = paymentMethod === "cod" 
-        ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
-        : "UPI Online Payment 📱";
+      const payModeLabel = paymentMethod === "cod"
+      ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
+      : paymentMethod === "wallet"
+      ? "Cafe Wallet 💳"
+      : "UPI Online Payment 📱";
 
       let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n`;
       msg += `*Bill No:* #${formattedBillStr}\n`;
