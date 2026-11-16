@@ -1361,7 +1361,7 @@ export default function BbCafeHome() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Bum Bum Cafe',
+          title: storeName,
           text: shareText,
           url: shareUrl,
         });
