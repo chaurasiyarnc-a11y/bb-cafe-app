@@ -3003,13 +3003,20 @@ try {
         updatedAt: new Date()
       };
 
-      if (editingItemObj) {
+     if (editingItemObj) {
         await updateDoc(doc(db, "products", editingItemObj.id), itemData);
-        setProducts(prev => prev.map(p => p.id === editingItemObj.id ? { id: editingItemObj.id, ...itemData } : p));
         toast.success("Item updated! ✅");
       } else {
-        const docRef = await addDoc(collection(db, "products"), itemData);
-        setProducts(prev => [...prev, { id: docRef.id, ...itemData }]);
+        // 👇 Duplicate check: पहले से उसी नाम का आइटम हो तो दोबारा नहीं जुड़ेगा
+        const alreadyExists = products.some(
+          p => (p.name || '').trim().toLowerCase() === itemData.name.toLowerCase()
+        );
+        if (alreadyExists) {
+          toast.dismiss(toastId);
+          toast.error(`"${itemData.name}" पहले से मेनू में मौजूद है!`);
+          return;
+        }
+        await addDoc(collection(db, "products"), itemData);
         toast.success("New item added! ✅");
       }
 
