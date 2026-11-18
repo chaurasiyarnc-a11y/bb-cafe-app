@@ -743,13 +743,33 @@ const [tableCount, setTableCount] = useState(6);
       }
     };
   };
+ const formatLocalDateYMD = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  const getPurchaseItemDateStr = (item: any) => {
+    if (item.date) return String(item.date).slice(0, 10);
+    if (item.timestamp) {
+      const d = item.timestamp?.toDate
+        ? item.timestamp.toDate()
+        : item.timestamp?.seconds
+        ? new Date(item.timestamp.seconds * 1000)
+        : new Date(item.timestamp);
+      if (!isNaN(d.getTime())) return formatLocalDateYMD(d);
+    }
+    return '';
+  };
+
   const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     setPurchaseHistoryFilter('this_month');
     setPurchaseHistorySearch('');
+    setPurchaseHistoryExactDate('');
+    setPurchaseHistoryItemFilter('All');
+    setPurchaseHistoryVendorFilter('All');
+    setPurchaseHistorySortBy('date_desc');
     try {
-      const q = query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(500));
+      const q = query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(1000));
       const snap = await getDocs(q);
       setPurchaseHistoryList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
@@ -759,27 +779,49 @@ const [tableCount, setTableCount] = useState(6);
     }
   };
 
-  // 👉 डेट के अनुसार माल को फ़िल्टर करने का ऑटो लॉजिक
+  const purchaseHistoryItemOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    purchaseHistoryList.forEach(item => {
+      const name = String(item.name || '').trim();
+      if (name && !map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), name);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+  }, [purchaseHistoryList]);
+
+  const purchaseHistoryVendorOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    purchaseHistoryList.forEach(item => {
+      const vendor = String(item.vendorName || '').trim();
+      if (vendor && !map.has(vendor.toLowerCase())) {
+        map.set(vendor.toLowerCase(), vendor);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+  }, [purchaseHistoryList]);
+
+  // 👉 Date, Item और Vendor के अनुसार फ़िल्टर + Sorting
   const filteredPurchaseHistory = useMemo(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
 
-    const thisMonthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
-    const thisMonthEnd = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+    const todayStr = formatLocalDateYMD(now);
+    const thisMonthStart = formatLocalDateYMD(new Date(currentYear, currentMonth, 1));
+    const thisMonthEnd = formatLocalDateYMD(new Date(currentYear, currentMonth + 1, 0));
+    const lastMonthStart = formatLocalDateYMD(new Date(currentYear, currentMonth - 1, 1));
+    const lastMonthEnd = formatLocalDateYMD(new Date(currentYear, currentMonth, 0));
 
-    const lastMonthStart = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
-    const lastMonthEnd = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+    const filtered = purchaseHistoryList.filter(item => {
+      const itemDateStr = getPurchaseItemDateStr(item);
 
-    return purchaseHistoryList.filter(item => {
-      let itemDateStr = item.date;
-      if (!itemDateStr && item.timestamp) {
-        const d = item.timestamp?.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
-        itemDateStr = d.toISOString().split('T')[0];
-      }
-
-      if (itemDateStr) {
-        if (purchaseHistoryFilter === 'this_month') {
+      if (purchaseHistoryExactDate) {
+        if (itemDateStr !== purchaseHistoryExactDate) return false;
+      } else if (itemDateStr) {
+        if (purchaseHistoryFilter === 'today') {
+          if (itemDateStr !== todayStr) return false;
+        } else if (purchaseHistoryFilter === 'this_month') {
           if (itemDateStr < thisMonthStart || itemDateStr > thisMonthEnd) return false;
         } else if (purchaseHistoryFilter === 'last_month') {
           if (itemDateStr < lastMonthStart || itemDateStr > lastMonthEnd) return false;
@@ -789,17 +831,62 @@ const [tableCount, setTableCount] = useState(6);
         }
       }
 
+      if (purchaseHistoryItemFilter !== 'All') {
+        if (String(item.name || '').trim().toLowerCase() !== purchaseHistoryItemFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      if (purchaseHistoryVendorFilter !== 'All') {
+        if (String(item.vendorName || '').trim().toLowerCase() !== purchaseHistoryVendorFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
       if (purchaseHistorySearch.trim()) {
         const q = purchaseHistorySearch.toLowerCase().trim();
         const matchName = String(item.name || '').toLowerCase().includes(q);
         const matchVendor = String(item.vendorName || '').toLowerCase().includes(q);
-        if (!matchName && !matchVendor) return false;
+        const matchDate = itemDateStr.includes(q);
+        if (!matchName && !matchVendor && !matchDate) return false;
       }
 
       return true;
     });
-  }, [purchaseHistoryList, purchaseHistoryFilter, purchaseHistoryStartDate, purchaseHistoryEndDate, purchaseHistorySearch]);
 
+    return [...filtered].sort((a, b) => {
+      const dA = getPurchaseItemDateStr(a);
+      const dB = getPurchaseItemDateStr(b);
+      if (purchaseHistorySortBy === 'date_desc') return dB.localeCompare(dA);
+      if (purchaseHistorySortBy === 'date_asc') return dA.localeCompare(dB);
+      if (purchaseHistorySortBy === 'amount_desc') return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+      if (purchaseHistorySortBy === 'amount_asc') return (Number(a.amount) || 0) - (Number(b.amount) || 0);
+      return 0;
+    });
+  }, [
+    purchaseHistoryList,
+    purchaseHistoryFilter,
+    purchaseHistoryStartDate,
+    purchaseHistoryEndDate,
+    purchaseHistoryExactDate,
+    purchaseHistoryItemFilter,
+    purchaseHistoryVendorFilter,
+    purchaseHistorySearch,
+    purchaseHistorySortBy
+  ]);
+
+  const purchaseHistoryTotals = useMemo(() => {
+    let totalAmount = 0;
+    const qtyByUnit: Record<string, number> = {};
+
+    filteredPurchaseHistory.forEach(item => {
+      totalAmount += Number(item.amount) || 0;
+      const unit = String(item.unit || 'Qty').trim();
+      qtyByUnit[unit] = (qtyByUnit[unit] || 0) + (Number(item.qty) || 0);
+    });
+
+    return { totalAmount, qtyByUnit };
+  }, [filteredPurchaseHistory]);
   // वेंडर को उधार चुकाने का फंक्शन (गल्ला और वेंडर खाता दोनों से कटेगा)
   const handlePayVendorDue = async () => {
     if (!payVendorObj) return;
