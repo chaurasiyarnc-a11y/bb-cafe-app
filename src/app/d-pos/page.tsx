@@ -556,8 +556,10 @@ const [tableCount, setTableCount] = useState(6);
  const [rawMaterials, setRawMaterials] = useState<any[]>([]);
   const [rawSearchQuery, setRawSearchQuery] = useState('');
   const [rawRateFilter, setRawRateFilter] = useState<'all' | 'missing_rate' | 'low_stock' | 'out_of_stock' | 'in_stock' | 'consumed'>('all');
+  const [rawCategoryFilter, setRawCategoryFilter] = useState<string>('All');
   const [rawUnitFilter, setRawUnitFilter] = useState<string>('All');
   const [rawSortBy, setRawSortBy] = useState<'name_asc' | 'name_desc' | 'stock_asc' | 'stock_desc' | 'value_desc' | 'consumed_desc' | 'rate_desc'>('name_asc');
+  const [rawFormCategory, setRawFormCategory] = useState<string>('Grocery');
   const [inventorySubTab, setInventorySubTab] = useState<'menu' | 'raw' | 'vendors'>('menu');
   // 👉 NEW: Vendors Khata States
   const [vendorsList, setVendorsList] = useState<any[]>([]);
