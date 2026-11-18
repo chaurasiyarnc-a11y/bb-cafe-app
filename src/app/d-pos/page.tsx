@@ -5392,26 +5392,62 @@ const handleFinalCheckoutAndPrintBill = async () => {
     });
   }, [products, inventorySearchQuery]);
 
- // 👉 NEW: Filtered Raw Materials (Search + बिना रेट वाले सामान छांटना)
+// 👉 Unique Units List (Kg, Pcs, Ltr, Gram...)
+  const rawUnitOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    rawMaterials.forEach(r => {
+      const u = String(r.unit || '').trim();
+      if (u && !map.has(u.toLowerCase())) map.set(u.toLowerCase(), u);
+    });
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+  }, [rawMaterials]);
+
+  // 👉 NEW: Filtered & Sorted Raw Materials (Search + Status + Unit + Sort)
   const filteredRawMaterials = useMemo(() => {
     const queryStr = rawSearchQuery.toLowerCase().trim();
-    return rawMaterials.filter(r => {
-      // 1. सर्च फ़िल्टर
-      if (queryStr && !(r.name || '').toLowerCase().includes(queryStr)) {
-        return false;
+    const filtered = rawMaterials.filter(r => {
+      // 1. सर्च फ़िल्टर (नाम या यूनिट)
+      if (queryStr) {
+        const matchName = (r.name || '').toLowerCase().includes(queryStr);
+        const matchUnit = (r.unit || '').toLowerCase().includes(queryStr);
+        if (!matchName && !matchUnit) return false;
       }
-      // 2. सिर्फ बिना रेट वाले सामान
-      if (rawRateFilter === 'missing_rate') {
-        const rate = Number(r.lastRate) || 0;
-        if (rate > 0) return false;
+
+      // 2. यूनिट फ़िल्टर
+      if (rawUnitFilter !== 'All') {
+        if (String(r.unit || '').trim().toLowerCase() !== rawUnitFilter.toLowerCase()) return false;
       }
-      // 3. सिर्फ कम स्टॉक वाले सामान
-      if (rawRateFilter === 'low_stock') {
-        if (Number(r.stock) > Number(r.lowAlert)) return false;
-      }
+
+      // 3. स्टेटस फ़िल्टर
+      const stock = Number(r.stock) || 0;
+      const alert = Number(r.lowAlert) || 0;
+      const rate = Number(r.lastRate) || 0;
+      const consumed = Number(r.totalConsumed) || 0;
+
+      if (rawRateFilter === 'missing_rate' && rate > 0) return false;
+      if (rawRateFilter === 'low_stock' && stock > alert) return false;
+      if (rawRateFilter === 'out_of_stock' && stock > 0) return false;
+      if (rawRateFilter === 'in_stock' && stock <= alert) return false;
+      if (rawRateFilter === 'consumed' && consumed <= 0) return false;
+
       return true;
     });
-  }, [rawMaterials, rawSearchQuery, rawRateFilter]);
+
+    return [...filtered].sort((a, b) => {
+      if (rawSortBy === 'name_asc') return String(a.name || '').localeCompare(String(b.name || ''));
+      if (rawSortBy === 'name_desc') return String(b.name || '').localeCompare(String(a.name || ''));
+      if (rawSortBy === 'stock_asc') return (Number(a.stock) || 0) - (Number(b.stock) || 0);
+      if (rawSortBy === 'stock_desc') return (Number(b.stock) || 0) - (Number(a.stock) || 0);
+      if (rawSortBy === 'value_desc') {
+        const vA = (Number(a.stock) || 0) * (Number(a.lastRate) || 0);
+        const vB = (Number(b.stock) || 0) * (Number(b.lastRate) || 0);
+        return vB - vA;
+      }
+      if (rawSortBy === 'consumed_desc') return (Number(b.totalConsumed) || 0) - (Number(a.totalConsumed) || 0);
+      if (rawSortBy === 'rate_desc') return (Number(b.lastRate) || 0) - (Number(a.lastRate) || 0);
+      return 0;
+    });
+  }, [rawMaterials, rawSearchQuery, rawRateFilter, rawUnitFilter, rawSortBy]);
  // ==========================================
   // 👉 NEW: EXCEL (CSV) IMPORT & EXPORT LOGIC
   // ==========================================
