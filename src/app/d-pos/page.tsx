@@ -599,14 +599,20 @@ const [tableCount, setTableCount] = useState(6);
   const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(false);
   const [purchaseHistoryList, setPurchaseHistoryList] = useState<any[]>([]);
   const [isPurchaseHistoryLoading, setIsPurchaseHistoryLoading] = useState(false);
-  const [purchaseHistoryFilter, setPurchaseHistoryFilter] = useState<'this_month' | 'last_month' | 'all' | 'custom'>('this_month');
-  const [purchaseHistoryStartDate, setPurchaseHistoryStartDate] = useState(
-    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-  );
-  const [purchaseHistoryEndDate, setPurchaseHistoryEndDate] = useState(
-    () => new Date().toISOString().split('T')[0]
-  );
+ const [purchaseHistoryFilter, setPurchaseHistoryFilter] = useState<'today' | 'this_month' | 'last_month' | 'all' | 'custom'>('this_month');
+  const [purchaseHistoryStartDate, setPurchaseHistoryStartDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [purchaseHistoryEndDate, setPurchaseHistoryEndDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [purchaseHistorySearch, setPurchaseHistorySearch] = useState('');
+  const [purchaseHistoryExactDate, setPurchaseHistoryExactDate] = useState('');
+  const [purchaseHistoryItemFilter, setPurchaseHistoryItemFilter] = useState('All');
+  const [purchaseHistoryVendorFilter, setPurchaseHistoryVendorFilter] = useState('All');
+  const [purchaseHistorySortBy, setPurchaseHistorySortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'>('date_desc');
   
 // 📸 PRO AI SCANNER (GOOGLE GEMINI 1.5 FLASH - SECURE)
   const handleScanBillWithCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
