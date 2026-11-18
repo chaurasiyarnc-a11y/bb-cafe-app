@@ -7419,6 +7419,7 @@ onChange={handleTitleCaseChange(setInventorySearchQuery)}
                                 setRawFormName(raw.name);
                                 setRawFormStock(raw.stock);
                                 setRawFormUnit(raw.unit);
+                                setRawFormCategory(getRawCategory(raw));
                                 setRawFormLowAlert(raw.lowAlert);
                                 setRawFormRate(raw.lastRate !== undefined ? raw.lastRate : ''); // 👉 पुराना भाव बॉक्स में भर जाएगा
                                 setRawActionType('add');
