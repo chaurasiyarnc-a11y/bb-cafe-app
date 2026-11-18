@@ -7317,9 +7317,9 @@ onChange={handleTitleCaseChange(setInventorySearchQuery)}
                        <p className="text-2xl font-black font-mono text-amber-600 mt-0.5">{rawMaterials.filter(r => Number(r.stock) <= Number(r.lowAlert)).length}</p>
                     </div>
 
-                    <div className="bg-green-50 dark:bg-green-900/10 p-3.5 rounded-2xl border border-green-200 dark:border-green-800/50 shadow-sm flex flex-col justify-center">
+                   <div className="bg-green-50 dark:bg-green-900/10 p-3.5 rounded-2xl border border-green-200 dark:border-green-800/50 shadow-sm flex flex-col justify-center">
                        <p className="text-[10px] font-black uppercase text-green-600">
-                         {(rawRateFilter !== 'all' || rawUnitFilter !== 'All' || rawSearchQuery) ? 'फ़िल्टर स्टॉक कीमत (Filtered)' : 'कुल स्टॉक कीमत (Valuation)'}
+                         {(rawCategoryFilter !== 'All' || rawRateFilter !== 'all' || rawUnitFilter !== 'All' || rawSearchQuery) ? `फ़िल्टर कीमत (${rawCategoryFilter})` : 'कुल स्टॉक कीमत (Valuation)'}
                        </p>
                        <p className="text-xl font-black font-mono text-green-700 dark:text-green-400 mt-0.5">
                          ₹{filteredRawMaterials.reduce((sum, r) => sum + ((Number(r.stock) || 0) * (Number(r.lastRate) || 0)), 0).toFixed(2)}
