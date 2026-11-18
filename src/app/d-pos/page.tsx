@@ -553,9 +553,11 @@ const [tableCount, setTableCount] = useState(6);
   const [mergeTargetCat, setMergeTargetCat] = useState('');
 
  // 👉 NEW: Raw Material States (कच्चे माल के लिए)
-  const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+ const [rawMaterials, setRawMaterials] = useState<any[]>([]);
   const [rawSearchQuery, setRawSearchQuery] = useState('');
-  const [rawRateFilter, setRawRateFilter] = useState<'all' | 'missing_rate' | 'low_stock'>('all'); // 👉 नया: बिना रेट वाले छांटने का फ़िल्टर
+  const [rawRateFilter, setRawRateFilter] = useState<'all' | 'missing_rate' | 'low_stock' | 'out_of_stock' | 'in_stock' | 'consumed'>('all');
+  const [rawUnitFilter, setRawUnitFilter] = useState<string>('All');
+  const [rawSortBy, setRawSortBy] = useState<'name_asc' | 'name_desc' | 'stock_asc' | 'stock_desc' | 'value_desc' | 'consumed_desc' | 'rate_desc'>('name_asc');
   const [inventorySubTab, setInventorySubTab] = useState<'menu' | 'raw' | 'vendors'>('menu');
   // 👉 NEW: Vendors Khata States
   const [vendorsList, setVendorsList] = useState<any[]>([]);
