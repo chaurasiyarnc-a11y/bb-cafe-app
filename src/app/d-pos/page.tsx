@@ -5404,7 +5404,41 @@ const handleFinalCheckoutAndPrintBill = async () => {
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
   }, [rawMaterials]);
 
-  // 👉 NEW: Filtered & Sorted Raw Materials (Search + Status + Unit + Sort)
+  const RAW_CATEGORIES = [
+    { id: 'Vegetables', label: '🥬 Vegetables (सब्ज़ी)' },
+    { id: 'Grocery', label: '🛒 Grocery (किराना / मसाले)' },
+    { id: 'Beverages', label: '🥤 Beverages (ड्रिंक्स / चाय)' },
+    { id: 'Disposal', label: '📦 Disposal (डिस्पोज़ल / पैकिंग)' },
+    { id: 'Dairy & Frozen', label: '🥛 Dairy & Frozen (डेयरी)' },
+    { id: 'Cleaning & Gas', label: '🧼 Cleaning & Gas (सफाई / गैस)' },
+    { id: 'Other', label: '📌 Other (अन्य)' }
+  ];
+
+  // 👉 नाम से अपने-आप केटेगरी पहचानने वाला स्मार्ट हेल्पर (ताकि 195 पुराने आइटम भी तुरंत छँट जाएँ)
+  const getRawCategory = (r: any): string => {
+    if (r.category && String(r.category).trim()) return String(r.category).trim();
+    const n = String(r.name || '').toLowerCase();
+    const u = String(r.unit || '').toLowerCase();
+
+    if (/(plastic|container|disposal|cup|glass|straw|spoon|fork|tissue|napkin|foil|paper|box|bowl|plate|dona|bag|carry|poly|pouch|lid|parcel|thermocol|toothpick|wrap)/.test(n)) {
+      return 'Disposal';
+    }
+    if (/(sprite|coke|cola|pepsi|fanta|mirinda|dew|sting|red bull|fizz|maaza|slice|frooti|soda|water|bisleri|tin|cold drink|drink|juice|mojito|syrup|crush|coffee|tea|chai|चाय|patti|cocoa|shake)/.test(n)) {
+      return 'Beverages';
+    }
+    if (/(brinjal|बैंगन|aloo|potato|onion|pyaz|pyaaz|tomato|tamatar|chilli|mirch|capsicum|shimla|ginger|adrak|garlic|lahsun|coriander|dhaniya|lemon|nimbu|cabbage|gobhi|carrot|gajar|peas|matar|palak|spinach|bhindi|kheera|cucumber|mushroom|pudina|mint|veg|sabji|सब्जी|beet|mooli)/.test(n)) {
+      return 'Vegetables';
+    }
+    if (/(milk|दूध|dahi|दही|curd|paneer|पनीर|cheese|butter|makkhan|cream|malai|ghee|khoya|mawa|ice cream|frozen|fries|patty|tikki|nugget|momo|sweet corn|corn frozen)/.test(n) || u.includes('दही')) {
+      return 'Dairy & Frozen';
+    }
+    if (/(gas|lpg|cylinder|nirma|surf|vim|detergent|soap|phenyl|harpic|lizol|colin|sanitizer|mop|broom|jhadu|scrub|sponge|cleaner|matchbox|lighter)/.test(n)) {
+      return 'Cleaning & Gas';
+    }
+    return 'Grocery';
+  };
+
+  // 👉 NEW: Filtered & Sorted Raw Materials (Category + Search + Status + Unit + Sort)
   const filteredRawMaterials = useMemo(() => {
     const queryStr = rawSearchQuery.toLowerCase().trim();
     const filtered = rawMaterials.filter(r => {
@@ -5415,12 +5449,17 @@ const handleFinalCheckoutAndPrintBill = async () => {
         if (!matchName && !matchUnit) return false;
       }
 
-      // 2. यूनिट फ़िल्टर
+      // 2. केटेगरी फ़िल्टर
+      if (rawCategoryFilter !== 'All') {
+        if (getRawCategory(r).toLowerCase() !== rawCategoryFilter.toLowerCase()) return false;
+      }
+
+      // 3. यूनिट फ़िल्टर
       if (rawUnitFilter !== 'All') {
         if (String(r.unit || '').trim().toLowerCase() !== rawUnitFilter.toLowerCase()) return false;
       }
 
-      // 3. स्टेटस फ़िल्टर
+      // 4. स्टेटस फ़िल्टर
       const stock = Number(r.stock) || 0;
       const alert = Number(r.lowAlert) || 0;
       const rate = Number(r.lastRate) || 0;
@@ -5449,7 +5488,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
       if (rawSortBy === 'rate_desc') return (Number(b.lastRate) || 0) - (Number(a.lastRate) || 0);
       return 0;
     });
-  }, [rawMaterials, rawSearchQuery, rawRateFilter, rawUnitFilter, rawSortBy]);
+  }, [rawMaterials, rawSearchQuery, rawCategoryFilter, rawRateFilter, rawUnitFilter, rawSortBy]);
  // ==========================================
   // 👉 NEW: EXCEL (CSV) IMPORT & EXPORT LOGIC
   // ==========================================
