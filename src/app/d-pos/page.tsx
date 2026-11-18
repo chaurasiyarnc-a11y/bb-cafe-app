@@ -650,33 +650,59 @@ const [tableCount, setTableCount] = useState(6);
           2. If rate is missing, put 0.
         `;
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
-        
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-goog-api-key': GEMINI_API_KEY // 👈 यह .env वाली Key यहाँ जाएगी
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: prompt },
-                { inlineData: { mimeType: file.type, data: base64Data } }
-              ]
-            }]
-          })
-        });
+       const modelsToTry = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+        let result: any = null;
+        let lastErrorMsg = 'Google API Error';
 
-        const result = await response.json();
-        
-        if (result.error) {
-           throw new Error(result.error.message || "Google API Error");
+        for (const modelName of modelsToTry) {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': GEMINI_API_KEY
+            },
+            body: JSON.stringify({
+              contents: [{
+                role: 'user',
+                parts: [
+                  { text: prompt },
+                  { inlineData: { mimeType: file.type || 'image/jpeg', data: base64Data } }
+                ]
+              }]
+            })
+          });
+
+          const data = await response.json();
+          if (!data.error) {
+            result = data;
+            break;
+          }
+          lastErrorMsg = data.error.message || lastErrorMsg;
+          // अगर model not found (404) या server busy (503) हो तो अगला model try करें
+          if (data.error.code !== 404 && data.error.code !== 503) {
+            throw new Error(lastErrorMsg);
+          }
         }
 
-        const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        
-        const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        if (!result) {
+          throw new Error(lastErrorMsg);
+        }
+
+        const parts = result.candidates?.[0]?.content?.parts || [];
+        const responseText =
+          parts
+            .filter((p: any) => !p.thought && p.text)
+            .map((p: any) => p.text)
+            .join('\n') ||
+          parts[0]?.text ||
+          '';
+
+        const cleanedText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const jsonStart = cleanedText.indexOf('[');
+        const jsonEnd = cleanedText.lastIndexOf(']');
+        const cleanJsonStr =
+          jsonStart !== -1 && jsonEnd !== -1 ? cleanedText.slice(jsonStart, jsonEnd + 1) : cleanedText;
         
         let extractedItems = [];
         try {
