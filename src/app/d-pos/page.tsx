@@ -559,7 +559,32 @@ const [tableCount, setTableCount] = useState(6);
   const [rawCategoryFilter, setRawCategoryFilter] = useState<string>('All');
   const [rawUnitFilter, setRawUnitFilter] = useState<string>('All');
   const [rawSortBy, setRawSortBy] = useState<'name_asc' | 'name_desc' | 'stock_asc' | 'stock_desc' | 'value_desc' | 'consumed_desc' | 'rate_desc'>('name_asc');
+  const DEFAULT_RAW_CATEGORIES = [
+    { id: 'Vegetables', label: '🥬 Vegetables (सब्ज़ी)' },
+    { id: 'Grocery', label: '🛒 Grocery (किराना / मसाले)' },
+    { id: 'Beverages', label: '🥤 Beverages (ड्रिंक्स / चाय)' },
+    { id: 'Disposal', label: '📦 Disposal (डिस्पोज़ल / पैकिंग)' },
+    { id: 'Dairy & Frozen', label: '🥛 Dairy & Frozen (डेयरी)' },
+    { id: 'Cleaning & Gas', label: '🧼 Cleaning & Gas (सफाई / गैस)' },
+    { id: 'Other', label: '📌 Other (अन्य)' }
+  ];
+  const [rawCategoriesList, setRawCategoriesList] = useState<{ id: string; label: string }[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('bb_pos_raw_categories');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return DEFAULT_RAW_CATEGORIES;
+  });
   const [rawFormCategory, setRawFormCategory] = useState<string>('Grocery');
+  const [isRawCatManagerOpen, setIsRawCatManagerOpen] = useState(false);
+  const [newRawCatName, setNewRawCatName] = useState('');
+  const [renamingRawCatId, setRenamingRawCatId] = useState<string | null>(null);
+  const [renameRawCatValue, setRenameRawCatValue] = useState('');
   const [inventorySubTab, setInventorySubTab] = useState<'menu' | 'raw' | 'vendors'>('menu');
   // 👉 NEW: Vendors Khata States
   const [vendorsList, setVendorsList] = useState<any[]>([]);
