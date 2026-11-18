@@ -10810,6 +10810,7 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                   let payload: any = { 
                     name: trimmedName, 
                     unit: rawFormUnit, 
+                    category: rawFormCategory,
                     lowAlert: Number(rawFormLowAlert) || 0,
                     lastRate: Number(rawFormRate) || 0 // 👉 भाव (Rate) सेव होगा
                   };
