@@ -2556,6 +2556,10 @@ const toTitleCase = (val: string) =>
           setGlobalCategoryOrder(d.categoryOrder);
           localStorage.setItem("bb_pos_category_order", JSON.stringify(d.categoryOrder));
         }
+        if (Array.isArray(d.rawCategories) && d.rawCategories.length > 0) {
+          setRawCategoriesList(d.rawCategories);
+          localStorage.setItem("bb_pos_raw_categories", JSON.stringify(d.rawCategories));
+        }
       }
     });
 
