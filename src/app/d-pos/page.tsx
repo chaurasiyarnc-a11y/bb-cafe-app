@@ -7375,7 +7375,21 @@ onChange={handleTitleCaseChange(setInventorySearchQuery)}
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[10px] text-neutral-500 font-bold mt-0.5">Alert below: {raw.lowAlert} {raw.unit}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <select
+                                  value={getRawCategory(raw)}
+                                  onChange={async (e) => {
+                                    const newCat = e.target.value;
+                                    await updateDoc(doc(db, "raw_materials", raw.id), { category: newCat });
+                                    toast.success(`${raw.name} → ${newCat} में सेव हुआ!`);
+                                  }}
+                                  className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-neutral-700 dark:text-neutral-300 outline-none cursor-pointer"
+                                  title="केटेगरी बदलने के लिए चुनें"
+                                >
+                                  {RAW_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                                </select>
+                                <span className="text-[10px] text-neutral-500 font-bold">Alert: {raw.lowAlert} {raw.unit}</span>
+                              </div>
                             </div>
                             
                             {/* Current Stock */}
