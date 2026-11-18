@@ -7122,6 +7122,39 @@ onChange={handleTitleCaseChange(setInventorySearchQuery)}
                /* 👉 UPGRADED: RAW MATERIALS DASHBOARD WITH RATE ALERTS & FILTERS */
                 <div className="space-y-4">
                   
+                {/* 👉 CATEGORY FILTER TABS (Vegetables, Grocery, Beverages, Disposal...) */}
+                  <div className="flex flex-wrap gap-1.5 bg-neutral-100 dark:bg-neutral-800/80 p-1.5 rounded-2xl border border-neutral-200 dark:border-neutral-700">
+                    <button
+                      type="button"
+                      onClick={() => setRawCategoryFilter('All')}
+                      className={`px-3 py-1.5 text-[11px] font-black uppercase rounded-xl transition-all ${
+                        rawCategoryFilter === 'All' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-700'
+                      }`}
+                    >
+                      सब केटेगरी ({rawMaterials.length})
+                    </button>
+                    {RAW_CATEGORIES.map(cat => {
+                      const count = rawMaterials.filter(r => getRawCategory(r) === cat.id).length;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setRawCategoryFilter(rawCategoryFilter === cat.id ? 'All' : cat.id)}
+                          className={`px-3 py-1.5 text-[11px] font-black rounded-xl transition-all flex items-center gap-1 ${
+                            rawCategoryFilter === cat.id
+                              ? 'bg-orange-600 text-white shadow'
+                              : 'bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:border-orange-400'
+                          }`}
+                        >
+                          <span>{cat.label}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono ${rawCategoryFilter === cat.id ? 'bg-black/25 text-white' : 'bg-neutral-200 dark:bg-neutral-800'}`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
                  {/* Search Bar + Unit Dropdown + Sort Dropdown + Status Filter Buttons */}
                   <div className="space-y-2.5">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-2.5">
