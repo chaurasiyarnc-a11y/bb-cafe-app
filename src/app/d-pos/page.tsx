@@ -11114,11 +11114,11 @@ onChange={e => handleTitleCaseInput(e, (val) => {
           </div>
         )}
       </AnimatePresence>
-      {/* 👉 NEW POPUP: PURCHASE HISTORY MODAL (माल का खाता + स्मार्ट डेट फ़िल्टर) */}
+     {/* 👉 NEW POPUP: PURCHASE HISTORY MODAL (DATE, ITEM, VENDOR FILTER + TOTAL) */}
       <AnimatePresence>
         {isPurchaseHistoryModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-4xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-5xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col">
               
               <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
                 <div>
@@ -11126,66 +11126,146 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                     <History size={18} /> Raw Material Purchase History (खरीदा हुआ माल)
                   </h3>
                   <p className="text-[10px] text-neutral-500 font-bold mt-1">
-                    महीने के अनुसार फ़िल्टर करें और केवल उसी महीने का टोटल व लिस्ट देखें
+                    Date, Item या Vendor के अनुसार फ़िल्टर करें और तुरंत Total राशि व मात्रा देखें
                   </p>
                 </div>
                 <button onClick={() => setIsPurchaseHistoryModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
               </div>
 
-              {/* 👉 DATE FILTERS & SEARCH BAR */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 shrink-0">
-                
-                {/* Quick Month Filter Buttons */}
-                <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl shadow-inner">
+              {/* QUICK DATE PRESETS + SEARCH + CLEAR */}
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2.5 bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 shrink-0">
+                <div className="flex flex-wrap bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl shadow-inner gap-1">
                   <button 
-                    onClick={() => setPurchaseHistoryFilter('this_month')} 
-                    className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${
-                      purchaseHistoryFilter === 'this_month' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
+                    onClick={() => { setPurchaseHistoryExactDate(''); setPurchaseHistoryFilter('today'); }} 
+                    className={`px-3 py-1.5 text-[11px] font-black uppercase rounded-lg transition-all ${
+                      !purchaseHistoryExactDate && purchaseHistoryFilter === 'today' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    Today (आज)
+                  </button>
+                  <button 
+                    onClick={() => { setPurchaseHistoryExactDate(''); setPurchaseHistoryFilter('this_month'); }} 
+                    className={`px-3 py-1.5 text-[11px] font-black uppercase rounded-lg transition-all ${
+                      !purchaseHistoryExactDate && purchaseHistoryFilter === 'this_month' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
                     }`}
                   >
                     This Month (इस महीने)
                   </button>
                   <button 
-                    onClick={() => setPurchaseHistoryFilter('last_month')} 
-                    className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${
-                      purchaseHistoryFilter === 'last_month' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
+                    onClick={() => { setPurchaseHistoryExactDate(''); setPurchaseHistoryFilter('last_month'); }} 
+                    className={`px-3 py-1.5 text-[11px] font-black uppercase rounded-lg transition-all ${
+                      !purchaseHistoryExactDate && purchaseHistoryFilter === 'last_month' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
                     }`}
                   >
                     Last Month (पिछला महीना)
                   </button>
                   <button 
-                    onClick={() => setPurchaseHistoryFilter('all')} 
-                    className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${
-                      purchaseHistoryFilter === 'all' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
+                    onClick={() => { setPurchaseHistoryExactDate(''); setPurchaseHistoryFilter('all'); }} 
+                    className={`px-3 py-1.5 text-[11px] font-black uppercase rounded-lg transition-all ${
+                      !purchaseHistoryExactDate && purchaseHistoryFilter === 'all' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
                     }`}
                   >
                     All Time (सब)
                   </button>
                   <button 
-                    onClick={() => setPurchaseHistoryFilter('custom')} 
-                    className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg transition-all flex items-center gap-1 ${
-                      purchaseHistoryFilter === 'custom' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
+                    onClick={() => { setPurchaseHistoryExactDate(''); setPurchaseHistoryFilter('custom'); }} 
+                    className={`px-3 py-1.5 text-[11px] font-black uppercase rounded-lg transition-all flex items-center gap-1 ${
+                      !purchaseHistoryExactDate && purchaseHistoryFilter === 'custom' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white'
                     }`}
                   >
-                    📅 Custom
+                    📅 Range
                   </button>
                 </div>
 
-                {/* Search Item or Vendor */}
-                <div className="w-full md:w-60 relative">
-                  <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
-                  <input 
-                    type="text" 
-                    placeholder="माल या वेंडर खोजें..." 
-                    value={purchaseHistorySearch} 
-onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
-                    className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl pl-8 pr-3 py-1.5 text-xs font-bold outline-none" 
-                  />
+                <div className="flex items-center gap-2 w-full lg:w-auto">
+                  <div className="flex-1 lg:w-60 relative">
+                    <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
+                    <input 
+                      type="text" 
+                      placeholder="माल, वेंडर या तारीख खोजें..." 
+                      value={purchaseHistorySearch} 
+                      onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
+                      className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl pl-8 pr-3 py-1.5 text-xs font-bold outline-none focus:border-indigo-500" 
+                    />
+                  </div>
+                  {(purchaseHistoryExactDate || purchaseHistoryItemFilter !== 'All' || purchaseHistoryVendorFilter !== 'All' || purchaseHistorySearch) && (
+                    <button
+                      onClick={() => {
+                        setPurchaseHistoryExactDate('');
+                        setPurchaseHistoryItemFilter('All');
+                        setPurchaseHistoryVendorFilter('All');
+                        setPurchaseHistorySearch('');
+                      }}
+                      className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 dark:border-red-800 rounded-xl text-[10px] font-black uppercase hover:bg-red-100 shrink-0"
+                    >
+                      ✕ Clear
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Custom Date Pickers (अगर Custom चुना हो) */}
-              {purchaseHistoryFilter === 'custom' && (
+              {/* DEDICATED DATE, ITEM, VENDOR & SORT FILTERS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 rounded-2xl border border-indigo-200/70 dark:border-indigo-800/40 shrink-0">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 flex justify-between">
+                    <span>📅 Exact Date (खास तारीख)</span>
+                    {purchaseHistoryExactDate && (
+                      <button onClick={() => setPurchaseHistoryExactDate('')} className="text-red-500 hover:underline">Reset</button>
+                    )}
+                  </label>
+                  <input 
+                    type="date" 
+                    value={purchaseHistoryExactDate} 
+                    onChange={e => setPurchaseHistoryExactDate(e.target.value)} 
+                    className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer" 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">📦 Item Filter (माल चुनें)</label>
+                  <select 
+                    value={purchaseHistoryItemFilter} 
+                    onChange={e => setPurchaseHistoryItemFilter(e.target.value)} 
+                    className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="All">All Items (सभी सामान)</option>
+                    {purchaseHistoryItemOptions.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">🏪 Vendor Filter (व्यापारी चुनें)</label>
+                  <select 
+                    value={purchaseHistoryVendorFilter} 
+                    onChange={e => setPurchaseHistoryVendorFilter(e.target.value)} 
+                    className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="All">All Vendors (सभी व्यापारी)</option>
+                    {purchaseHistoryVendorOptions.map(vendor => (
+                      <option key={vendor} value={vendor}>{vendor}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">↕️ Sort By (क्रम)</label>
+                  <select 
+                    value={purchaseHistorySortBy} 
+                    onChange={e => setPurchaseHistorySortBy(e.target.value as any)} 
+                    className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="date_desc">Date: Newest First (नई तारीख)</option>
+                    <option value="date_asc">Date: Oldest First (पुरानी तारीख)</option>
+                    <option value="amount_desc">Amount: High to Low (ज्यादा राशि)</option>
+                    <option value="amount_asc">Amount: Low to High (कम राशि)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Custom Date Range Pickers */}
+              {!purchaseHistoryExactDate && purchaseHistoryFilter === 'custom' && (
                 <div className="flex items-center gap-3 bg-indigo-50/50 dark:bg-indigo-900/10 p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800/40 shrink-0">
                   <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">तारीख से:</span>
                   <input 
@@ -11208,25 +11288,71 @@ onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
                 <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>
               ) : (
                 <>
-                  {/* SUMMARY BOX: चुनी गई तारीख का कुल माल */}
-                  <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 p-4 rounded-2xl shrink-0 flex justify-between items-center shadow-sm">
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">
-                        {purchaseHistoryFilter === 'this_month' ? 'इस महीने खरीदा गया माल (This Month Total)' : 
-                         purchaseHistoryFilter === 'last_month' ? 'पिछले महीने खरीदा गया माल (Last Month Total)' : 
-                         purchaseHistoryFilter === 'custom' ? 'चुनी गई तारीख का कुल माल' : 'अब तक खरीदा गया कुल माल'}
+                  {/* SUMMARY CARDS: TOTAL AMOUNT + TOTAL QTY + ENTRIES */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 shrink-0">
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 p-3.5 rounded-2xl shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 truncate">
+                        {purchaseHistoryExactDate
+                          ? `Date: ${purchaseHistoryExactDate}`
+                          : purchaseHistoryFilter === 'today'
+                          ? 'आज का कुल माल (Today Total)'
+                          : purchaseHistoryFilter === 'this_month'
+                          ? 'इस महीने का कुल माल (This Month)'
+                          : purchaseHistoryFilter === 'last_month'
+                          ? 'पिछले महीने का कुल माल (Last Month)'
+                          : purchaseHistoryFilter === 'custom'
+                          ? `${purchaseHistoryStartDate} to ${purchaseHistoryEndDate}`
+                          : 'कुल माल (All Time)'}
+                        {purchaseHistoryItemFilter !== 'All' ? ` • ${purchaseHistoryItemFilter}` : ''}
+                        {purchaseHistoryVendorFilter !== 'All' ? ` • ${purchaseHistoryVendorFilter}` : ''}
                       </p>
-                      <p className="text-3xl font-black font-mono text-indigo-700 dark:text-indigo-300 mt-1">
-                        ₹{filteredPurchaseHistory.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2)}
+                      <p className="text-2xl font-black font-mono text-indigo-700 dark:text-indigo-300 mt-1">
+                        ₹{purchaseHistoryTotals.totalAmount.toFixed(2)}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-black uppercase text-neutral-500">Entries Found</p>
-                      <p className="text-xl font-black font-mono text-neutral-800 dark:text-neutral-200">{filteredPurchaseHistory.length}</p>
+
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 p-3.5 rounded-2xl shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">कुल मात्रा (Filtered Qty Total)</p>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {Object.keys(purchaseHistoryTotals.qtyByUnit).length === 0 ? (
+                          <span className="text-lg font-black font-mono text-neutral-400">0</span>
+                        ) : (
+                          Object.entries(purchaseHistoryTotals.qtyByUnit).map(([unit, qty]) => (
+                            <span key={unit} className="bg-white dark:bg-neutral-900 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-lg text-sm font-black font-mono text-emerald-700 dark:text-emerald-400">
+                              {Number(qty.toFixed(3))} {unit}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-neutral-100 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 p-3.5 rounded-2xl shadow-sm flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-neutral-500">Entries Found</p>
+                        <p className="text-2xl font-black font-mono text-neutral-800 dark:text-neutral-200 mt-1">{filteredPurchaseHistory.length}</p>
+                      </div>
+                      <button
+                        onClick={() => triggerCsvDownload(
+                          filteredPurchaseHistory.map(i => ({
+                            date: getPurchaseItemDateStr(i),
+                            name: i.name || '',
+                            vendorName: i.vendorName || '',
+                            qty: `${i.qty || 0} ${i.unit || ''}`,
+                            rate: i.rate || 0,
+                            amount: Number(i.amount || 0).toFixed(2)
+                          })),
+                          `Purchase_History_${new Date().toISOString().split('T')[0]}`,
+                          ['Date', 'Item Name', 'Vendor', 'Qty', 'Rate', 'Total'],
+                          ['date', 'name', 'vendorName', 'qty', 'rate', 'amount']
+                        )}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase shadow"
+                      >
+                        📥 Excel
+                      </button>
                     </div>
                   </div>
 
-                  {/* TABLE: फ़िल्टर किया हुआ डेटा */}
+                  {/* TABLE WITH STICKY TOTAL FOOTER */}
                   <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50">
                     <table className="w-full text-left text-xs whitespace-nowrap">
                       <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0 z-10">
@@ -11249,16 +11375,54 @@ onChange={handleTitleCaseChange(setPurchaseHistorySearch)}
                         ) : (
                           filteredPurchaseHistory.map((item) => (
                             <tr key={item.id} className="bg-white dark:bg-neutral-900 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
-                              <td className="py-2.5 px-3 font-bold text-neutral-700 dark:text-neutral-300">{item.date}</td>
-                              <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-white">{item.name}</td>
-                              <td className="py-2.5 px-3 font-bold text-neutral-500">{item.vendorName || '--'}</td>
+                              <td className="py-2.5 px-3 font-bold text-neutral-700 dark:text-neutral-300 font-mono">
+                                {getPurchaseItemDateStr(item)}
+                              </td>
+                              <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-white">
+                                <button
+                                  type="button"
+                                  onClick={() => setPurchaseHistoryItemFilter(String(item.name || '').trim())}
+                                  className="hover:text-indigo-600 hover:underline text-left"
+                                  title="सिर्फ इस आइटम का टोटल देखने के लिए क्लिक करें"
+                                >
+                                  {item.name}
+                                </button>
+                              </td>
+                              <td className="py-2.5 px-3 font-bold text-neutral-500">
+                                {item.vendorName ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPurchaseHistoryVendorFilter(String(item.vendorName).trim())}
+                                    className="hover:text-indigo-600 hover:underline text-left"
+                                    title="सिर्फ इस वेंडर का टोटल देखने के लिए क्लिक करें"
+                                  >
+                                    {item.vendorName}
+                                  </button>
+                                ) : '--'}
+                              </td>
                               <td className="py-2.5 px-3 text-center font-mono font-bold">{item.qty} <span className="text-[9px] text-neutral-500">{item.unit}</span></td>
                               <td className="py-2.5 px-3 text-right font-mono text-neutral-500">₹{item.rate}</td>
-                              <td className="py-2.5 px-3 text-right font-mono font-black text-indigo-600 dark:text-indigo-400">₹{item.amount?.toFixed(2)}</td>
+                              <td className="py-2.5 px-3 text-right font-mono font-black text-indigo-600 dark:text-indigo-400">₹{Number(item.amount || 0).toFixed(2)}</td>
                             </tr>
                           ))
                         )}
                       </tbody>
+                      {filteredPurchaseHistory.length > 0 && (
+                        <tfoot className="sticky bottom-0 z-10 bg-indigo-50 dark:bg-neutral-800 border-t-2 border-indigo-300 dark:border-neutral-700">
+                          <tr>
+                            <td colSpan={3} className="py-3 px-3 font-black uppercase text-indigo-700 dark:text-indigo-300 text-xs">
+                              Filtered Grand Total ({filteredPurchaseHistory.length} Entries)
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono font-black text-emerald-700 dark:text-emerald-400">
+                              {Object.entries(purchaseHistoryTotals.qtyByUnit).map(([u, q]) => `${Number(q.toFixed(3))} ${u}`).join(' + ')}
+                            </td>
+                            <td className="py-3 px-3 text-right text-neutral-400">--</td>
+                            <td className="py-3 px-3 text-right font-mono font-black text-sm text-indigo-700 dark:text-indigo-300">
+                              ₹{purchaseHistoryTotals.totalAmount.toFixed(2)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 </>
