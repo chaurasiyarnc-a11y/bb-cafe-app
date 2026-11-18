@@ -7265,6 +7265,17 @@ onChange={handleTitleCaseChange(setInventorySearchQuery)}
                         </button>
                       );
                     })}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewRawCatName('');
+                        setRenamingRawCatId(null);
+                        setIsRawCatManagerOpen(true);
+                      }}
+                      className="px-3 py-1.5 text-[11px] font-black uppercase rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow flex items-center gap-1 ml-auto"
+                    >
+                      ⚙️ + Add / Rename
+                    </button>
                   </div>
 
                  {/* Search Bar + Unit Dropdown + Sort Dropdown + Status Filter Buttons */}
