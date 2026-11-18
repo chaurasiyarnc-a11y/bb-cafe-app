@@ -5433,40 +5433,123 @@ const handleFinalCheckoutAndPrintBill = async () => {
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
   }, [rawMaterials]);
 
-  const RAW_CATEGORIES = [
-    { id: 'Vegetables', label: '🥬 Vegetables (सब्ज़ी)' },
-    { id: 'Grocery', label: '🛒 Grocery (किराना / मसाले)' },
-    { id: 'Beverages', label: '🥤 Beverages (ड्रिंक्स / चाय)' },
-    { id: 'Disposal', label: '📦 Disposal (डिस्पोज़ल / पैकिंग)' },
-    { id: 'Dairy & Frozen', label: '🥛 Dairy & Frozen (डेयरी)' },
-    { id: 'Cleaning & Gas', label: '🧼 Cleaning & Gas (सफाई / गैस)' },
-    { id: 'Other', label: '📌 Other (अन्य)' }
-  ];
+ const RAW_CATEGORIES = rawCategoriesList;
 
-  // 👉 नाम से अपने-आप केटेगरी पहचानने वाला स्मार्ट हेल्पर (ताकि 195 पुराने आइटम भी तुरंत छँट जाएँ)
+  // 👉 नाम से अपने-आप केटेगरी पहचानने वाला स्मार्ट हेल्पर
   const getRawCategory = (r: any): string => {
     if (r.category && String(r.category).trim()) return String(r.category).trim();
     const n = String(r.name || '').toLowerCase();
     const u = String(r.unit || '').toLowerCase();
 
+    let detected = 'Grocery';
     if (/(plastic|container|disposal|cup|glass|straw|spoon|fork|tissue|napkin|foil|paper|box|bowl|plate|dona|bag|carry|poly|pouch|lid|parcel|thermocol|toothpick|wrap)/.test(n)) {
-      return 'Disposal';
+      detected = 'Disposal';
+    } else if (/(sprite|coke|cola|pepsi|fanta|mirinda|dew|sting|red bull|fizz|maaza|slice|frooti|soda|water|bisleri|tin|cold drink|drink|juice|mojito|syrup|crush|coffee|tea|chai|चाय|patti|cocoa|shake)/.test(n)) {
+      detected = 'Beverages';
+    } else if (/(brinjal|बैंगन|aloo|potato|onion|pyaz|pyaaz|tomato|tamatar|chilli|mirch|capsicum|shimla|ginger|adrak|garlic|lahsun|coriander|dhaniya|lemon|nimbu|cabbage|gobhi|carrot|gajar|peas|matar|palak|spinach|bhindi|kheera|cucumber|mushroom|pudina|mint|veg|sabji|सब्जी|beet|mooli)/.test(n)) {
+      detected = 'Vegetables';
+    } else if (/(milk|दूध|dahi|दही|curd|paneer|पनीर|cheese|butter|makkhan|cream|malai|ghee|khoya|mawa|ice cream|frozen|fries|patty|tikki|nugget|momo|sweet corn|corn frozen)/.test(n) || u.includes('दही')) {
+      detected = 'Dairy & Frozen';
+    } else if (/(gas|lpg|cylinder|nirma|surf|vim|detergent|soap|phenyl|harpic|lizol|colin|sanitizer|mop|broom|jhadu|scrub|sponge|cleaner|matchbox|lighter)/.test(n)) {
+      detected = 'Cleaning & Gas';
     }
-    if (/(sprite|coke|cola|pepsi|fanta|mirinda|dew|sting|red bull|fizz|maaza|slice|frooti|soda|water|bisleri|tin|cold drink|drink|juice|mojito|syrup|crush|coffee|tea|chai|चाय|patti|cocoa|shake)/.test(n)) {
-      return 'Beverages';
-    }
-    if (/(brinjal|बैंगन|aloo|potato|onion|pyaz|pyaaz|tomato|tamatar|chilli|mirch|capsicum|shimla|ginger|adrak|garlic|lahsun|coriander|dhaniya|lemon|nimbu|cabbage|gobhi|carrot|gajar|peas|matar|palak|spinach|bhindi|kheera|cucumber|mushroom|pudina|mint|veg|sabji|सब्जी|beet|mooli)/.test(n)) {
-      return 'Vegetables';
-    }
-    if (/(milk|दूध|dahi|दही|curd|paneer|पनीर|cheese|butter|makkhan|cream|malai|ghee|khoya|mawa|ice cream|frozen|fries|patty|tikki|nugget|momo|sweet corn|corn frozen)/.test(n) || u.includes('दही')) {
-      return 'Dairy & Frozen';
-    }
-    if (/(gas|lpg|cylinder|nirma|surf|vim|detergent|soap|phenyl|harpic|lizol|colin|sanitizer|mop|broom|jhadu|scrub|sponge|cleaner|matchbox|lighter)/.test(n)) {
-      return 'Cleaning & Gas';
-    }
-    return 'Grocery';
+    return rawCategoriesList.some(c => c.id === detected) ? detected : (rawCategoriesList[0]?.id || 'Other');
   };
 
+  // 👉 नयी Raw Material Category जोड़ना
+  const handleAddRawCategory = async () => {
+    const cleanName = toTitleCase(newRawCatName.trim());
+    if (!cleanName) return toast.error("केटेगरी का नाम लिखें!");
+    if (rawCategoriesList.some(c => c.id.toLowerCase() === cleanName.toLowerCase())) {
+      return toast.error(`"${cleanName}" केटेगरी पहले से मौजूद है!`);
+    }
+    const updated = [...rawCategoriesList, { id: cleanName, label: `🏷️ ${cleanName}` }];
+    setRawCategoriesList(updated);
+    localStorage.setItem('bb_pos_raw_categories', JSON.stringify(updated));
+    await updateGlobalPosConfig({ rawCategories: updated });
+    setNewRawCatName('');
+    toast.success(`नयी केटेगरी "${cleanName}" जुड़ गई! ✅`);
+  };
+
+  // 👉 पुरानी Category का नाम बदलना (Rename + सारे आइटम्स अपडेट)
+  const handleRenameRawCategory = async (oldId: string) => {
+    const newName = toTitleCase(renameRawCatValue.trim());
+    if (!newName) return toast.error("नया नाम लिखें!");
+    if (oldId === newName) {
+      setRenamingRawCatId(null);
+      return;
+    }
+    if (rawCategoriesList.some(c => c.id.toLowerCase() === newName.toLowerCase() && c.id !== oldId)) {
+      return toast.error(`"${newName}" नाम पहले से मौजूद है!`);
+    }
+
+    const toastId = toast.loading("केटेगरी का नाम बदला जा रहा है...");
+    try {
+      const updatedCats = rawCategoriesList.map(c => {
+        if (c.id !== oldId) return c;
+        const firstToken = c.label.split(' ')[0];
+        const hasEmoji = /[^\x00-\x7F]/.test(firstToken);
+        return { id: newName, label: hasEmoji ? `${firstToken} ${newName}` : `🏷️ ${newName}` };
+      });
+
+      const itemsToMove = rawMaterials.filter(r => getRawCategory(r) === oldId);
+      for (let i = 0; i < itemsToMove.length; i += 450) {
+        const batch = writeBatch(db);
+        itemsToMove.slice(i, i + 450).forEach(r => {
+          batch.update(doc(db, "raw_materials", r.id), { category: newName });
+        });
+        await batch.commit();
+      }
+
+      setRawCategoriesList(updatedCats);
+      localStorage.setItem('bb_pos_raw_categories', JSON.stringify(updatedCats));
+      await updateGlobalPosConfig({ rawCategories: updatedCats });
+
+      if (rawCategoryFilter === oldId) setRawCategoryFilter(newName);
+      if (rawFormCategory === oldId) setRawFormCategory(newName);
+
+      setRenamingRawCatId(null);
+      setRenameRawCatValue('');
+      toast.dismiss(toastId);
+      toast.success(`"${oldId}" का नाम बदलकर "${newName}" हो गया (${itemsToMove.length} आइटम्स अपडेट)! ✅`);
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("नाम बदलने में त्रुटि आई!");
+    }
+  };
+
+  // 👉 Category हटाना (Delete)
+  const handleDeleteRawCategory = async (catId: string) => {
+    if (rawCategoriesList.length <= 1 || catId === 'Other') {
+      return toast.error("यह डिफ़ॉल्ट केटेगरी डिलीट नहीं हो सकती!");
+    }
+    if (!window.confirm(`क्या आप "${catId}" केटेगरी को हटाना चाहते हैं? इसके आइटम "Other" में चले जाएँगे।`)) return;
+
+    const toastId = toast.loading("केटेगरी हटाई जा रही है...");
+    try {
+      const fallbackCat = rawCategoriesList.find(c => c.id === 'Other')?.id || rawCategoriesList.find(c => c.id !== catId)?.id || 'Other';
+      const itemsToMove = rawMaterials.filter(r => getRawCategory(r) === catId);
+      for (let i = 0; i < itemsToMove.length; i += 450) {
+        const batch = writeBatch(db);
+        itemsToMove.slice(i, i + 450).forEach(r => {
+          batch.update(doc(db, "raw_materials", r.id), { category: fallbackCat });
+        });
+        await batch.commit();
+      }
+
+      const updatedCats = rawCategoriesList.filter(c => c.id !== catId);
+      setRawCategoriesList(updatedCats);
+      localStorage.setItem('bb_pos_raw_categories', JSON.stringify(updatedCats));
+      await updateGlobalPosConfig({ rawCategories: updatedCats });
+      if (rawCategoryFilter === catId) setRawCategoryFilter('All');
+
+      toast.dismiss(toastId);
+      toast.success(`"${catId}" हटा दी गई! 🗑️`);
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("हटाने में समस्या आई!");
+    }
+  };
   // 👉 NEW: Filtered & Sorted Raw Materials (Category + Search + Status + Unit + Sort)
   const filteredRawMaterials = useMemo(() => {
     const queryStr = rawSearchQuery.toLowerCase().trim();
