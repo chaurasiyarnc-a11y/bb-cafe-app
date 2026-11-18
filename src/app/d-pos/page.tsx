@@ -10872,6 +10872,13 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                   </div>
                 </div>
 
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Category (केटेगरी)</label>
+                  <select value={rawFormCategory} onChange={e => setRawFormCategory(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none cursor-pointer focus:border-green-500">
+                    {RAW_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                </div>
+
                 {/* 👉 यहाँ डालेंगे भाव (Rate) */}
                 <div className="space-y-1 bg-green-50 dark:bg-green-900/10 p-2.5 rounded-xl border border-green-200 dark:border-green-800/40">
                   <label className="text-[10px] font-black uppercase text-green-700 dark:text-green-400 flex items-center justify-between">
