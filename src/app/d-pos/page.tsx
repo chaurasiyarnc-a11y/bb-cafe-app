@@ -7199,10 +7199,10 @@ onChange={handleTitleCaseChange(setInventorySearchQuery)}
                           <option value="rate_desc">🏷️ Rate: ज्यादा भाव</option>
                         </select>
 
-                        {(rawRateFilter !== 'all' || rawUnitFilter !== 'All' || rawSearchQuery) && (
+                       {(rawCategoryFilter !== 'All' || rawRateFilter !== 'all' || rawUnitFilter !== 'All' || rawSearchQuery) && (
                           <button
                             type="button"
-                            onClick={() => { setRawRateFilter('all'); setRawUnitFilter('All'); setRawSearchQuery(''); setRawSortBy('name_asc'); }}
+                            onClick={() => { setRawCategoryFilter('All'); setRawRateFilter('all'); setRawUnitFilter('All'); setRawSearchQuery(''); setRawSortBy('name_asc'); }}
                             className="px-3 py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 dark:border-red-800 rounded-xl text-xs font-black uppercase hover:bg-red-100"
                           >
                             ✕ Reset
