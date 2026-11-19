@@ -1297,8 +1297,7 @@ const [tableCount, setTableCount] = useState(6);
   const [isRecipeExcelProcessing, setIsRecipeExcelProcessing] = useState(false); // 👉 NEW
 
   // Reports
-  // Reports
-const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7days' | 'last30days' | 'custom'>('today');
+ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7days' | 'last30days' | 'this_month' | 'last_month' | 'custom'>('today');
   const [dashboardSubTab, setDashboardSubTab] = useState<'overview' | 'sales_report' | 'crm_analytics'>('overview');
   const [reportCategoryFilter, setReportCategoryFilter] = useState<string>('All'); // 👈 यह लाइन यहाँ जोड़नी है
   const [customStartDate, setCustomStartDate] = useState(new Date().toISOString().split('T')[0]);
