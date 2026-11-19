@@ -10406,11 +10406,28 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                           <div className={`bg-white w-4 h-4 rounded-full transform transition-transform ${cashTenderEnabled ? 'translate-x-6' : ''}`}></div>
                         </button>
                       </div>
-                      <div className="space-y-2 pt-2">
+                       <div className="space-y-2 pt-2">
                         <p className="text-xs font-bold uppercase text-neutral-500">Dynamic UPI ID (QR Code):</p>
                         <div className="flex gap-2">
                           <input type="text" value={upiIdConfig} onChange={e => setUpiIdConfig(e.target.value)} className="flex-1 bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-3 py-2.5 text-sm font-mono outline-none" />
                          <button onClick={() => { localStorage.setItem("bb_pos_upi_id", upiIdConfig); updateGlobalPosConfig({ upiIdConfig }); toast.success("UPI ID Synced Across All Devices!"); }} className="bg-blue-600 text-white px-5 rounded-xl text-xs font-black uppercase">Save</button>
+                        </div>
+                      </div>
+                      <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                        <p className="text-xs font-bold uppercase text-orange-600">🎯 Sales Targets (Monthly / Daily ₹):</p>
+                        <div className="flex gap-2">
+                          <input type="number" value={targetMonthInput} onChange={e => setTargetMonthInput(e.target.value)} placeholder="Monthly ₹" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" />
+                          <input type="number" value={targetDailyInput} onChange={e => setTargetDailyInput(e.target.value)} placeholder="Daily ₹" className="w-28 bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" />
+                          <button onClick={() => {
+                            const mVal = Number(targetMonthInput) || 150000;
+                            const dVal = Number(targetDailyInput) || 5000;
+                            setMonthlySalesTarget(mVal);
+                            setDailySalesTarget(dVal);
+                            localStorage.setItem("bb_pos_monthly_target", String(mVal));
+                            localStorage.setItem("bb_pos_daily_target", String(dVal));
+                            updateGlobalPosConfig({ monthlySalesTarget: mVal, dailySalesTarget: dVal });
+                            toast.success("Sales Targets Synced Across All Devices! 🎯");
+                          }} className="bg-orange-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
                         </div>
                       </div>
                     </div>
