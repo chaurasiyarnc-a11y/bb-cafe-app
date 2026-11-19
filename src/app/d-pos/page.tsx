@@ -1418,9 +1418,11 @@ const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7d
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'udhari') fetchDueOrders();
-  }, [activeTab]);
+ useEffect(() => {
+    if (isLoggedIn && (activeTab === 'udhari' || activeTab === 'dashboard')) {
+      fetchDueOrders();
+    }
+  }, [activeTab, isLoggedIn]);
 
 const handleSendUdhariReminder = (targetOrder: any) => {
     if (!targetOrder.customerPhone) {
