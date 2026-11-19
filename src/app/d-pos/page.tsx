@@ -8900,83 +8900,392 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                 </div>
 
                 {/* ========================================= */}
-                {/* 1. OVERVIEW VIEW */}
+                {/* 1. OVERVIEW VIEW (PRO BUSINESS ANALYTICS) */}
                 {/* ========================================= */}
                 {dashboardSubTab === 'overview' && (
                   (() => {
-                    let dashSale = 0; let dashOrdersCount = 0; 
+                    const parseTsMs = (ts: any) => {
+                      if (!ts) return 0;
+                      if (ts.toDate) return ts.toDate().getTime();
+                      if (typeof ts === 'object' && ts.seconds) return ts.seconds * 1000;
+                      const t = new Date(ts).getTime();
+                      return isNaN(t) ? 0 : t;
+                    };
+
+                    const now = new Date();
+                    const currYear = now.getFullYear();
+                    const currMonth = now.getMonth();
+                    const currDay = now.getDate();
+                    const daysInCurrMonth = new Date(currYear, currMonth + 1, 0).getDate();
+                    const remainingDaysInMonth = Math.max(0, daysInCurrMonth - currDay);
+
+                    // Date Windows
+                    const todayStartMs = new Date(currYear, currMonth, currDay, 0, 0, 0, 0).getTime();
+                    const todayEndMs = new Date(currYear, currMonth, currDay, 23, 59, 59, 999).getTime();
+
+                    const thisMonthStartMs = new Date(currYear, currMonth, 1, 0, 0, 0, 0).getTime();
+                    const lastMonthMaxDay = new Date(currYear, currMonth, 0).getDate();
+                    const paceDay = Math.min(currDay, lastMonthMaxDay);
+                    const lastMonthStartMs = new Date(currYear, currMonth - 1, 1, 0, 0, 0, 0).getTime();
+                    const lastMonthPaceEndMs = new Date(currYear, currMonth - 1, paceDay, 23, 59, 59, 999).getTime();
+                    const lastMonthFullEndMs = new Date(currYear, currMonth, 0, 23, 59, 59, 999).getTime();
+
+                    const dayOfWeek = (now.getDay() + 6) % 7; // Mon = 0
+                    const thisWeekStartMs = new Date(currYear, currMonth, currDay - dayOfWeek, 0, 0, 0, 0).getTime();
+                    const lastWeekStartMs = thisWeekStartMs - 7 * 86400000;
+                    const lastWeekPaceEndMs = todayEndMs - 7 * 86400000;
+
+                    const lastYearStartMs = new Date(currYear - 1, currMonth, 1, 0, 0, 0, 0).getTime();
+                    const lastYearPaceEndMs = new Date(currYear - 1, currMonth, Math.min(currDay, new Date(currYear - 1, currMonth + 1, 0).getDate()), 23, 59, 59, 999).getTime();
+
+                    // Selected Filter YYYY-MM-DD range (for Purchase / Audit comparison)
+                    let filterStartDate = new Date(currYear, currMonth, currDay);
+                    let filterEndDate = new Date(currYear, currMonth, currDay);
+                    if (reportFilter === 'yesterday') {
+                      filterStartDate.setDate(filterStartDate.getDate() - 1);
+                      filterEndDate.setDate(filterEndDate.getDate() - 1);
+                    } else if (reportFilter === 'last7days') {
+                      filterStartDate.setDate(filterStartDate.getDate() - 6);
+                    } else if (reportFilter === 'last30days') {
+                      filterStartDate.setDate(filterStartDate.getDate() - 29);
+                    } else if (reportFilter === 'this_month') {
+                      filterStartDate = new Date(currYear, currMonth, 1);
+                    } else if (reportFilter === 'last_month') {
+                      filterStartDate = new Date(currYear, currMonth - 1, 1);
+                      filterEndDate = new Date(currYear, currMonth, 0);
+                    } else if (reportFilter === 'custom' && customStartDate && customEndDate) {
+                      const sp = customStartDate.split('-'); filterStartDate = new Date(Number(sp[0]), Number(sp[1]) - 1, Number(sp[2]));
+                      const ep = customEndDate.split('-'); filterEndDate = new Date(Number(ep[0]), Number(ep[1]) - 1, Number(ep[2]));
+                    }
+                    const filterStartStr = formatLocalDateYMD(filterStartDate);
+                    const filterEndStr = formatLocalDateYMD(filterEndDate);
+                    const filterStartMs = new Date(filterStartDate.getFullYear(), filterStartDate.getMonth(), filterStartDate.getDate(), 0, 0, 0, 0).getTime();
+                    const filterEndMs = new Date(filterEndDate.getFullYear(), filterEndDate.getMonth(), filterEndDate.getDate(), 23, 59, 59, 999).getTime();
+
+                    // 1. Month, Week, YoY & Today Pace Calculations from allOrdersMaster
+                    let todaySales = 0; let todayOrders = 0;
+                    let mtdSales = 0; let mtdOrders = 0;
+                    let lastMonthPaceSales = 0; let lastMonthPaceOrders = 0;
+                    let lastMonthFullSales = 0; let lastMonthFullOrders = 0;
+                    let thisWeekSales = 0; let lastWeekPaceSales = 0;
+                    let lastYearPaceSales = 0;
+                    const mtdCatSales: { [cat: string]: number } = {};
+                    const lastMonthCatSales: { [cat: string]: number } = {};
+                    const phoneOrderCounts: { [phone: string]: number } = {};
+
+                    allOrdersMaster.forEach((o: any) => {
+                      if (o.customerPhone && o.status !== 'rejected' && o.status !== 'cancelled') {
+                        const cp = String(o.customerPhone).replace(/\D/g, '').slice(-10);
+                        if (cp.length === 10) phoneOrderCounts[cp] = (phoneOrderCounts[cp] || 0) + 1;
+                      }
+                      if (o.status !== 'completed') return;
+                      const ms = parseTsMs(o.timestamp);
+                      const amt = Number(o.total) || 0;
+
+                      if (ms >= todayStartMs && ms <= todayEndMs) { todaySales += amt; todayOrders++; }
+                      if (ms >= thisMonthStartMs && ms <= todayEndMs) {
+                        mtdSales += amt; mtdOrders++;
+                        o.items?.forEach((it: any) => {
+                          const prod = products.find(p => p.id === it.id);
+                          const cat = prod?.category || 'General';
+                          mtdCatSales[cat] = (mtdCatSales[cat] || 0) + (Number(it.price) * (Number(it.quantity) || 1));
+                        });
+                      }
+                      if (ms >= lastMonthStartMs && ms <= lastMonthPaceEndMs) {
+                        lastMonthPaceSales += amt; lastMonthPaceOrders++;
+                        o.items?.forEach((it: any) => {
+                          const prod = products.find(p => p.id === it.id);
+                          const cat = prod?.category || 'General';
+                          lastMonthCatSales[cat] = (lastMonthCatSales[cat] || 0) + (Number(it.price) * (Number(it.quantity) || 1));
+                        });
+                      }
+                      if (ms >= lastMonthStartMs && ms <= lastMonthFullEndMs) { lastMonthFullSales += amt; lastMonthFullOrders++; }
+                      if (ms >= thisWeekStartMs && ms <= todayEndMs) { thisWeekSales += amt; }
+                      if (ms >= lastWeekStartMs && ms <= lastWeekPaceEndMs) { lastWeekPaceSales += amt; }
+                      if (ms >= lastYearStartMs && ms <= lastYearPaceEndMs) { lastYearPaceSales += amt; }
+                    });
+
+                    let mtdExpenses = 0; let lastMonthPaceExpenses = 0; let lastMonthFullExpenses = 0;
+                    allExpensesMaster.forEach((e: any) => {
+                      const ms = parseTsMs(e.timestamp);
+                      const amt = Number(e.amount) || 0;
+                      if (ms >= thisMonthStartMs && ms <= todayEndMs) mtdExpenses += amt;
+                      if (ms >= lastMonthStartMs && ms <= lastMonthPaceEndMs) lastMonthPaceExpenses += amt;
+                      if (ms >= lastMonthStartMs && ms <= lastMonthFullEndMs) lastMonthFullExpenses += amt;
+                    });
+
+                    const mtdProfit = mtdSales - mtdExpenses;
+                    const lastMonthPaceProfit = lastMonthPaceSales - lastMonthPaceExpenses;
+                    const mtdAov = mtdOrders > 0 ? Math.round(mtdSales / mtdOrders) : 0;
+                    const lastMonthPaceAov = lastMonthPaceOrders > 0 ? Math.round(lastMonthPaceSales / lastMonthPaceOrders) : 0;
+
+                    const calcGrowth = (curr: number, prev: number) => {
+                      if (prev <= 0) return curr > 0 ? 100 : 0;
+                      return Math.round(((curr - prev) / prev) * 100);
+                    };
+                    const salesGrowthPct = calcGrowth(mtdSales, lastMonthPaceSales);
+                    const ordersGrowthPct = calcGrowth(mtdOrders, lastMonthPaceOrders);
+                    const profitGrowthPct = calcGrowth(mtdProfit, lastMonthPaceProfit);
+                    const aovGrowthPct = calcGrowth(mtdAov, lastMonthPaceAov);
+                    const weekGrowthPct = calcGrowth(thisWeekSales, lastWeekPaceSales);
+                    const yoyGrowthPct = calcGrowth(mtdSales, lastYearPaceSales);
+
+                    // Category Growth Comparison
+                    const allCompareCats = Array.from(new Set([...Object.keys(mtdCatSales), ...Object.keys(lastMonthCatSales)]));
+                    const categoryComparison = allCompareCats.map(cat => {
+                      const cVal = mtdCatSales[cat] || 0;
+                      const pVal = lastMonthCatSales[cat] || 0;
+                      return { cat, curr: cVal, prev: pVal, growth: calcGrowth(cVal, pVal) };
+                    }).sort((a, b) => b.curr - a.curr).slice(0, 6);
+
+                    // Target & Forecast Metrics
+                    const mtdActualPct = monthlySalesTarget > 0 ? Number(((mtdSales / monthlySalesTarget) * 100).toFixed(1)) : 0;
+                    const mtdBarPct = Math.min(100, mtdActualPct);
+                    const dailyBarPct = dailySalesTarget > 0 ? Math.min(100, Math.round((todaySales / dailySalesTarget) * 100)) : 0;
+                    const requiredPerDay = remainingDaysInMonth > 0 ? Math.max(0, Math.ceil((monthlySalesTarget - mtdSales) / remainingDaysInMonth)) : Math.max(0, monthlySalesTarget - mtdSales);
+                    const monthEndForecast = currDay > 0 ? Math.round((mtdSales / currDay) * daysInCurrMonth) : 0;
+                    const expectedPaceSales = (monthlySalesTarget / daysInCurrMonth) * currDay;
+                    const targetStatus = mtdSales >= expectedPaceSales
+                      ? { label: '🟢 On Track', cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30' }
+                      : mtdSales >= expectedPaceSales * 0.8
+                      ? { label: '🟡 Needs Push', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30' }
+                      : { label: '🔴 Behind Target', cls: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30' };
+
+                    // 2. Selected Period Analytics (from reportOrders & dailyExpenses)
+                    let dashSale = 0; let dashOrdersCount = 0;
                     let dashUpi = 0; let dashCash = 0;
                     let dashDiscount = 0; let dashPointsRedeemed = 0;
                     let dashMen = 0; let dashWomen = 0; let dashKids = 0; let dashTotalGuests = 0;
-                    let dashGamePointsGiven = 0; let gamersCount = 0;
-                    const itemSalesMap: { [key: string]: { qty: number, rev: number } } = {};
-                    let periodUdhariGenerated = 0;
+                    let gamersCount = 0; let periodUdhariGenerated = 0;
+                    let rejectedCount = 0; let unsettledCount = 0; let unsettledAmt = 0;
+                    let repeatCustOrders = 0; let newCustOrders = 0;
 
-                    reportOrders.forEach(o => {
+                    const channelMap = { table: 0, tableOrd: 0, pickup: 0, pickupOrd: 0, delivery: 0, deliveryOrd: 0, web: 0, webOrd: 0, pos: 0, posOrd: 0 };
+                    const itemSalesMap: { [key: string]: { qty: number; rev: number } } = {};
+                    const prodIdQtyMap: { [id: string]: number } = {};
+                    const comboPairMap: { [pair: string]: number } = {};
+                    const hourSalesMap: { [hr: number]: { amt: number; cnt: number } } = {};
+                    const weekdayMap: { [wd: number]: { amt: number; days: Set<string> } } = {};
+                    const staffSalesMap: { [staff: string]: { amt: number; orders: number } } = {};
+
+                    reportOrders.forEach((o: any) => {
                       const amt = Number(o.total) || 0;
-                      if (o.paymentMethod === 'due' && o.status !== 'rejected' && o.status !== 'cancelled') {
-                        periodUdhariGenerated += amt;
+                      if (o.status === 'rejected' || o.status === 'cancelled') { rejectedCount++; return; }
+                      if (o.paymentMethod === 'due') periodUdhariGenerated += amt;
+                      if (o.status === 'unsettled' || (o.status === 'pending' && !o.paymentSettled)) {
+                        unsettledCount++; unsettledAmt += amt;
                       }
-                      if (o.status === 'completed') {
-                        dashSale += amt;
-                        dashOrdersCount++;
-                        dashDiscount += (Number(o.discountAmount) || 0);
-                        dashPointsRedeemed += (Number(o.pointsRedeemed) || 0);
+                      if (o.status !== 'completed') return;
 
-                        if(o.paymentMethod === 'upi') dashUpi += amt;
-                        else if(o.paymentMethod === 'cash') dashCash += amt;
-                        else if(o.paymentMethod === 'split') {
-                           dashCash += Number(o.splitCashAmount) || 0;
-                           dashUpi += Number(o.splitUpiAmount) || 0;
+                      dashSale += amt;
+                      dashOrdersCount++;
+                      dashDiscount += (Number(o.discountAmount) || 0);
+                      dashPointsRedeemed += (Number(o.pointsRedeemed) || 0);
+
+                      if (o.paymentMethod === 'upi') dashUpi += amt;
+                      else if (o.paymentMethod === 'cash') dashCash += amt;
+                      else if (o.paymentMethod === 'split') {
+                        dashCash += Number(o.splitCashAmount) || 0;
+                        dashUpi += Number(o.splitUpiAmount) || 0;
+                      }
+
+                      // Channels & Source
+                      const fType = o.fulfillmentType || 'pickup';
+                      if (fType === 'table') { channelMap.table += amt; channelMap.tableOrd++; }
+                      else if (fType === 'delivery') { channelMap.delivery += amt; channelMap.deliveryOrd++; }
+                      else { channelMap.pickup += amt; channelMap.pickupOrd++; }
+
+                      if (o.source === 'PC_POS') { channelMap.pos += amt; channelMap.posOrd++; }
+                      else { channelMap.web += amt; channelMap.webOrd++; }
+
+                      // New vs Repeat
+                      const cp = o.customerPhone ? String(o.customerPhone).replace(/\D/g, '').slice(-10) : '';
+                      if (cp.length === 10) {
+                        if ((phoneOrderCounts[cp] || 1) > 1) repeatCustOrders++;
+                        else newCustOrders++;
+                      }
+
+                      if (o.guests) {
+                        dashMen += (o.guests.men || 0); dashWomen += (o.guests.women || 0);
+                        dashKids += (o.guests.kids || 0); dashTotalGuests += (o.guests.total || 0);
+                      }
+                      if (o.promoCodeUsed || o.pointsEarned > 0) gamersCount++;
+
+                      // Peak Hours & Weekdays
+                      const oMs = parseTsMs(o.timestamp);
+                      if (oMs > 0) {
+                        const od = new Date(oMs);
+                        const hr = od.getHours();
+                        if (!hourSalesMap[hr]) hourSalesMap[hr] = { amt: 0, cnt: 0 };
+                        hourSalesMap[hr].amt += amt; hourSalesMap[hr].cnt += 1;
+
+                        const wd = od.getDay();
+                        if (!weekdayMap[wd]) weekdayMap[wd] = { amt: 0, days: new Set() };
+                        weekdayMap[wd].amt += amt;
+                        weekdayMap[wd].days.add(formatLocalDateYMD(od));
+                      }
+
+                      // Staff Leaderboard
+                      const staffName = o.createdByName || o.settledByName || 'Counter Staff';
+                      if (!staffSalesMap[staffName]) staffSalesMap[staffName] = { amt: 0, orders: 0 };
+                      staffSalesMap[staffName].amt += amt;
+                      staffSalesMap[staffName].orders += 1;
+
+                      // Items & Combos
+                      const uniqueCleanNamesInOrder: string[] = [];
+                      o.items?.forEach((it: any) => {
+                        if (it.id) prodIdQtyMap[it.id] = (prodIdQtyMap[it.id] || 0) + (Number(it.quantity) || 1);
+                        let cleanName = (it.name || '').split('|')[0].replace(/[^\x00-\x7F]/g, "").replace(/\(\s*\)/g, "").trim();
+                        if (!cleanName) cleanName = it.name || "Menu Item";
+                        if (!itemSalesMap[cleanName]) itemSalesMap[cleanName] = { qty: 0, rev: 0 };
+                        itemSalesMap[cleanName].qty += (Number(it.quantity) || 1);
+                        itemSalesMap[cleanName].rev += (Number(it.price) * (Number(it.quantity) || 1));
+
+                        const baseComboName = cleanName.split('(')[0].trim();
+                        if (baseComboName && !uniqueCleanNamesInOrder.includes(baseComboName)) {
+                          uniqueCleanNamesInOrder.push(baseComboName);
                         }
-
-                        if (o.guests) {
-                          dashMen += (o.guests.men || 0); dashWomen += (o.guests.women || 0);
-                          dashKids += (o.guests.kids || 0); dashTotalGuests += (o.guests.total || 0);
+                      });
+                      if (uniqueCleanNamesInOrder.length >= 2) {
+                        const sortedU = [...uniqueCleanNamesInOrder].sort();
+                        for (let i = 0; i < sortedU.length; i++) {
+                          for (let j = i + 1; j < sortedU.length; j++) {
+                            const key = `${sortedU[i]} + ${sortedU[j]}`;
+                            comboPairMap[key] = (comboPairMap[key] || 0) + 1;
+                          }
                         }
-                        if (o.promoCodeUsed || o.pointsEarned > 0) gamersCount++;
-
-                        o.items?.forEach((it: any) => {
-                           let cleanName = it.name.split('|')[0].replace(/[^\x00-\x7F]/g, "").replace(/\(\s*\)/g, "").trim();
-                           if (!cleanName) cleanName = "Menu Item";
-                           if(!itemSalesMap[cleanName]) itemSalesMap[cleanName] = { qty: 0, rev: 0 };
-                           itemSalesMap[cleanName].qty += (Number(it.quantity) || 1);
-                           itemSalesMap[cleanName].rev += (Number(it.price) * (Number(it.quantity) || 1));
-                        });
                       }
                     });
 
+                    // Expenses & Category Breakdown
                     let dashExpense = 0;
-                    dailyExpenses.forEach(e => dashExpense += (Number(e.amount) || 0));
+                    const expCatMap: { [cat: string]: number } = {};
+                    dailyExpenses.forEach((e: any) => {
+                      const ea = Number(e.amount) || 0;
+                      dashExpense += ea;
+                      const cat = e.category || 'General';
+                      expCatMap[cat] = (expCatMap[cat] || 0) + ea;
+                    });
+                    const expenseBreakdown = Object.entries(expCatMap).sort((a, b) => b[1] - a[1]);
+
+                    // Food Cost % (Raw Material Purchases in selected range vs Sales)
+                    const periodPurchaseCost = purchaseHistoryList.reduce((sum: number, p: any) => {
+                      const dStr = getPurchaseItemDateStr(p);
+                      if (dStr && dStr >= filterStartStr && dStr <= filterEndStr) {
+                        return sum + (Number(p.amount) || 0);
+                      }
+                      return sum;
+                    }, 0);
+                    const foodCostPct = dashSale > 0 ? ((periodPurchaseCost / dashSale) * 100).toFixed(1) : '0.0';
 
                     const dashNetProfit = dashSale - dashExpense;
                     const dashAov = dashOrdersCount > 0 ? Math.round(dashSale / dashOrdersCount) : 0;
-                    const topItems = Object.entries(itemSalesMap).sort((a,b) => b[1].qty - a[1].qty).slice(0, 5);
+                    const topItems = Object.entries(itemSalesMap).sort((a, b) => b[1].qty - a[1].qty).slice(0, 5);
+
+                    // Bottom / Least Selling Items from active products
+                    const bottomItems = products
+                      .filter(p => p.isAvailable !== false)
+                      .map(p => ({ name: p.name, category: p.category, qty: prodIdQtyMap[p.id] || 0, price: p.price }))
+                      .sort((a, b) => a.qty - b.qty)
+                      .slice(0, 5);
+
+                    // Dish-Wise Profit Margin (from Recipe + Raw Material Rate)
+                    const dishMargins = products
+                      .filter(p => Array.isArray(p.recipe) && p.recipe.length > 0 && Number(p.price) > 0)
+                      .map(p => {
+                        let cost = 0;
+                        p.recipe.forEach((rec: any) => {
+                          if (!rec.variant || rec.variant === 'All') {
+                            const rm = rawMaterials.find(r => r.id === rec.rawId);
+                            if (rm && Number(rm.lastRate) > 0) cost += Number(rec.qty) * Number(rm.lastRate);
+                          }
+                        });
+                        const price = Number(p.price);
+                        const profit = price - cost;
+                        const marginPct = price > 0 ? Math.round((profit / price) * 100) : 0;
+                        return { name: p.name, price, cost: Math.round(cost), profit: Math.round(profit), marginPct };
+                      })
+                      .filter(d => d.cost > 0)
+                      .sort((a, b) => b.marginPct - a.marginPct)
+                      .slice(0, 6);
+
+                    const topCombos = Object.entries(comboPairMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+                    // Peak Hours & Weekday Stats
+                    const sortedHoursList = Object.entries(hourSalesMap)
+                      .map(([h, v]) => {
+                        const hr = Number(h);
+                        const label = `${hr % 12 || 12} ${hr >= 12 ? 'PM' : 'AM'}`;
+                        return { hr, label, amt: v.amt, cnt: v.cnt };
+                      })
+                      .sort((a, b) => b.amt - a.amt);
+                    const topPeakHour = sortedHoursList[0];
+
+                    const WD_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    const weekdayAvgList = Object.entries(weekdayMap)
+                      .map(([wd, v]) => ({
+                        day: WD_NAMES[Number(wd)],
+                        avg: v.days.size > 0 ? Math.round(v.amt / v.days.size) : v.amt,
+                        total: v.amt
+                      }))
+                      .sort((a, b) => b.avg - a.avg);
+                    const bestWeekday = weekdayAvgList[0];
+                    const weakestWeekday = weekdayAvgList.length > 1 ? weekdayAvgList[weekdayAvgList.length - 1] : null;
+
+                    // Staff Leaderboard
+                    const staffLeaderboard = Object.entries(staffSalesMap)
+                      .map(([name, s]) => ({ name, amt: s.amt, orders: s.orders, aov: s.orders > 0 ? Math.round(s.amt / s.orders) : 0 }))
+                      .sort((a, b) => b.amt - a.amt);
+
+                    // Audit Logs in Selected Range
+                    let periodEdits = 0; let periodReprints = 0;
+                    dashboardAuditLogs.forEach(l => {
+                      const ms = parseTsMs(l.timestamp);
+                      if (ms >= filterStartMs && ms <= filterEndMs) {
+                        if (l.action === 'edit') periodEdits++;
+                        if (l.action === 'reprint') periodReprints++;
+                      }
+                    });
+
+                    // Udhari & Vendor Due + Action Alerts
                     const lifetimePendingUdhari = dueOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+                    const totalVendorDue = vendorsList.reduce((acc, v) => acc + (Number(v.totalDue) || 0), 0);
+                    const netMarketBalance = lifetimePendingUdhari - totalVendorDue;
+
+                    const oldUdhari15Days = dueOrders.filter(o => {
+                      const dMs = parseTsMs(o.timestamp);
+                      return dMs > 0 && Math.floor((Date.now() - dMs) / 86400000) >= 15;
+                    });
+                    const lowStockRaws = rawMaterials.filter(r => Number(r.stock) <= Number(r.lowAlert));
 
                     return (
                       <div className="max-w-7xl mx-auto space-y-6 pb-10">
                         {/* Date Filters */}
-                        <div className="flex justify-end mb-2">
-                           <div className="flex flex-col items-end gap-2">
-                              <div className="flex bg-neutral-100 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-inner">
-                                <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Today</button>
-                                <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Yesterday</button>
-                               <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
-                                <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1 ${reportFilter === 'custom' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>📅 Custom</button>
-                                <div className="w-px h-6 bg-neutral-300 dark:bg-neutral-700 mx-1 my-auto"></div>
-                                <button onClick={() => fetchReportData(true)} className="px-3 py-1.5 text-[10px] font-black uppercase rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1" title="Force Refresh Data">
-                                  <SafeRefreshCw size={12}/> Refresh
-                                </button>
-                              </div>
-                              {reportFilter === 'custom' && (
-                                <div className="flex items-center gap-2 bg-neutral-50 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
-                                  <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-neutral-700 dark:text-neutral-300" />
-                                  <span className="text-[10px] font-black uppercase text-neutral-400">To</span>
-                                  <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-neutral-700 dark:text-neutral-300" />
-                                </div>
-                              )}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
+                          <div className="text-[11px] font-black uppercase text-neutral-500">
+                            Showing: <span className="text-orange-600">{filterStartStr === filterEndStr ? filterStartStr : `${filterStartStr} → ${filterEndStr}`}</span>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="flex flex-wrap bg-neutral-100 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-inner gap-0.5">
+                              <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Today</button>
+                              <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Yesterday</button>
+                              <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
+                              <button onClick={() => setReportFilter('this_month')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'this_month' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>This Month</button>
+                              <button onClick={() => setReportFilter('last_month')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last_month' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Last Month</button>
+                              <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1 ${reportFilter === 'custom' ? 'bg-orange-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>📅 Custom</button>
+                              <div className="w-px h-6 bg-neutral-300 dark:bg-neutral-700 mx-1 my-auto"></div>
+                              <button onClick={() => fetchReportData(true)} className="px-3 py-1.5 text-[10px] font-black uppercase rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1" title="Force Refresh Data">
+                                <SafeRefreshCw size={12}/> Refresh
+                              </button>
                             </div>
+                            {reportFilter === 'custom' && (
+                              <div className="flex items-center gap-2 bg-neutral-50 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                                <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-neutral-700 dark:text-neutral-300" />
+                                <span className="text-[10px] font-black uppercase text-neutral-400">To</span>
+                                <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-neutral-700 dark:text-neutral-300" />
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {isReportLoading ? (
@@ -8986,107 +9295,476 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                           </div>
                         ) : (
                           <>
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                              <div className="lg:col-span-2 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10 border border-emerald-200 dark:border-emerald-800/50 p-6 rounded-3xl shadow-sm relative overflow-hidden">
-                                 <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none"><IndianRupee size={200}/></div>
-                                 <h3 className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-4 border-b border-emerald-200 dark:border-emerald-800/50 pb-2">Financial Overview (चुनी गई तारीख का बिज़नेस)</h3>
-                                 
-                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
-                                    <div className="space-y-1">
-                                      <p className="text-[10px] font-black uppercase text-neutral-500">Gross Sales</p>
-                                      <p className="text-3xl font-black font-mono text-neutral-900 dark:text-white">₹{dashSale}</p>
-                                      <p className="text-[10px] font-bold text-neutral-500">{dashOrdersCount} Orders Settled</p>
+                            {/* ================================================================= */}
+                            {/* TOP STRIP: 1. SALES TARGET & FORECAST + 2. MONTH-ON-MONTH COMPARE */}
+                            {/* ================================================================= */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              {/* 🎯 Monthly & Daily Sales Target Card */}
+                              <div className="bg-white dark:bg-neutral-900 border-2 border-orange-500/30 p-5 rounded-3xl shadow-sm space-y-4">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="text-xs font-black uppercase text-orange-600">🎯 Monthly Sales Target (इस महीने का लक्ष्य)</h3>
+                                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${targetStatus.cls}`}>{targetStatus.label}</span>
                                     </div>
-                                    <div className="space-y-1">
-                                      <p className="text-[10px] font-black uppercase text-red-500">Total Expenses</p>
-                                      <p className="text-3xl font-black font-mono text-red-600">-₹{dashExpense}</p>
-                                    </div>
-                                    <div className="space-y-1 border-l border-emerald-200 dark:border-emerald-800/50 pl-4">
-                                      <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">Net Profit (मुनाफ़ा)</p>
-                                      <p className={`text-3xl font-black font-mono ${dashNetProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                        {dashNetProfit >= 0 ? '+' : ''}₹{dashNetProfit}
-                                      </p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400">Avg. Order Value</p>
-                                      <p className="text-3xl font-black font-mono text-blue-700 dark:text-blue-300">₹{dashAov}</p>
-                                    </div>
-                                 </div>
+                                    <p className="text-[10px] text-neutral-500 font-bold mt-1">
+                                      1 से {currDay} तारीख तक: <span className="font-mono font-black text-neutral-900 dark:text-white">₹{mtdSales.toLocaleString('en-IN')}</span> / ₹{monthlySalesTarget.toLocaleString('en-IN')} ({mtdActualPct}%)
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setTargetMonthInput(String(monthlySalesTarget));
+                                      setTargetDailyInput(String(dailySalesTarget));
+                                      setIsTargetModalOpen(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-600 hover:text-white text-orange-600 rounded-xl text-[10px] font-black uppercase border border-orange-500/30 transition-colors shrink-0"
+                                  >
+                                    ✏️ Edit Target
+                                  </button>
+                                </div>
 
-                                 <div className="mt-6 flex justify-between items-center text-[10px] font-black uppercase bg-white dark:bg-neutral-900 p-2.5 rounded-xl shadow-inner border border-emerald-100 dark:border-neutral-800">
-                                    <span className="text-neutral-500">Payment Split:</span>
-                                    <div className="flex gap-4">
-                                      <span className="text-emerald-600 flex items-center gap-1"><IndianRupee size={12}/> Cash: ₹{dashCash}</span>
-                                      <span className="text-blue-600 flex items-center gap-1">📱 UPI: ₹{dashUpi}</span>
-                                    </div>
-                                 </div>
+                                {/* Progress Bar */}
+                                <div className="space-y-1.5">
+                                  <div className="w-full h-3.5 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden border border-neutral-200 dark:border-neutral-700">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-orange-500 via-amber-500 to-green-500 rounded-full transition-all duration-700"
+                                      style={{ width: `${mtdBarPct}%` }}
+                                    />
+                                  </div>
+                                  <div className="flex justify-between text-[10px] font-bold text-neutral-500">
+                                    <span>Today: ₹{todaySales.toLocaleString('en-IN')} / ₹{dailySalesTarget.toLocaleString('en-IN')} ({dailyBarPct}%)</span>
+                                    <span>{remainingDaysInMonth} दिन बाकी</span>
+                                  </div>
+                                </div>
+
+                                {/* Forecast & Daily Required Rate */}
+                                <div className="grid grid-cols-2 gap-3 pt-1">
+                                  <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 p-3 rounded-2xl">
+                                    <p className="text-[9px] font-black uppercase text-amber-700 dark:text-amber-400">⚡ रोज़ ज़रूरी सेल (Daily Run Rate)</p>
+                                    <p className="text-lg font-black font-mono text-amber-700 dark:text-amber-300 mt-0.5">
+                                      ₹{requiredPerDay.toLocaleString('en-IN')}<span className="text-[10px] font-bold">/दिन</span>
+                                    </p>
+                                  </div>
+                                  <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800/40 p-3 rounded-2xl">
+                                    <p className="text-[9px] font-black uppercase text-purple-700 dark:text-purple-400">🔮 महीने के अंत का अनुमान (Forecast)</p>
+                                    <p className="text-lg font-black font-mono text-purple-700 dark:text-purple-300 mt-0.5">
+                                      ₹{monthEndForecast.toLocaleString('en-IN')}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
 
-                              <div className="flex flex-col gap-4">
-                                <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 p-5 rounded-3xl shadow-sm flex-1 flex flex-col justify-center relative overflow-hidden group">
-                                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><SafeFileText size={60} className="text-red-600"/></div>
-                                  <p className="text-[10px] font-black uppercase text-red-500 mb-1">Lifetime Pending Udhari (कुल उधार)</p>
-                                  <p className="text-3xl font-black font-mono text-red-600">₹{lifetimePendingUdhari}</p>
-                                  <p className="text-[10px] text-red-700/70 dark:text-red-400/70 font-bold mt-1 mb-3">बाजार में आपका इतना पैसा फंसा है</p>
-                                  <button onClick={() => setActiveTab('udhari')} className="bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase py-2 rounded-xl shadow-sm w-max px-4">View Khata</button>
-                                </div>
-                                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 p-4 rounded-3xl shadow-sm flex items-center justify-between">
+                              {/* 📊 Last Month vs This Month Same-Date Pace Comparison */}
+                              <div className="bg-white dark:bg-neutral-900 border-2 border-blue-500/30 p-5 rounded-3xl shadow-sm space-y-3">
+                                <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
                                   <div>
-                                    <p className="text-[10px] font-black uppercase text-amber-600 mb-0.5">Udhari Given</p>
-                                    <p className="text-[9px] text-neutral-500 font-bold">(In Selected Dates)</p>
+                                    <h3 className="text-xs font-black uppercase text-blue-600">📈 Last Month vs This Month (1–{currDay} तारीख तुलना)</h3>
+                                    <p className="text-[10px] text-neutral-500 font-bold">पिछले महीने के पहले {paceDay} दिनों की रफ़्तार से सीधी तुलना</p>
                                   </div>
-                                  <p className="text-lg font-black font-mono text-amber-600">₹{periodUdhariGenerated}</p>
+                                  <span className={`px-2.5 py-1 rounded-xl text-xs font-black font-mono ${salesGrowthPct >= 0 ? 'bg-green-500/15 text-green-600' : 'bg-red-500/15 text-red-600'}`}>
+                                    {salesGrowthPct >= 0 ? `▲ +${salesGrowthPct}%` : `▼ ${salesGrowthPct}%`}
+                                  </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                  <div className="bg-neutral-50 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                                    <p className="text-[9px] font-black uppercase text-neutral-500">Sales (1–{currDay})</p>
+                                    <p className="text-sm font-black font-mono text-neutral-900 dark:text-white mt-0.5">₹{mtdSales.toLocaleString('en-IN')}</p>
+                                    <p className="text-[9px] font-bold text-neutral-500">Prev: ₹{lastMonthPaceSales.toLocaleString('en-IN')}</p>
+                                  </div>
+                                  <div className="bg-neutral-50 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                                    <p className="text-[9px] font-black uppercase text-neutral-500">Orders</p>
+                                    <p className="text-sm font-black font-mono text-neutral-900 dark:text-white mt-0.5">{mtdOrders}</p>
+                                    <p className={`text-[9px] font-black ${ordersGrowthPct >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                      Prev: {lastMonthPaceOrders} ({ordersGrowthPct >= 0 ? '+' : ''}{ordersGrowthPct}%)
+                                    </p>
+                                  </div>
+                                  <div className="bg-neutral-50 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                                    <p className="text-[9px] font-black uppercase text-neutral-500">Avg. Bill (AOV)</p>
+                                    <p className="text-sm font-black font-mono text-neutral-900 dark:text-white mt-0.5">₹{mtdAov}</p>
+                                    <p className={`text-[9px] font-black ${aovGrowthPct >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                      Prev: ₹{lastMonthPaceAov} ({aovGrowthPct >= 0 ? '+' : ''}{aovGrowthPct}%)
+                                    </p>
+                                  </div>
+                                  <div className="bg-neutral-50 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                                    <p className="text-[9px] font-black uppercase text-neutral-500">Net Profit</p>
+                                    <p className="text-sm font-black font-mono text-emerald-600 mt-0.5">₹{mtdProfit.toLocaleString('en-IN')}</p>
+                                    <p className={`text-[9px] font-black ${profitGrowthPct >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                      Prev: ₹{lastMonthPaceProfit.toLocaleString('en-IN')}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap justify-between items-center gap-2 pt-1 text-[10px] font-bold bg-blue-50/70 dark:bg-blue-950/20 px-3 py-2 rounded-xl border border-blue-100 dark:border-blue-900/40">
+                                  <span>📅 पूरा पिछला महीना: <strong className="font-mono text-blue-700 dark:text-blue-400">₹{lastMonthFullSales.toLocaleString('en-IN')}</strong> ({lastMonthFullOrders} Ord)</span>
+                                  <span>🗓️ This Week: <strong className="font-mono">₹{thisWeekSales}</strong> ({weekGrowthPct >= 0 ? `+${weekGrowthPct}%` : `${weekGrowthPct}%`} vs Last Wk)</span>
+                                  {lastYearPaceSales > 0 && (
+                                    <span>📆 YoY: <strong className={yoyGrowthPct >= 0 ? 'text-green-600' : 'text-red-500'}>{yoyGrowthPct >= 0 ? `+${yoyGrowthPct}%` : `${yoyGrowthPct}%`}</strong></span>
+                                  )}
                                 </div>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm">
-                                <div className="flex justify-between items-center mb-4 border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                                  <h3 className="text-xs font-black text-orange-600 uppercase flex items-center gap-2"><Layers size={16} /> Top 5 Selling Items</h3>
-                                  <span className="text-[9px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-2 py-1 rounded font-bold uppercase">In Selected Dates</span>
-                                </div>
-                                {topItems.length === 0 ? (
-                                  <p className="text-xs text-neutral-400 py-6 text-center italic">कोई बिक्री रिकॉर्ड नहीं मिला।</p>
-                                ) : (
-                                  <div className="space-y-2">
-                                    {topItems.map(([itemName, data], idx) => (
-                                      <div key={idx} className="flex justify-between items-center bg-orange-50/50 dark:bg-orange-900/10 px-3 py-2 rounded-xl border border-orange-100 dark:border-orange-800/30">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-[10px] font-black text-orange-400">#{idx + 1}</span>
-                                          <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{itemName}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-right">
-                                          <span className="text-[11px] font-black font-mono text-neutral-500">{data.qty} Qty</span>
-                                          <span className="text-xs font-black font-mono text-green-600 dark:text-green-400 w-16">₹{data.rev}</span>
-                                        </div>
+                            {/* Category Growth Comparison Bar */}
+                            {categoryComparison.length > 0 && (
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 rounded-2xl shadow-sm">
+                                <p className="text-[10px] font-black uppercase text-neutral-500 mb-2.5">📊 Category Growth (इस महीने बनाम पिछला महीना 1–{currDay})</p>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                                  {categoryComparison.map(c => (
+                                    <div key={c.cat} className="bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 p-2.5 rounded-xl">
+                                      <div className="flex justify-between items-center gap-1">
+                                        <span className="text-[10px] font-black truncate text-neutral-800 dark:text-neutral-200">{c.cat}</span>
+                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${c.growth >= 0 ? 'bg-green-500/15 text-green-600' : 'bg-red-500/15 text-red-500'}`}>
+                                          {c.growth >= 0 ? `+${c.growth}%` : `${c.growth}%`}
+                                        </span>
                                       </div>
-                                    ))}
+                                      <p className="text-xs font-mono font-black text-orange-600 mt-1">₹{c.curr}</p>
+                                      <p className="text-[9px] text-neutral-400 font-mono">Prev: ₹{c.prev}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ================================================================= */}
+                            {/* MIDDLE GRID: FINANCIALS + MARKET UDHARI/VENDOR + CHANNELS & COST */}
+                            {/* ================================================================= */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                              <div className="lg:col-span-2 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10 border border-emerald-200 dark:border-emerald-800/50 p-6 rounded-3xl shadow-sm relative overflow-hidden space-y-4">
+                                <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none"><IndianRupee size={200}/></div>
+                                <h3 className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest border-b border-emerald-200 dark:border-emerald-800/50 pb-2">Financial Overview (चुनी गई तारीख का बिज़नेस)</h3>
+                                
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+                                  <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-neutral-500">Gross Sales</p>
+                                    <p className="text-3xl font-black font-mono text-neutral-900 dark:text-white">₹{dashSale}</p>
+                                    <p className="text-[10px] font-bold text-neutral-500">{dashOrdersCount} Orders Settled</p>
                                   </div>
+                                  <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-red-500">Total Expenses</p>
+                                    <p className="text-3xl font-black font-mono text-red-600">-₹{dashExpense}</p>
+                                  </div>
+                                  <div className="space-y-1 border-l border-emerald-200 dark:border-emerald-800/50 pl-4">
+                                    <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">Net Profit (मुनाफ़ा)</p>
+                                    <p className={`text-3xl font-black font-mono ${dashNetProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                      {dashNetProfit >= 0 ? '+' : ''}₹{dashNetProfit}
+                                    </p>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400">Food Cost % (खरीद)</p>
+                                    <p className="text-2xl font-black font-mono text-blue-700 dark:text-blue-300">{foodCostPct}%</p>
+                                    <p className="text-[9px] font-bold text-neutral-500">Purchase: ₹{Math.round(periodPurchaseCost)}</p>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap justify-between items-center gap-2 text-[10px] font-black uppercase bg-white dark:bg-neutral-900 p-2.5 rounded-xl shadow-inner border border-emerald-100 dark:border-neutral-800 relative z-10">
+                                  <span className="text-neutral-500">AOV: <strong className="text-neutral-900 dark:text-white">₹{dashAov}</strong></span>
+                                  <div className="flex gap-4">
+                                    <span className="text-emerald-600 flex items-center gap-1"><IndianRupee size={12}/> Cash: ₹{dashCash}</span>
+                                    <span className="text-blue-600 flex items-center gap-1">📱 UPI: ₹{dashUpi}</span>
+                                  </div>
+                                </div>
+
+                                {/* Order Channels & Expense Category Breakdown */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+                                  <div className="bg-white/80 dark:bg-neutral-900/80 p-3 rounded-2xl border border-emerald-100 dark:border-neutral-800 space-y-1.5">
+                                    <p className="text-[9px] font-black uppercase text-neutral-500">🍽️ Order Channels (पैसा कहाँ से आया)</p>
+                                    <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
+                                      <div className="bg-amber-50 dark:bg-amber-900/20 p-1.5 rounded-lg">
+                                        <p className="font-bold text-amber-700 dark:text-amber-400">🪑 Table</p>
+                                        <p className="font-mono font-black">₹{channelMap.table}</p>
+                                      </div>
+                                      <div className="bg-blue-50 dark:bg-blue-900/20 p-1.5 rounded-lg">
+                                        <p className="font-bold text-blue-700 dark:text-blue-400">🛍️ Pickup</p>
+                                        <p className="font-mono font-black">₹{channelMap.pickup}</p>
+                                      </div>
+                                      <div className="bg-purple-50 dark:bg-purple-900/20 p-1.5 rounded-lg">
+                                        <p className="font-bold text-purple-700 dark:text-purple-400">🛵 Delivery</p>
+                                        <p className="font-mono font-black">₹{channelMap.delivery}</p>
+                                      </div>
+                                    </div>
+                                    <p className="text-[9px] font-bold text-neutral-500 flex justify-between pt-1">
+                                      <span>💻 POS: ₹{channelMap.pos} ({channelMap.posOrd})</span>
+                                      <span>🌐 Online App: ₹{channelMap.web} ({channelMap.webOrd})</span>
+                                    </p>
+                                  </div>
+
+                                  <div className="bg-white/80 dark:bg-neutral-900/80 p-3 rounded-2xl border border-emerald-100 dark:border-neutral-800 space-y-1.5">
+                                    <p className="text-[9px] font-black uppercase text-red-500">💸 Expense Breakdown (खर्च का हिसाब)</p>
+                                    {expenseBreakdown.length === 0 ? (
+                                      <p className="text-[10px] text-neutral-400 italic py-2">चुनी गई तारीख में कोई खर्च दर्ज नहीं है।</p>
+                                    ) : (
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {expenseBreakdown.map(([cat, amt]) => (
+                                          <span key={cat} className="text-[10px] font-bold bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-2 py-1 rounded-lg border border-red-200 dark:border-red-800/40">
+                                            {cat}: ₹{amt}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Customer Udhari + Vendor Payables */}
+                              <div className="flex flex-col gap-3">
+                                <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 p-4 rounded-3xl shadow-sm flex-1 flex flex-col justify-between relative overflow-hidden">
+                                  <div>
+                                    <p className="text-[10px] font-black uppercase text-red-500 mb-0.5">📕 Customer Udhari (बाजार से लेना है)</p>
+                                    <p className="text-2xl font-black font-mono text-red-600">₹{lifetimePendingUdhari.toLocaleString('en-IN')}</p>
+                                    <p className="text-[9px] text-neutral-500 font-bold">Period Given: ₹{periodUdhariGenerated} | 15+ Days Old: {oldUdhari15Days.length} Bills</p>
+                                  </div>
+                                  <button onClick={() => setActiveTab('udhari')} className="mt-2 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase py-1.5 px-3 rounded-xl shadow-sm w-max">View Khata</button>
+                                </div>
+
+                                <div className="bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-800/50 p-4 rounded-3xl shadow-sm flex items-center justify-between">
+                                  <div>
+                                    <p className="text-[10px] font-black uppercase text-indigo-600">🏪 Vendor Due (व्यापारियों को देना है)</p>
+                                    <p className="text-xl font-black font-mono text-indigo-700 dark:text-indigo-400">₹{totalVendorDue.toFixed(0)}</p>
+                                  </div>
+                                  <button onClick={() => { setActiveTab('inventory'); setInventorySubTab('vendors'); }} className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase py-1.5 px-3 rounded-xl">Vendors</button>
+                                </div>
+
+                                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 p-3.5 rounded-2xl shadow-sm flex items-center justify-between">
+                                  <div>
+                                    <p className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400">⚖️ Net Market Balance</p>
+                                    <p className="text-[9px] text-neutral-500 font-bold">(Customer Udhari - Vendor Due)</p>
+                                  </div>
+                                  <p className={`text-base font-black font-mono ${netMarketBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {netMarketBalance >= 0 ? '+' : ''}₹{Math.round(netMarketBalance)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* ================================================================= */}
+                            {/* ACTION CENTER + SECURITY MONITOR + PEAK HOURS & STAFF             */}
+                            {/* ================================================================= */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                              {/* ✅ Today's Action Center (Birthdays + Low Stock + Old Udhari) */}
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm space-y-3">
+                                <h3 className="text-xs font-black uppercase text-pink-600 border-b border-neutral-100 dark:border-neutral-800 pb-2">⚡ Today's Action Center (अलर्ट्स)</h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div onClick={() => { setActiveTab('inventory'); setInventorySubTab('raw'); setRawRateFilter('low_stock'); }} className="cursor-pointer bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 p-2.5 rounded-xl hover:border-amber-500">
+                                    <p className="text-[9px] font-black uppercase text-amber-700">📦 Low Stock</p>
+                                    <p className="text-lg font-black font-mono text-amber-600">{lowStockRaws.length} Items</p>
+                                  </div>
+                                  <div onClick={() => setActiveTab('udhari')} className="cursor-pointer bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40 p-2.5 rounded-xl hover:border-red-500">
+                                    <p className="text-[9px] font-black uppercase text-red-600">⏰ 15+ Days Due</p>
+                                    <p className="text-lg font-black font-mono text-red-600">{oldUdhari15Days.length} Bills</p>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <p className="text-[10px] font-black uppercase text-neutral-500">🎂 Upcoming Birthdays / Anniv (7 Days): {upcomingEvents.length}</p>
+                                  {upcomingEvents.length === 0 ? (
+                                    <p className="text-[10px] text-neutral-400 italic">अगले 7 दिनों में कोई सेव इवेंट नहीं है।</p>
+                                  ) : (
+                                    <div className="max-h-32 overflow-y-auto space-y-1.5 pr-1">
+                                      {upcomingEvents.slice(0, 5).map((ev, idx) => (
+                                        <div key={idx} className="flex justify-between items-center bg-pink-50/70 dark:bg-pink-900/10 p-2 rounded-xl border border-pink-200 dark:border-pink-800/40">
+                                          <div className="min-w-0 pr-2">
+                                            <p className="text-[11px] font-black truncate text-neutral-800 dark:text-neutral-200">{ev.eventName} ({ev.eventType})</p>
+                                            <p className="text-[9px] font-bold text-pink-600">{ev.daysLeft === 0 ? '🎉 आज है!' : `${ev.daysLeft} दिन बाद (${ev.eventDate})`}</p>
+                                          </div>
+                                          <button
+                                            onClick={() => {
+                                              const msg = `Happy ${ev.eventType} ${ev.eventName}! 🎂✨ ${storeNameConfig || 'Bum Bum Cafe'} की तरफ से खास शुभकामनाएं! आज आकर अपना स्पेशल सरप्राइज क्लेम करें। ☕`;
+                                              window.open(`https://wa.me/91${String(ev.customerPhone).replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(msg)}`, '_blank');
+                                            }}
+                                            className="px-2.5 py-1 bg-green-600 text-white rounded-lg text-[9px] font-black uppercase shrink-0"
+                                          >
+                                            Wish 📲
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 🚨 Security & Leakage Monitor */}
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm space-y-3">
+                                <h3 className="text-xs font-black uppercase text-red-600 border-b border-neutral-100 dark:border-neutral-800 pb-2 flex items-center gap-1.5">
+                                  <SafeLock size={14} /> Security & Leakage Monitor (Red Flags)
+                                </h3>
+                                <div className="grid grid-cols-2 gap-2.5">
+                                  <div className="bg-red-50/60 dark:bg-red-900/10 p-2.5 rounded-xl border border-red-200 dark:border-red-800/40">
+                                    <p className="text-[9px] font-black uppercase text-red-500">✏️ Bill Re-Edits</p>
+                                    <p className="text-lg font-black font-mono text-red-600">{periodEdits}</p>
+                                  </div>
+                                  <div className="bg-orange-50/60 dark:bg-orange-900/10 p-2.5 rounded-xl border border-orange-200 dark:border-orange-800/40">
+                                    <p className="text-[9px] font-black uppercase text-orange-600">🖨️ Reprints</p>
+                                    <p className="text-lg font-black font-mono text-orange-600">{periodReprints}</p>
+                                  </div>
+                                  <div className="bg-amber-50/60 dark:bg-amber-900/10 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/40">
+                                    <p className="text-[9px] font-black uppercase text-amber-700">🟡 Unsettled Bills</p>
+                                    <p className="text-sm font-black font-mono text-amber-700">{unsettledCount} (₹{unsettledAmt})</p>
+                                  </div>
+                                  <div className="bg-neutral-100 dark:bg-neutral-800 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                                    <p className="text-[9px] font-black uppercase text-neutral-500">❌ Cancelled / Rejected</p>
+                                    <p className="text-lg font-black font-mono text-neutral-700 dark:text-neutral-200">{rejectedCount}</p>
+                                  </div>
+                                </div>
+                                <div className="bg-neutral-50 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 flex justify-between items-center text-[10px] font-bold">
+                                  <span className="text-neutral-500">Manual Discounts Given:</span>
+                                  <span className="font-mono font-black text-orange-600">₹{dashDiscount}</span>
+                                </div>
+                              </div>
+
+                              {/* ⏰ Peak Hours, Best/Weakest Day & Staff Leaderboard */}
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm space-y-3">
+                                <h3 className="text-xs font-black uppercase text-blue-600 border-b border-neutral-100 dark:border-neutral-800 pb-2 flex items-center gap-1.5">
+                                  <Clock size={14} /> Peak Hours & Staff Leaderboard
+                                </h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-blue-50 dark:bg-blue-900/10 p-2.5 rounded-xl border border-blue-200 dark:border-blue-800/40">
+                                    <p className="text-[9px] font-black uppercase text-blue-600">🔥 Peak Rush Hour</p>
+                                    <p className="text-sm font-black font-mono text-blue-700 dark:text-blue-300">{topPeakHour ? `${topPeakHour.label} (₹${topPeakHour.amt})` : 'N/A'}</p>
+                                  </div>
+                                  <div className="bg-emerald-50 dark:bg-emerald-900/10 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800/40">
+                                    <p className="text-[9px] font-black uppercase text-emerald-600">📅 Best / Weak Day</p>
+                                    <p className="text-[11px] font-black font-mono text-emerald-700 dark:text-emerald-300">
+                                      {bestWeekday ? `${bestWeekday.day} (₹${bestWeekday.avg})` : 'N/A'}
+                                      {weakestWeekday ? ` / ${weakestWeekday.day}` : ''}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <p className="text-[10px] font-black uppercase text-neutral-500">🏆 Staff Performance</p>
+                                  {staffLeaderboard.length === 0 ? (
+                                    <p className="text-[10px] text-neutral-400 italic">कोई स्टाफ डेटा नहीं।</p>
+                                  ) : (
+                                    <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
+                                      {staffLeaderboard.map((st, idx) => (
+                                        <div key={st.name} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/50 px-2.5 py-1.5 rounded-xl text-[11px] border border-neutral-200 dark:border-neutral-700">
+                                          <span className="font-bold">#{idx + 1} {st.name}</span>
+                                          <span className="font-mono font-black text-green-600">₹{st.amt} <span className="text-[9px] text-neutral-400">({st.orders} Bills • Avg ₹{st.aov})</span></span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* ================================================================= */}
+                            {/* BOTTOM INSIGHTS: TOP/BOTTOM ITEMS + DISH MARGINS + COMBOS + CRM    */}
+                            {/* ================================================================= */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              {/* Top 5 vs Bottom 5 Items */}
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm space-y-3">
+                                <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                                  <h3 className="text-xs font-black text-orange-600 uppercase flex items-center gap-2">
+                                    <Layers size={16} /> {showBottomItems ? 'Bottom 5 / Zero-Sale Items' : 'Top 5 Selling Items'}
+                                  </h3>
+                                  <div className="flex bg-neutral-100 dark:bg-neutral-800 p-0.5 rounded-lg">
+                                    <button onClick={() => setShowBottomItems(false)} className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-md ${!showBottomItems ? 'bg-orange-600 text-white' : 'text-neutral-500'}`}>Top 5</button>
+                                    <button onClick={() => setShowBottomItems(true)} className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-md ${showBottomItems ? 'bg-red-600 text-white' : 'text-neutral-500'}`}>Bottom 5</button>
+                                  </div>
+                                </div>
+
+                                {!showBottomItems ? (
+                                  topItems.length === 0 ? (
+                                    <p className="text-xs text-neutral-400 py-6 text-center italic">कोई बिक्री रिकॉर्ड नहीं मिला।</p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {topItems.map(([itemName, data], idx) => (
+                                        <div key={idx} className="flex justify-between items-center bg-orange-50/50 dark:bg-orange-900/10 px-3 py-2 rounded-xl border border-orange-100 dark:border-orange-800/30">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-black text-orange-400">#{idx + 1}</span>
+                                            <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{itemName}</span>
+                                          </div>
+                                          <div className="flex items-center gap-3 text-right">
+                                            <span className="text-[11px] font-black font-mono text-neutral-500">{data.qty} Qty</span>
+                                            <span className="text-xs font-black font-mono text-green-600 dark:text-green-400 w-16">₹{data.rev}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )
+                                ) : (
+                                  bottomItems.length === 0 ? (
+                                    <p className="text-xs text-neutral-400 py-6 text-center italic">कोई डेटा नहीं।</p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {bottomItems.map((bi, idx) => (
+                                        <div key={idx} className="flex justify-between items-center bg-red-50/40 dark:bg-red-900/10 px-3 py-2 rounded-xl border border-red-100 dark:border-red-800/30">
+                                          <div>
+                                            <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{bi.name}</span>
+                                            <span className="text-[9px] text-neutral-400 ml-2">({bi.category})</span>
+                                          </div>
+                                          <span className="text-[11px] font-black font-mono text-red-600">{bi.qty} Sold</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )
                                 )}
                               </div>
 
-                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm flex flex-col justify-between">
-                                <div className="border-b border-neutral-100 dark:border-neutral-800 pb-2 mb-4">
-                                  <h3 className="text-xs font-black text-purple-600 uppercase flex items-center gap-2"><SafeUserPlus size={16} /> CRM Footfall & Loyalty</h3>
-                                  <p className="text-[9px] text-neutral-400 font-bold mt-1 uppercase">Stats for Selected Period</p>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                  <div className="bg-purple-50 dark:bg-purple-900/10 p-3 rounded-2xl border border-purple-100 dark:border-purple-800/30">
-                                    <p className="text-[10px] font-black uppercase text-purple-500 mb-1">Total Footfall (लोग आए)</p>
-                                    <p className="text-2xl font-black font-mono text-purple-700 dark:text-purple-400">{dashTotalGuests}</p>
-                                    <div className="flex gap-2 mt-2 text-[9px] font-bold text-neutral-500">
-                                      <span>👨 {dashMen}</span><span>👩 {dashWomen}</span><span>👶 {dashKids}</span>
+                              {/* Best Combos + Dish Margin */}
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm space-y-4">
+                                <div>
+                                  <h3 className="text-xs font-black text-emerald-600 uppercase border-b border-neutral-100 dark:border-neutral-800 pb-2 mb-2">🍟 Frequently Bought Together (Best Combos)</h3>
+                                  {topCombos.length === 0 ? (
+                                    <p className="text-[11px] text-neutral-400 italic">कॉम्बो सुझाव के लिए अभी और मल्टी-आइटम ऑर्डर्स की ज़रूरत है।</p>
+                                  ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                      {topCombos.map(([pair, cnt]) => (
+                                        <span key={pair} className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 rounded-xl text-[10px] font-bold">
+                                          {pair} <strong className="font-mono ml-1 text-emerald-600">({cnt}x)</strong>
+                                        </span>
+                                      ))}
                                     </div>
-                                  </div>
-                                  <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-2xl border border-blue-100 dark:border-blue-800/30">
-                                    <p className="text-[10px] font-black uppercase text-blue-500 mb-1">Gamification Hits</p>
-                                    <p className="text-2xl font-black font-mono text-blue-700 dark:text-blue-400">{gamersCount}</p>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <h3 className="text-xs font-black text-blue-600 uppercase border-b border-neutral-100 dark:border-neutral-800 pb-2 mb-2">💰 Top Recipe Profit Margins (मुनाफा %)</h3>
+                                  {dishMargins.length === 0 ? (
+                                    <p className="text-[11px] text-neutral-400 italic">आइटम की Recipe और Raw Material Rate सेट होने पर मार्जिन यहाँ दिखेगा।</p>
+                                  ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      {dishMargins.map((dm, idx) => (
+                                        <div key={idx} className="flex justify-between items-center bg-blue-50/50 dark:bg-blue-900/10 px-2.5 py-1.5 rounded-xl border border-blue-100 dark:border-blue-800/30 text-[10px]">
+                                          <span className="font-bold truncate pr-2">{dm.name}</span>
+                                          <span className="font-mono font-black text-green-600 shrink-0">{dm.marginPct}% (₹{dm.profit})</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* CRM Footfall, New vs Repeat & Loyalty */}
+                            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-sm">
+                              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2 mb-4">
+                                <h3 className="text-xs font-black text-purple-600 uppercase flex items-center gap-2"><SafeUserPlus size={16} /> CRM Footfall, Repeat Rate & Loyalty</h3>
+                                <span className="text-[10px] font-bold text-neutral-500">
+                                  New: <strong className="text-emerald-600">{newCustOrders}</strong> | Repeat: <strong className="text-blue-600">{repeatCustOrders}</strong>
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="bg-purple-50 dark:bg-purple-900/10 p-3 rounded-2xl border border-purple-100 dark:border-purple-800/30">
+                                  <p className="text-[10px] font-black uppercase text-purple-500 mb-1">Total Footfall (लोग आए)</p>
+                                  <p className="text-2xl font-black font-mono text-purple-700 dark:text-purple-400">{dashTotalGuests}</p>
+                                  <div className="flex gap-2 mt-1 text-[9px] font-bold text-neutral-500">
+                                    <span>👨 {dashMen}</span><span>👩 {dashWomen}</span><span>👶 {dashKids}</span>
                                   </div>
                                 </div>
-                                <div className="bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 flex justify-between items-center">
-                                  <div><p className="text-[10px] font-black uppercase text-neutral-500">Points Redeemed</p><p className="text-lg font-black font-mono text-red-500 mt-0.5">-₹{dashPointsRedeemed}</p></div>
-                                  <div className="text-right"><p className="text-[10px] font-black uppercase text-neutral-500">Coupon Discount</p><p className="text-lg font-black font-mono text-orange-500 mt-0.5">-₹{dashDiscount}</p></div>
+                                <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-2xl border border-blue-100 dark:border-blue-800/30">
+                                  <p className="text-[10px] font-black uppercase text-blue-500 mb-1">Gamification Hits</p>
+                                  <p className="text-2xl font-black font-mono text-blue-700 dark:text-blue-400">{gamersCount}</p>
+                                </div>
+                                <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded-2xl border border-red-100 dark:border-red-800/30">
+                                  <p className="text-[10px] font-black uppercase text-red-500 mb-1">Points Redeemed</p>
+                                  <p className="text-2xl font-black font-mono text-red-600">-₹{dashPointsRedeemed}</p>
+                                </div>
+                                <div className="bg-orange-50 dark:bg-orange-900/10 p-3 rounded-2xl border border-orange-100 dark:border-orange-800/30">
+                                  <p className="text-[10px] font-black uppercase text-orange-500 mb-1">Coupon Discount</p>
+                                  <p className="text-2xl font-black font-mono text-orange-600">-₹{dashDiscount}</p>
                                 </div>
                               </div>
                             </div>
@@ -9096,7 +9774,6 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                     );
                   })()
                 )}
-
                 {/* ========================================= */}
                 {/* 2. SALES & REPORTS VIEW */}
                 {/* ========================================= */}
