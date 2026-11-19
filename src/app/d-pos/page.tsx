@@ -5240,10 +5240,16 @@ const fetchReportData = async (forceRefresh = false) => {
     let start = new Date();
     let end = new Date();
 
-   if (reportFilter === 'last7days') {
+  if (reportFilter === 'last7days') {
       start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0); end.setHours(23, 59, 59, 999);
     } else if (reportFilter === 'last30days') {
       start.setDate(start.getDate() - 29); start.setHours(0, 0, 0, 0); end.setHours(23, 59, 59, 999);
+    } else if (reportFilter === 'this_month') {
+      start = new Date(start.getFullYear(), start.getMonth(), 1, 0, 0, 0, 0); end.setHours(23, 59, 59, 999);
+    } else if (reportFilter === 'last_month') {
+      const nowRef = new Date();
+      start = new Date(nowRef.getFullYear(), nowRef.getMonth() - 1, 1, 0, 0, 0, 0);
+      end = new Date(nowRef.getFullYear(), nowRef.getMonth(), 0, 23, 59, 59, 999);
     } else if (reportFilter === 'custom' && customStartDate && customEndDate) {
       const sParts = customStartDate.split('-');
       start = new Date(Number(sParts[0]), Number(sParts[1]) - 1, Number(sParts[2]), 0, 0, 0, 0);
