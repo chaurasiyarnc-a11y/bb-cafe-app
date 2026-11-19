@@ -5008,9 +5008,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
     }
   };
 // 🚀 INSTANT MEMORY CACHE & REPORTS DATA FETCHING
-// 🚀 INSTANT MEMORY CACHE & REPORTS DATA FETCHING
-  const fetchReportData = async (forceRefresh = false) => {
-    // अगर हमारे पास पहले से डेटा है और हम ज़बरदस्ती रिफ्रेश नहीं कर रहे, तो लोडिंग स्पिनर मत दिखाओ (Instant Load)
+const fetchReportData = async (forceRefresh = false) => {
     if (!reportAllOrdersRef.current.length || forceRefresh) {
       setIsReportLoading(true);
     }
@@ -5030,6 +5028,13 @@ const handleFinalCheckoutAndPrintBill = async () => {
       } else if (reportFilter === 'last30days') {
         startTarget.setDate(startTarget.getDate() - 29); startTarget.setHours(0, 0, 0, 0);
         endTarget.setHours(23, 59, 59, 999);
+      } else if (reportFilter === 'this_month') {
+        startTarget = new Date(startTarget.getFullYear(), startTarget.getMonth(), 1, 0, 0, 0, 0);
+        endTarget.setHours(23, 59, 59, 999);
+      } else if (reportFilter === 'last_month') {
+        const nowRef = new Date();
+        startTarget = new Date(nowRef.getFullYear(), nowRef.getMonth() - 1, 1, 0, 0, 0, 0);
+        endTarget = new Date(nowRef.getFullYear(), nowRef.getMonth(), 0, 23, 59, 59, 999);
       } else if (reportFilter === 'custom' && customStartDate && customEndDate) {
         const startParts = customStartDate.split('-');
         startTarget = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
@@ -5037,12 +5042,11 @@ const handleFinalCheckoutAndPrintBill = async () => {
         endTarget = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]), 23, 59, 59, 999);
       }
 
-      // 5 मिनट तक कैश इस्तेमाल करें, या अगर forceRefresh हो तो नया डेटा लाएं
       const needsFetch = forceRefresh || reportAllOrdersRef.current.length === 0 || (Date.now() - reportLastFetchTimeRef.current > 5 * 60 * 1000);
 
       if (needsFetch) {
         if (navigator.onLine) {
-          const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(2000));
+          const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(3000));
           const snapOrders = await getDocs(qOrders);
           reportAllOrdersRef.current = snapOrders.docs.map(d => {
             const data = d.data();
@@ -5051,7 +5055,7 @@ const handleFinalCheckoutAndPrintBill = async () => {
           });
           localStorage.setItem("bb_pos_cached_report_orders", JSON.stringify(reportAllOrdersRef.current));
 
-          const qExpenses = query(collection(db, "daily_expenses"), orderBy("timestamp", "desc"), limit(200));
+          const qExpenses = query(collection(db, "daily_expenses"), orderBy("timestamp", "desc"), limit(500));
           const snapExpenses = await getDocs(qExpenses);
           reportAllExpensesRef.current = snapExpenses.docs.map(d => {
             const data = d.data();
@@ -5059,6 +5063,12 @@ const handleFinalCheckoutAndPrintBill = async () => {
             return { ...data, id: d.id, timestamp: correctTime };
           });
           localStorage.setItem("bb_pos_cached_report_expenses", JSON.stringify(reportAllExpensesRef.current));
+
+          try {
+            const qAudit = query(collection(db, "audit_logs"), orderBy("timestamp", "desc"), limit(300));
+            const snapAudit = await getDocs(qAudit);
+            setDashboardAuditLogs(snapAudit.docs.map(d => ({ id: d.id, ...d.data() })));
+          } catch (e) {}
           
           reportLastFetchTimeRef.current = Date.now();
         } else {
@@ -5073,7 +5083,6 @@ const handleFinalCheckoutAndPrintBill = async () => {
       const offlineOrdersQueue = JSON.parse(localStorage.getItem("bb_pos_offline_orders_queue") || "[]");
       const offlineExpensesQueue = JSON.parse(localStorage.getItem("bb_pos_offline_expenses_queue") || "[]");
 
-      // 👉 JADU: liveOrders को मिला दें ताकि आज का डेटा रियल-टाइम दिखे बिना डेटाबेस कॉल के!
       const combinedOrders = [...offlineOrdersQueue, ...liveOrders, ...reportAllOrdersRef.current];
       const combinedExpenses = [...offlineExpensesQueue, ...reportAllExpensesRef.current];
 
@@ -5082,10 +5091,12 @@ const handleFinalCheckoutAndPrintBill = async () => {
       const finalOrders = Array.from(uniqueOrdersMap.values());
 
       const uniqueExpMap = new Map();
-      combinedExpenses.forEach(e => uniqueExpMap.set(e.id || e.title, e));
+      combinedExpenses.forEach(e => uniqueExpMap.set(e.id || `${e.title}_${e.timestamp}`, e));
       const finalExpenses = Array.from(uniqueExpMap.values());
 
-      // 👉 SAFE DATE PARSER (यह टूटी हुई डेट्स को फिक्स करेगा)
+      setAllOrdersMaster(finalOrders);
+      setAllExpensesMaster(finalExpenses);
+
       const getSafeTime = (ts: any) => {
         if (!ts) return Date.now();
         if (ts.toDate) return ts.toDate().getTime();
