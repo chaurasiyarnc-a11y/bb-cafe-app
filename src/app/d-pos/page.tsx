@@ -2467,8 +2467,12 @@ const toTitleCase = (val: string) =>
     if (savedStoreName) setStoreNameConfig(savedStoreName);
     const savedStoreAddress = localStorage.getItem("bb_pos_store_address");
     if (savedStoreAddress) setStoreAddressConfig(savedStoreAddress);
-    const savedStorePhone = localStorage.getItem("bb_pos_store_phone");
+   const savedStorePhone = localStorage.getItem("bb_pos_store_phone");
     if (savedStorePhone) setStorePhoneConfig(savedStorePhone);
+    const savedMonthlyTarget = localStorage.getItem("bb_pos_monthly_target");
+    if (savedMonthlyTarget) { setMonthlySalesTarget(Number(savedMonthlyTarget) || 150000); setTargetMonthInput(savedMonthlyTarget); }
+    const savedDailyTarget = localStorage.getItem("bb_pos_daily_target");
+    if (savedDailyTarget) { setDailySalesTarget(Number(savedDailyTarget) || 5000); setTargetDailyInput(savedDailyTarget); }
     const savedCounter = localStorage.getItem("bb_pos_local_bill_counter_pc");
     if (!savedCounter || Number(savedCounter) < 199 || Number(savedCounter) >= 10000) {
       localStorage.setItem("bb_pos_local_bill_counter_pc", "199");
@@ -2562,7 +2566,17 @@ const toTitleCase = (val: string) =>
   localStorage.setItem("bb_pos_store_name", d.storeNameConfig);
 }
         if (d.storeAddressConfig) setStoreAddressConfig(d.storeAddressConfig);
-        if (d.storePhoneConfig) setStorePhoneConfig(d.storePhoneConfig);
+       if (d.storePhoneConfig) setStorePhoneConfig(d.storePhoneConfig);
+        if (d.monthlySalesTarget !== undefined) {
+          setMonthlySalesTarget(Number(d.monthlySalesTarget) || 150000);
+          setTargetMonthInput(String(d.monthlySalesTarget));
+          localStorage.setItem("bb_pos_monthly_target", String(d.monthlySalesTarget));
+        }
+        if (d.dailySalesTarget !== undefined) {
+          setDailySalesTarget(Number(d.dailySalesTarget) || 5000);
+          setTargetDailyInput(String(d.dailySalesTarget));
+          localStorage.setItem("bb_pos_daily_target", String(d.dailySalesTarget));
+        }
         if (Array.isArray(d.categoryOrder)) {
           setGlobalCategoryOrder(d.categoryOrder);
           localStorage.setItem("bb_pos_category_order", JSON.stringify(d.categoryOrder));
