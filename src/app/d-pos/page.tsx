@@ -4802,16 +4802,17 @@ const handleFinalCheckoutAndPrintBill = async () => {
     const doc = new jsPDF();
     const todayDate = new Date().toLocaleDateString('en-IN');
     const currentTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const periodLabel = reportFilter === 'custom' ? `${customStartDate} to ${customEndDate}` : reportFilter.replace('_', ' ').toUpperCase();
 
     // --- 1. HEADER ---
-    doc.setFontSize(24);
-    doc.setTextColor(234, 88, 12); // Orange Theme
+    doc.setFontSize(22);
+    doc.setTextColor(234, 88, 12);
     doc.text((storeNameConfig || "BUM BUM CAFE").toUpperCase(), 105, 18, { align: "center" });
     
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text("Mohandra | Daily EOD Sales & Settlement Report", 105, 24, { align: "center" });
-    doc.text(`Date: ${todayDate}   |   Generated At: ${currentTime}`, 105, 29, { align: "center" });
+    doc.text(`Sales, Expense & Audit Report (${periodLabel})`, 105, 24, { align: "center" });
+    doc.text(`Generated: ${todayDate} | ${currentTime}`, 105, 29, { align: "center" });
     
     doc.setDrawColor(200, 200, 200);
     doc.line(15, 33, 195, 33);
@@ -4819,53 +4820,58 @@ const handleFinalCheckoutAndPrintBill = async () => {
     // --- 2. FINANCIAL SUMMARY TABLE ---
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
-    doc.text("1. Financial Summary", 15, 43);
+    doc.text("1. Financial Summary", 15, 42);
 
     autoTable(doc, {
-      startY: 47,
+      startY: 46,
       head: [["Description", "Amount / Count"]],
       body: [
         ["Total Settled Orders", `${reportSummary.totalOrdersCount} Orders`],
         ["Gross Sales (Total Billing)", `Rs. ${reportSummary.totalSale}`],
+        ["Realized Collection (Cash + UPI)", `Rs. ${reportSummary.realizedSale}`],
         ["Received via Cash", `Rs. ${reportSummary.cashSale}`],
         ["Received via UPI / Online", `Rs. ${reportSummary.upiSale}`],
         ["Udhar (Due / Unpaid)", `Rs. ${reportSummary.dueSale}`],
-        ["Total Discount Given", `Rs. ${reportSummary.totalDiscount}`], // 👉 NEW
+        ["Total Discount & Points Redeemed", `Rs. ${reportSummary.totalDiscount + reportSummary.totalPointsRedeemed}`],
+        ["Total Business Expenses (All Sources)", `Rs. ${reportSummary.totalExpenseAmount}`],
+        ["Net Profit (Gross - Expenses)", `Rs. ${reportSummary.totalSale - reportSummary.totalExpenseAmount}`],
       ],
       theme: 'grid',
       headStyles: { fillColor: [50, 50, 50], textColor: [255, 255, 255] },
-      styles: { fontSize: 10, cellPadding: 4 },
+      styles: { fontSize: 9.5, cellPadding: 3.5 },
       columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } }
     });
 
-    // --- 3. CASH DRAWER AUDIT TABLE ---
-    let finalY = (doc as any).lastAutoTable.finalY + 10;
-    // 👉 मैंने यहाँ से भी हिंदी शब्द हटा दिया है ताकि PDF में कचरा (Garbage text) न छपे
-    doc.text("2. Cash Drawer Audit", 15, finalY);
+    // --- 3. CASH DRAWER & EXPENSE BREAKDOWN TABLE ---
+    let finalY = (doc as any).lastAutoTable.finalY + 9;
+    doc.text("2. Cash Drawer Audit & Expense Sources", 15, finalY);
 
     autoTable(doc, {
       startY: finalY + 4,
       head: [["Description", "Amount (Rs.)"]],
       body: [
-        ["Total Cash Collected", `Rs. ${reportSummary.cashSale}`],
-        ["Total Expenses Paid from Drawer", `- Rs. ${reportSummary.totalExpenseAmount}`],
+        ["Opening Cash Float", `Rs. ${reportSummary.openingCash}`],
+        ["Total Cash Collected", `+ Rs. ${reportSummary.cashSale}`],
+        ["Expenses Paid from Drawer (Galla)", `- Rs. ${reportSummary.drawerExpenseAmount}`],
+        ["Pocket Reimbursements from Drawer", `- Rs. ${reportSummary.pocketSettledInPeriod}`],
         ["NET CASH IN DRAWER", `Rs. ${reportSummary.netCashInDrawer}`],
+        ["Expenses Paid from Owner Pocket (Jeb)", `Rs. ${reportSummary.pocketExpenseAmount}`],
+        ["Expenses Paid via UPI / Bank", `Rs. ${reportSummary.upiExpenseAmount}`],
       ],
       theme: 'grid',
       headStyles: { fillColor: [234, 88, 12], textColor: [255, 255, 255] },
-      styles: { fontSize: 10, cellPadding: 4 },
+      styles: { fontSize: 9.5, cellPadding: 3.5 },
       bodyStyles: { textColor: [0, 0, 0] },
       columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
       didParseCell: function(data: any) {
-        if (data.row.index === 2 && data.section === 'body') {
-          data.cell.styles.textColor = [22, 163, 74]; // Green color for Net Cash
+        if (data.row.index === 4 && data.section === 'body') {
+          data.cell.styles.textColor = [22, 163, 74];
         }
-        if (data.row.index === 1 && data.section === 'body') {
-          data.cell.styles.textColor = [220, 38, 38]; // Red color for Expense
+        if ((data.row.index === 2 || data.row.index === 3) && data.section === 'body') {
+          data.cell.styles.textColor = [220, 38, 38];
         }
       }
     });
-
     // --- 4. ITEM-WISE SALES TABLE (CLEANED) ---
     finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.text("3. Item-wise Sales Breakdown", 15, finalY);
