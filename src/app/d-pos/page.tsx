@@ -11735,25 +11735,94 @@ onChange={e => handleTitleCaseInput(e, (val) => {
           </div>
         )}
       </AnimatePresence>
-      {/* POPUP: DRAWER EXPENSE [F6] */}
+      {/* POPUP: SMART EXPENSE ENTRY / EDIT (गल्ला / जेब / UPI) */}
       <AnimatePresence>
         {isExpenseModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
-              <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="font-black text-sm uppercase text-red-600 flex items-center gap-2"><Receipt size={16} /> Drawer Expense [F6]</h3>
-                <button onClick={() => setIsExpenseModalOpen(false)}><X size={18} /></button>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-red-600 flex items-center gap-2">
+                  <Receipt size={18} /> {editingExpenseId ? 'Edit Expense (खर्च सुधारें)' : 'Add Expense (नया खर्च दर्ज करें)'}
+                </h3>
+                <button onClick={() => { setIsExpenseModalOpen(false); setEditingExpenseId(null); }} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={18} /></button>
               </div>
+
+              {/* 1-Tap Quick Expense Presets */}
+              {!editingExpenseId && (
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: '🥛 Milk', title: 'Milk Purchase', cat: 'Milk / Dairy' },
+                    { label: '🥬 Sabzi', title: 'Fresh Vegetables', cat: 'Vegetables' },
+                    { label: '🔥 Gas', title: 'Gas Cylinder / Fuel', cat: 'Gas / Electricity' },
+                    { label: '🧊 Ice', title: 'Ice Cubes', cat: 'Grocery / Kirana' },
+                    { label: '📦 Packing', title: 'Packing Boxes / Cups', cat: 'Packing / Disposal' },
+                    { label: '👨‍🍳 Staff Adv', title: 'Staff Advance', cat: 'Staff Salary / Advance' },
+                  ].map(preset => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => { setExpenseTitle(preset.title); setExpenseCategory(preset.cat); }}
+                      className="px-2.5 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-orange-500 hover:text-white rounded-lg text-[10px] font-black border border-neutral-200 dark:border-neutral-700 transition-colors"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
-                <input type="text" required placeholder="Expense Title (e.g. Milk 5L)" value={expenseTitle} onChange={handleTitleCaseChange(setExpenseTitle)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-bold outline-none" autoFocus />
-                <input type="number" required min={1} placeholder="Amount (₹)" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-mono text-sm outline-none font-bold" />
-                <button type="submit" className="w-full py-2.5 bg-red-600 text-white font-black uppercase text-xs rounded-xl shadow">Save Expense</button>
+                {/* Payment Source Selector */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500 block">पैसा कहाँ से दिया? (Paid From) *</label>
+                  <div className="grid grid-cols-3 gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                    <button type="button" onClick={() => setExpenseSource('drawer')} className={`py-2 rounded-lg text-[10px] font-black uppercase transition-all ${expenseSource === 'drawer' ? 'bg-amber-500 text-black shadow' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                      💵 गल्ले से
+                    </button>
+                    <button type="button" onClick={() => setExpenseSource('pocket')} className={`py-2 rounded-lg text-[10px] font-black uppercase transition-all ${expenseSource === 'pocket' ? 'bg-purple-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                      👛 जेब से
+                    </button>
+                    <button type="button" onClick={() => setExpenseSource('upi')} className={`py-2 rounded-lg text-[10px] font-black uppercase transition-all ${expenseSource === 'upi' ? 'bg-blue-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                      📱 UPI / Bank
+                    </button>
+                  </div>
+                </div>
+
+                <input type="text" required placeholder="खर्च का नाम (e.g. Milk 5L, Gas, Advance) *" value={expenseTitle} onChange={handleTitleCaseChange(setExpenseTitle)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 font-bold outline-none focus:border-red-500" autoFocus />
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <input type="number" required min={1} step="0.01" placeholder="राशि ₹ (Amount) *" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 font-mono text-sm outline-none font-black focus:border-red-500" />
+                  <input type="date" value={expenseDateInput} onChange={e => setExpenseDateInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-xs font-bold outline-none cursor-pointer" />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Category (कैटेगरी चुनें)</label>
+                  <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 font-bold outline-none cursor-pointer">
+                    <option value="Milk / Dairy">🥛 Milk / Dairy (दूध-दही-पनीर)</option>
+                    <option value="Vegetables">🥬 Vegetables (सब्ज़ी-फल)</option>
+                    <option value="Grocery / Kirana">🛒 Grocery / Kirana (किराना-मसाले)</option>
+                    <option value="Gas / Electricity">🔥 Gas / Electricity (गैस-बिजली)</option>
+                    <option value="Staff Salary / Advance">👨‍🍳 Staff Salary / Advance (स्टाफ)</option>
+                    <option value="Vendor Payment">🏪 Vendor Payment (व्यापारी)</option>
+                    <option value="Packing / Disposal">📦 Packing / Disposal (पैकिंग)</option>
+                    <option value="Cleaning / Maintenance">🧹 Cleaning / Maintenance (सफाई-मरम्मत)</option>
+                    <option value="Rent">🏠 Rent (किराया)</option>
+                    <option value="Other">📌 Other (अन्य)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <input type="text" placeholder="Staff Name (यदि एडवांस हो)" value={expenseStaffName} onChange={handleTitleCaseChange(setExpenseStaffName)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2 text-xs font-bold outline-none" />
+                  <input type="text" placeholder="Note / Remark (वैकल्पिक)" value={expenseNote} onChange={handleTitleCaseChange(setExpenseNote)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2 text-xs font-bold outline-none" />
+                </div>
+
+                <button type="submit" className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black uppercase text-xs rounded-xl shadow-lg">
+                  {editingExpenseId ? 'Update Expense (अपडेट करें)' : 'Save Expense (सेव करें)'}
+                </button>
               </form>
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
-{/* POPUP: PARKED / HELD CARTS */}
+      </AnimatePresence>{/* POPUP: PARKED / HELD CARTS */}
       <AnimatePresence>
         {isHeldCartsModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
