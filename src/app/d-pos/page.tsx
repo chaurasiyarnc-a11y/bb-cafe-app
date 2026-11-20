@@ -5301,8 +5301,7 @@ const fetchReportData = async (forceRefresh = false) => {
   };
 
   useEffect(() => {
-    // 👉 अब Reports और Dashboard में जाते ही तुरंत मेमोरी से लोड होगा (बिना लोडिंग के)
-    if (activeTab === 'reports' || activeTab === 'dashboard') {
+    if (activeTab === 'reports' || activeTab === 'dashboard' || activeTab === 'expenses') {
       fetchReportData(false);
     }
   }, [activeTab, reportFilter, customStartDate, customEndDate, liveOrders]);
