@@ -190,7 +190,7 @@ export default function BbCafeDesktopPos() {
       console.error("Config sync failed", e);
     }
   };
- const [activeTab, setActiveTab] = useState<'dashboard' | 'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'udhari' | 'customers' | 'admin_portal'>('billing');
+const [activeTab, setActiveTab] = useState<'dashboard' | 'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'expenses' | 'udhari' | 'customers' | 'admin_portal'>('billing');
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
   // 👉 NEW: Cash Tendered Calculator On/Off
@@ -600,7 +600,7 @@ const [tableCount, setTableCount] = useState(6);
   const [vendorsList, setVendorsList] = useState<any[]>([]);
   const [payVendorObj, setPayVendorObj] = useState<any>(null);
   const [vendorPayAmount, setVendorPayAmount] = useState<number | ''>('');
-  const [vendorPayMethod, setVendorPayMethod] = useState<'cash' | 'upi'>('cash');
+ const [vendorPayMethod, setVendorPayMethod] = useState<'drawer' | 'pocket' | 'upi'>('drawer');
   const [vendorDateFilter, setVendorDateFilter] = useState<'this_month' | 'last_month' | 'all' | 'custom'>('this_month');
   const [vendorStartDate, setVendorStartDate] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
