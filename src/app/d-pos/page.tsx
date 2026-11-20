@@ -5305,13 +5305,17 @@ const fetchReportData = async (forceRefresh = false) => {
       fetchReportData(false);
     }
   }, [activeTab, reportFilter, customStartDate, customEndDate, liveOrders]);
- // Financial Summary: ONLY COMPLETED / SETTLED BILLS
+ // Financial Summary: ONLY COMPLETED / SETTLED BILLS + SMART EXPENSE & DRAWER SPLIT
   const reportSummary = useMemo(() => {
     let totalSale = 0;
     let cashSale = 0;
     let upiSale = 0;
     let dueSale = 0;
-    let totalDiscount = 0; // 👉 NEW: छूट के लिए नया वेरिएबल
+    let totalDiscount = 0;
+    let totalPointsRedeemed = 0;
+    let totalGst = 0;
+    let totalPacking = 0;
+    let totalDelivery = 0;
     let totalOrdersCount = 0;
     let unsettledTotal = 0;
     let unsettledCount = 0;
@@ -5321,9 +5325,11 @@ const fetchReportData = async (forceRefresh = false) => {
       if (o.status === 'completed') {
         totalOrdersCount++;
         totalSale += amt;
-        
-        // 👉 NEW: कूपन डिस्काउंट और पॉइंट्स डिस्काउंट दोनों को जोड़ें
-        totalDiscount += (Number(o.discountAmount) || 0) + (Number(o.pointsRedeemed) || 0);
+        totalDiscount += (Number(o.discountAmount) || 0);
+        totalPointsRedeemed += (Number(o.pointsRedeemed) || 0);
+        totalGst += (Number(o.gstAmount) || 0);
+        totalPacking += (Number(o.packingCharge) || 0);
+        totalDelivery += (Number(o.deliveryFee) || 0);
 
         if (o.paymentMethod === 'upi') {
           upiSale += amt;
@@ -5341,11 +5347,48 @@ const fetchReportData = async (forceRefresh = false) => {
       }
     });
 
-    const totalExpenseAmount = dailyExpenses.reduce((acc, exp) => acc + (Number(exp.amount) || 0), 0);
-    const netCashInDrawer = Math.max(0, cashSale - totalExpenseAmount);
+    let drawerExpenseAmount = 0;
+    let pocketExpenseAmount = 0;
+    let upiExpenseAmount = 0;
+    let pocketSettledInPeriod = 0;
 
-    return { totalSale, cashSale, upiSale, dueSale, totalDiscount, totalOrdersCount, totalExpenseAmount, netCashInDrawer, unsettledTotal, unsettledCount };
-  }, [reportOrders, dailyExpenses]);
+    dailyExpenses.forEach(exp => {
+      const amt = Number(exp.amount) || 0;
+      if (exp.entryType === 'pocket_settlement') {
+        pocketSettledInPeriod += amt;
+        return;
+      }
+      const src = getExpenseSourceNormalized(exp);
+      if (src === 'pocket') pocketExpenseAmount += amt;
+      else if (src === 'upi') upiExpenseAmount += amt;
+      else drawerExpenseAmount += amt;
+    });
+
+    const totalExpenseAmount = drawerExpenseAmount + pocketExpenseAmount + upiExpenseAmount;
+    const totalDrawerCashOut = drawerExpenseAmount + pocketSettledInPeriod;
+    const openingCash = Number(openingCashInput) || 0;
+    const realizedSale = cashSale + upiSale;
+    const netCashInDrawer = openingCash + cashSale - totalDrawerCashOut;
+
+    // All-time pending pocket balance owed to owner
+    let allTimePocketPaid = 0;
+    let allTimePocketSettled = 0;
+    reportAllExpensesRef.current.forEach(exp => {
+      const amt = Number(exp.amount) || 0;
+      if (exp.entryType === 'pocket_settlement') allTimePocketSettled += amt;
+      else if (getExpenseSourceNormalized(exp) === 'pocket') allTimePocketPaid += amt;
+    });
+    const pendingPocketBalance = Math.max(0, allTimePocketPaid - allTimePocketSettled);
+
+    return {
+      totalSale, realizedSale, cashSale, upiSale, dueSale,
+      totalDiscount, totalPointsRedeemed, totalGst, totalPacking, totalDelivery,
+      totalOrdersCount,
+      totalExpenseAmount, drawerExpenseAmount, pocketExpenseAmount, upiExpenseAmount,
+      pocketSettledInPeriod, totalDrawerCashOut, pendingPocketBalance,
+      openingCash, netCashInDrawer, unsettledTotal, unsettledCount
+    };
+  }, [reportOrders, dailyExpenses, openingCashInput]);
 
 // Item-wise Sales Report Calculation (With Category Logic)
   const itemWiseSales = useMemo(() => {
