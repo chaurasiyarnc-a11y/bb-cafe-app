@@ -8694,6 +8694,8 @@ onChange={handleTitleCaseChange(setReceiptSearchQuery)}
                             setExpenseStaffName('');
                             setExpenseSource('drawer');
                             setExpenseCategory('Milk / Dairy');
+                            setIsAddingNewExpCat(false); // 👉 NEW
+                            setNewExpCatInput(''); // 👉 NEW
                             setExpenseDateInput(new Date().toISOString().split('T')[0]);
                             setIsExpenseModalOpen(true);
                           }}
