@@ -8617,7 +8617,224 @@ onChange={handleTitleCaseChange(setReceiptSearchQuery)}
                   )}
                 </div>
               </div>
-            )}            {/* TAB 8: UDHARI BOOK */}
+            )}           
+            {/* TAB: DAILY EXPENSE BOOK (गल्ला / जेब / UPI) */}
+            {activeTab === 'expenses' && (
+              (() => {
+                const filteredExpenseBook = dailyExpenses.filter(exp => {
+                  const src = getExpenseSourceNormalized(exp);
+                  if (expenseFilterSource !== 'all' && src !== expenseFilterSource) return false;
+                  if (expenseFilterCategory !== 'All' && (exp.category || 'Other') !== expenseFilterCategory) return false;
+                  if (expenseSearchQuery.trim()) {
+                    const q = expenseSearchQuery.toLowerCase();
+                    const matchTitle = String(exp.title || '').toLowerCase().includes(q);
+                    const matchNote = String(exp.note || '').toLowerCase().includes(q);
+                    const matchStaff = String(exp.staffName || exp.enteredBy || '').toLowerCase().includes(q);
+                    if (!matchTitle && !matchNote && !matchStaff) return false;
+                  }
+                  return true;
+                });
+
+                const expCategoriesInList = Array.from(new Set(dailyExpenses.map(e => e.category || 'Other'))).sort();
+
+                return (
+                  <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-neutral-300 dark:border-neutral-800 pb-3 gap-3 shrink-0">
+                      <div>
+                        <h2 className="text-lg font-black uppercase text-red-600 flex items-center gap-2">
+                          <Receipt size={20} /> Daily Expense Book (गल्ला व जेब खर्च खाता)
+                        </h2>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                          गल्ले से, जेब से और UPI से किए गए सभी खर्च यहाँ देखें, एडिट करें और जेब का हिसाब सेटल करें।
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => handleSettlePocketBalance(reportSummary.pendingPocketBalance)}
+                          disabled={isSettlingPocket || reportSummary.pendingPocketBalance <= 0}
+                          className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase shadow"
+                        >
+                          👛 Settle Pocket (₹{reportSummary.pendingPocketBalance})
+                        </button>
+                        <button
+                          onClick={() => triggerCsvDownload(
+                            filteredExpenseBook.map(e => ({
+                              date: (e.timestamp?.toDate ? e.timestamp.toDate() : new Date(e.timestamp || Date.now())).toLocaleString('en-IN'),
+                              title: e.title || '',
+                              category: e.category || 'Other',
+                              source: getExpenseSourceNormalized(e).toUpperCase(),
+                              amount: e.amount || 0,
+                              staff: e.staffName || e.enteredBy || '',
+                              note: e.note || ''
+                            })),
+                            `Expense_Book_${reportFilter}_${new Date().toISOString().split('T')[0]}`,
+                            ['Date', 'Title', 'Category', 'Paid From', 'Amount', 'Staff/By', 'Note'],
+                            ['date', 'title', 'category', 'source', 'amount', 'staff', 'note']
+                          )}
+                          className="px-3.5 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase shadow"
+                        >
+                          📥 Export Excel
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingExpenseId(null);
+                            setExpenseTitle('');
+                            setExpenseAmount('');
+                            setExpenseNote('');
+                            setExpenseStaffName('');
+                            setExpenseSource('drawer');
+                            setExpenseCategory('Milk / Dairy');
+                            setExpenseDateInput(new Date().toISOString().split('T')[0]);
+                            setIsExpenseModalOpen(true);
+                          }}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase shadow"
+                        >
+                          + Add Expense
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 4 Summary Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+                      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 p-3.5 rounded-2xl">
+                        <p className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400">💵 गल्ले से खर्च (Drawer Cash)</p>
+                        <p className="text-2xl font-black font-mono text-amber-700 dark:text-amber-300 mt-0.5">₹{reportSummary.drawerExpenseAmount}</p>
+                        <p className="text-[9px] font-bold text-neutral-500">सीधे Cash Drawer से घटा</p>
+                      </div>
+                      <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800/50 p-3.5 rounded-2xl">
+                        <p className="text-[10px] font-black uppercase text-purple-600">👛 जेब से खर्च (Pocket)</p>
+                        <p className="text-2xl font-black font-mono text-purple-700 dark:text-purple-400 mt-0.5">₹{reportSummary.pocketExpenseAmount}</p>
+                        <p className="text-[9px] font-bold text-purple-600">कुल बाकी वापस लेना: ₹{reportSummary.pendingPocketBalance}</p>
+                      </div>
+                      <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50 p-3.5 rounded-2xl">
+                        <p className="text-[10px] font-black uppercase text-blue-600">📱 UPI / Bank खर्च</p>
+                        <p className="text-2xl font-black font-mono text-blue-700 dark:text-blue-400 mt-0.5">₹{reportSummary.upiExpenseAmount}</p>
+                        <p className="text-[9px] font-bold text-neutral-500">ऑनलाइन पेमेंट खर्च</p>
+                      </div>
+                      <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 p-3.5 rounded-2xl">
+                        <p className="text-[10px] font-black uppercase text-red-600">🧾 कुल बिज़नेस खर्च (P&L)</p>
+                        <p className="text-2xl font-black font-mono text-red-600 mt-0.5">₹{reportSummary.totalExpenseAmount}</p>
+                        <p className="text-[9px] font-bold text-neutral-500">{filteredExpenseBook.length} Entries Shown</p>
+                      </div>
+                    </div>
+
+                    {/* Filters Bar */}
+                    <div className="flex flex-col lg:flex-row gap-2.5 items-start lg:items-center justify-between bg-neutral-100 dark:bg-neutral-800/60 p-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-700 shrink-0">
+                      <div className="flex flex-wrap gap-1 bg-white dark:bg-neutral-900 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                        {(['today', 'yesterday', 'last7days', 'this_month', 'last_month', 'custom'] as const).map(rf => (
+                          <button key={rf} onClick={() => setReportFilter(rf)} className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg ${reportFilter === rf ? 'bg-red-600 text-white' : 'text-neutral-500'}`}>
+                            {rf === 'last7days' ? '7 Days' : rf.replace('_', ' ')}
+                          </button>
+                        ))}
+                      </div>
+
+                      {reportFilter === 'custom' && (
+                        <div className="flex items-center gap-1.5">
+                          <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border rounded-lg px-2 py-1 text-xs font-bold" />
+                          <span className="text-[10px] font-bold">To</span>
+                          <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-white dark:bg-neutral-900 border rounded-lg px-2 py-1 text-xs font-bold" />
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+                        <select value={expenseFilterSource} onChange={e => setExpenseFilterSource(e.target.value as any)} className="bg-white dark:bg-neutral-900 border rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none">
+                          <option value="all">All Sources (सब)</option>
+                          <option value="drawer">💵 गल्ले से (Drawer)</option>
+                          <option value="pocket">👛 जेब से (Pocket)</option>
+                          <option value="upi">📱 UPI / Bank</option>
+                        </select>
+                        <select value={expenseFilterCategory} onChange={e => setExpenseFilterCategory(e.target.value)} className="bg-white dark:bg-neutral-900 border rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none">
+                          <option value="All">All Categories</option>
+                          {expCategoriesInList.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="खर्च या स्टाफ खोजें..."
+                          value={expenseSearchQuery}
+                          onChange={handleTitleCaseChange(setExpenseSearchQuery)}
+                          className="flex-1 lg:w-48 bg-white dark:bg-neutral-900 border rounded-xl px-3 py-1.5 text-xs font-bold outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Expenses List */}
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                      {isReportLoading ? (
+                        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-red-500" size={32} /></div>
+                      ) : filteredExpenseBook.length === 0 ? (
+                        <div className="text-center py-20 text-neutral-500 font-bold text-xs">इस फ़िल्टर में कोई खर्च दर्ज नहीं है।</div>
+                      ) : (
+                        filteredExpenseBook.map((exp, idx) => {
+                          const src = getExpenseSourceNormalized(exp);
+                          const expDate = exp.timestamp?.toDate ? exp.timestamp.toDate() : new Date(exp.timestamp || Date.now());
+                          const isSettlement = exp.entryType === 'pocket_settlement';
+                          return (
+                            <div key={exp.id || idx} className={`bg-white dark:bg-neutral-900 border rounded-2xl p-3.5 flex flex-col sm:flex-row justify-between sm:items-center gap-3 shadow-sm ${isSettlement ? 'border-purple-400 bg-purple-50/40 dark:bg-purple-950/10' : 'border-neutral-200 dark:border-neutral-800'}`}>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border ${
+                                    src === 'drawer' ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                                    src === 'pocket' ? 'bg-purple-100 text-purple-800 border-purple-300' :
+                                    'bg-blue-100 text-blue-800 border-blue-300'
+                                  }`}>
+                                    {src === 'drawer' ? '💵 गल्ले से' : src === 'pocket' ? '👛 जेब से' : '📱 UPI'}
+                                  </span>
+                                  <span className="font-black text-sm text-neutral-900 dark:text-white">{exp.title}</span>
+                                  <span className="text-[10px] font-bold bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded text-neutral-600 dark:text-neutral-300">
+                                    {exp.category || 'Other'}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-3 text-[10px] text-neutral-500 font-bold">
+                                  <span>📅 {expDate.toLocaleString('en-IN')}</span>
+                                  <span>👤 By: {exp.enteredBy || 'Staff'}</span>
+                                  {exp.staffName && <span className="text-blue-600">👨‍🍳 Staff: {exp.staffName}</span>}
+                                  {exp.note && <span className="italic text-neutral-600 dark:text-neutral-400">📝 {exp.note}</span>}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                                <span className="font-mono font-black text-lg text-red-600">₹{exp.amount}</span>
+                                <div className="flex gap-1.5">
+                                  {!isSettlement && (
+                                    <button
+                                      onClick={() => {
+                                        setEditingExpenseId(exp.id);
+                                        setExpenseTitle(exp.title || '');
+                                        setExpenseAmount(Number(exp.amount) || '');
+                                        setExpenseCategory(exp.category || 'Other');
+                                        setExpenseSource(src);
+                                        setExpenseNote(exp.note || '');
+                                        setExpenseStaffName(exp.staffName || '');
+                                        setExpenseDateInput(exp.date || formatLocalDateYMD(expDate));
+                                        setIsExpenseModalOpen(true);
+                                      }}
+                                      className="p-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-amber-500 hover:text-black rounded-xl text-neutral-600 dark:text-neutral-300"
+                                      title="Edit Expense"
+                                    >
+                                      <SafeEdit3 size={14} />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeleteExpense(exp)}
+                                    className="p-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-600 hover:text-white text-red-600 rounded-xl"
+                                    title="Delete Expense"
+                                  >
+                                    <SafeTrash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })()
+            )}
+
+          {/* TAB 8: UDHARI BOOK */}
             {activeTab === 'udhari' && (
               <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
                 <div className="flex justify-between items-center border-b pb-3 shrink-0">
