@@ -5069,10 +5069,12 @@ const handleFinalCheckoutAndPrintBill = async () => {
       toast.dismiss(toastId);
       setExpenseTitle('');
       setExpenseAmount('');
-      setExpenseNote('');
+     setExpenseNote('');
       setExpenseStaffName('');
       setEditingExpenseId(null);
       setExpenseDateInput(todayYMD);
+      setIsAddingNewExpCat(false); // 👉 NEW
+      setNewExpCatInput(''); // 👉 NEW
       setIsExpenseModalOpen(false);
       fetchReportData(true);
     } catch (err) {
