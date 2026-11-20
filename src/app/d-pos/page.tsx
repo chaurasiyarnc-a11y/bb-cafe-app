@@ -11805,20 +11805,58 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                   <input type="date" value={expenseDateInput} onChange={e => setExpenseDateInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-xs font-bold outline-none cursor-pointer" />
                 </div>
 
-                <div className="space-y-1">
+               <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-neutral-500">Category (कैटेगरी चुनें)</label>
-                  <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 font-bold outline-none cursor-pointer">
-                    <option value="Milk / Dairy">🥛 Milk / Dairy (दूध-दही-पनीर)</option>
-                    <option value="Vegetables">🥬 Vegetables (सब्ज़ी-फल)</option>
-                    <option value="Grocery / Kirana">🛒 Grocery / Kirana (किराना-मसाले)</option>
-                    <option value="Gas / Electricity">🔥 Gas / Electricity (गैस-बिजली)</option>
-                    <option value="Staff Salary / Advance">👨‍🍳 Staff Salary / Advance (स्टाफ)</option>
-                    <option value="Vendor Payment">🏪 Vendor Payment (व्यापारी)</option>
-                    <option value="Packing / Disposal">📦 Packing / Disposal (पैकिंग)</option>
-                    <option value="Cleaning / Maintenance">🧹 Cleaning / Maintenance (सफाई-मरम्मत)</option>
-                    <option value="Rent">🏠 Rent (किराया)</option>
-                    <option value="Other">📌 Other (अन्य)</option>
-                  </select>
+                  
+                  {!isAddingNewExpCat ? (
+                    <select 
+                      value={expenseCategory} 
+                      onChange={e => {
+                        if (e.target.value === 'ADD_NEW') {
+                          setIsAddingNewExpCat(true);
+                        } else {
+                          setExpenseCategory(e.target.value);
+                        }
+                      }} 
+                      className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 font-bold outline-none cursor-pointer focus:border-red-500"
+                    >
+                      {/* पुरानी फिक्स लिस्ट + डेटाबेस में मौजूद नई कस्टम कैटेगरीज को मिलाकर दिखाना */}
+                      {Array.from(new Set([
+                        "🥛 Milk / Dairy", "🥬 Vegetables", "🛒 Grocery / Kirana", 
+                        "🔥 Gas / Electricity", "👨‍🍳 Staff Salary / Advance", "🏪 Vendor Payment", 
+                        "📦 Packing / Disposal", "🧹 Cleaning / Maintenance", "🏠 Rent", "📌 Other",
+                        ...dailyExpenses.map(e => e.category).filter(Boolean)
+                      ])).sort().map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      
+                      {/* नया जोड़ने का जादुई बटन */}
+                      <option value="ADD_NEW" className="font-black text-red-600 bg-red-50 dark:bg-red-900/20">
+                        + Add New Category (नई बनाएँ)
+                      </option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="नई केटेगरी का नाम लिखें..."
+                        value={newExpCatInput}
+                        onChange={handleTitleCaseChange(setNewExpCatInput)}
+                        className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-red-300 dark:border-red-800/50 rounded-xl p-2.5 font-bold outline-none focus:border-red-500"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingNewExpCat(false);
+                          setNewExpCatInput('');
+                        }}
+                        className="px-3 bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 dark:border-red-800/50 rounded-xl font-bold hover:bg-red-100 transition-colors"
+                      >
+                        रद्द करें (Cancel)
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
