@@ -6337,9 +6337,19 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                       <SafeHelpCircle size={12} /> Help [F1]
                     </button>
                   </div>
-                 <button onClick={() => setIsExpenseModalOpen(true)} className="w-full bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 text-neutral-800 dark:text-white hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors">
+                 <button onClick={() => {
+                   setEditingExpenseId(null);
+                   setExpenseTitle('');
+                   setExpenseAmount('');
+                   setExpenseNote('');
+                   setExpenseStaffName('');
+                   setExpenseSource('drawer');
+                   setExpenseCategory('Milk / Dairy');
+                   setExpenseDateInput(new Date().toISOString().split('T')[0]);
+                   setIsExpenseModalOpen(true);
+                 }} className="w-full bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 text-neutral-800 dark:text-white hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors">
                     <Receipt size={13} className="text-red-500 shrink-0" />
-                    <span className="truncate">Expense [F6]</span>
+                    <span className="truncate">+ Quick Expense</span>
                   </button>
                 </div>
               )}
