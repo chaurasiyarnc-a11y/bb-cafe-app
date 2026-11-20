@@ -5007,41 +5007,177 @@ const handleFinalCheckoutAndPrintBill = async () => {
     }
   };
   
-  // Daily Drawer Expense Save
+  // Helper: Expense का Payment Source पहचानना (पुराने डेटा के साथ 100% compatible)
+  const getExpenseSourceNormalized = (exp: any): 'drawer' | 'pocket' | 'upi' => {
+    if (exp.source === 'pocket' || exp.source === 'upi' || exp.source === 'drawer') return exp.source;
+    const t = String(exp.title || '').toUpperCase();
+    if (t.includes('(UPI)')) return 'upi';
+    if (t.includes('(POCKET)') || t.includes('(JEB)')) return 'pocket';
+    return 'drawer';
+  };
+
+  // Daily Expense Save / Update (गल्ला / जेब / UPI)
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = Number(expenseAmount);
-    if (!expenseTitle.trim() || isNaN(amt) || amt <= 0) return toast.error("Enter valid title and amount!");
-    const toastId = toast.loading("Saving expense...");
-    
-    const expObj = {
-     title: toTitleCase(expenseTitle.trim()),
+    if (!expenseTitle.trim() || isNaN(amt) || amt <= 0) return toast.error("सही नाम और राशि दर्ज करें!");
+    const toastId = toast.loading(editingExpenseId ? "खर्च अपडेट हो रहा है..." : "खर्च सेव हो रहा है...");
+
+    const todayYMD = new Date().toISOString().split('T')[0];
+    const chosenTimestamp = expenseDateInput && expenseDateInput !== todayYMD
+      ? new Date(`${expenseDateInput}T12:00:00`)
+      : new Date();
+
+    const expObj: any = {
+      title: toTitleCase(expenseTitle.trim()),
       amount: amt,
-      category: expenseCategory,
-      timestamp: new Date(),
-      enteredBy: currentUser?.name || 'Staff'
+      category: expenseCategory || 'Other',
+      source: expenseSource,
+      note: expenseNote.trim(),
+      staffName: expenseStaffName.trim(),
+      date: expenseDateInput || todayYMD,
+      timestamp: chosenTimestamp,
+      enteredBy: currentUser?.name || 'Staff',
+      entryType: 'expense'
+    };
+
+    try {
+      if (editingExpenseId) {
+        if (navigator.onLine) {
+          await updateDoc(doc(db, "daily_expenses", editingExpenseId), expObj);
+        } else {
+          queueOfflineUpdate("daily_expenses", editingExpenseId, expObj, 'update');
+        }
+        toast.success(`खर्च ₹${amt} अपडेट हो गया! ✅`);
+      } else {
+        if (navigator.onLine) {
+          await addDoc(collection(db, "daily_expenses"), expObj);
+        } else {
+          const offlineExp = JSON.parse(localStorage.getItem("bb_pos_offline_expenses_queue") || "[]");
+          offlineExp.push({ ...expObj, id: `off_exp_${Date.now()}` });
+          localStorage.setItem("bb_pos_offline_expenses_queue", JSON.stringify(offlineExp));
+        }
+        toast.success(`खर्च ₹${amt} (${expenseSource === 'drawer' ? 'गल्ले से' : expenseSource === 'pocket' ? 'जेब से' : 'UPI'}) सेव हो गया! ✅`);
+      }
+      toast.dismiss(toastId);
+      setExpenseTitle('');
+      setExpenseAmount('');
+      setExpenseNote('');
+      setExpenseStaffName('');
+      setEditingExpenseId(null);
+      setExpenseDateInput(todayYMD);
+      setIsExpenseModalOpen(false);
+      fetchReportData(true);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("खर्च सेव करने में समस्या आई!");
+    }
+  };
+
+  // Delete Expense
+  const handleDeleteExpense = async (exp: any) => {
+    if (!window.confirm(`क्या आप सच में "${exp.title}" (₹${exp.amount}) डिलीट करना चाहते हैं?`)) return;
+    const toastId = toast.loading("डिलीट हो रहा है...");
+    try {
+      if (navigator.onLine && !String(exp.id || '').startsWith('off_')) {
+        await deleteDoc(doc(db, "daily_expenses", exp.id));
+      } else {
+        queueOfflineUpdate("daily_expenses", exp.id, {}, 'delete');
+      }
+      reportAllExpensesRef.current = reportAllExpensesRef.current.filter(e => e.id !== exp.id);
+      setDailyExpenses(prev => prev.filter(e => e.id !== exp.id));
+      toast.dismiss(toastId);
+      toast.success("खर्च डिलीट हो गया! 🗑️");
+      fetchReportData(true);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("डिलीट करने में समस्या आई!");
+    }
+  };
+
+  // Settle Owner Pocket Balance (जेब से दिए पैसे गल्ले से वापस लेना — बिना P&L डबल किए)
+  const handleSettlePocketBalance = async (pendingAmt: number) => {
+    if (pendingAmt <= 0) return toast.error("जेब का कोई बकाया नहीं है!");
+    const entered = window.prompt(`आपके जेब से ₹${pendingAmt} लगे हैं। गल्ले से कितना पैसा वापस ले रहे हैं?`, String(pendingAmt));
+    if (!entered) return;
+    const settleAmt = Number(entered);
+    if (isNaN(settleAmt) || settleAmt <= 0 || settleAmt > pendingAmt) {
+      return toast.error("सही राशि डालें (बकाया से ज्यादा नहीं)!");
+    }
+
+    setIsSettlingPocket(true);
+    const toastId = toast.loading("जेब का हिसाब चुकता किया जा रहा है...");
+    try {
+      const payload = {
+        title: `Owner Pocket Reimbursement (जेब का हिसाब चुकता)`,
+        amount: settleAmt,
+        category: 'Pocket Settlement',
+        source: 'drawer',
+        entryType: 'pocket_settlement',
+        note: `Settled by ${currentUser?.name || 'Admin'}`,
+        date: new Date().toISOString().split('T')[0],
+        timestamp: new Date(),
+        enteredBy: currentUser?.name || 'Staff'
+      };
+      if (navigator.onLine) {
+        await addDoc(collection(db, "daily_expenses"), payload);
+      } else {
+        const offlineExp = JSON.parse(localStorage.getItem("bb_pos_offline_expenses_queue") || "[]");
+        offlineExp.push({ ...payload, id: `off_exp_${Date.now()}` });
+        localStorage.setItem("bb_pos_offline_expenses_queue", JSON.stringify(offlineExp));
+      }
+      toast.dismiss(toastId);
+      toast.success(`₹${settleAmt} गल्ले से घट गए और जेब का हिसाब बराबर हो गया! ✅`);
+      fetchReportData(true);
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("सेटलमेंट विफल रहा!");
+    } finally {
+      setIsSettlingPocket(false);
+    }
+  };
+
+  // Save Cash Drawer Audit to Firestore
+  const handleSaveCashAudit = async () => {
+    if (physicalCashInput === '' || isNaN(Number(physicalCashInput))) {
+      return toast.error("पहले गल्ले में गिना हुआ कैश (Counted Cash) डालें!");
+    }
+    setIsSavingCashAudit(true);
+    const toastId = toast.loading("गल्ला मिलान सेव हो रहा है...");
+    const counted = Number(physicalCashInput);
+    const expected = reportSummary.netCashInDrawer;
+    const diff = counted - expected;
+
+    const auditPayload = {
+      date: new Date().toISOString().split('T')[0],
+      openingCash: reportSummary.openingCash,
+      cashSale: reportSummary.cashSale,
+      drawerExpense: reportSummary.drawerExpenseAmount,
+      pocketSettled: reportSummary.pocketSettledInPeriod,
+      expectedCash: expected,
+      countedCash: counted,
+      difference: diff,
+      note: auditNoteInput.trim(),
+      staffName: currentUser?.name || 'Staff',
+      terminalId,
+      timestamp: new Date()
     };
 
     try {
       if (navigator.onLine) {
-        await addDoc(collection(db, "daily_expenses"), expObj);
-      } else {
-        const offlineExp = JSON.parse(localStorage.getItem("bb_pos_offline_expenses_queue") || "[]");
-        offlineExp.push(expObj);
-        localStorage.setItem("bb_pos_offline_expenses_queue", JSON.stringify(offlineExp));
+        const docRef = await addDoc(collection(db, "cash_audits"), auditPayload);
+        setCashAuditHistory(prev => [{ id: docRef.id, ...auditPayload }, ...prev]);
       }
       toast.dismiss(toastId);
-      toast.success(`Expense ₹${amt} saved! ✅`);
-      setExpenseTitle('');
-      setExpenseAmount('');
-      setIsExpenseModalOpen(false);
-      fetchReportData();
-    } catch (err) {
+      toast.success(`गल्ला मिलान सेव हो गया! (${diff === 0 ? 'Matched ✅' : diff > 0 ? `Excess +₹${diff}` : `Short -₹${Math.abs(diff)}`})`);
+      setAuditNoteInput('');
+    } catch (e) {
       toast.dismiss(toastId);
-      toast.error("Failed to record expense");
+      toast.error("गल्ला मिलान सेव करने में समस्या आई!");
+    } finally {
+      setIsSavingCashAudit(false);
     }
-  };
-// 🚀 INSTANT MEMORY CACHE & REPORTS DATA FETCHING
+  };// 🚀 INSTANT MEMORY CACHE & REPORTS DATA FETCHING
 const fetchReportData = async (forceRefresh = false) => {
     if (!reportAllOrdersRef.current.length || forceRefresh) {
       setIsReportLoading(true);
