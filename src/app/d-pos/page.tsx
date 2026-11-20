@@ -13909,25 +13909,34 @@ onChange={handleTitleCaseChange(setSecurityReason)}
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black uppercase text-neutral-500 block mb-1">पेमेंट माध्यम (Payment Method)</label>
-                  <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                  <label className="text-[10px] font-black uppercase text-neutral-500 block mb-1">पैसा कहाँ से दिया? (Payment Source)</label>
+                  <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl border border-neutral-200 dark:border-neutral-700">
                     <button 
                       type="button" 
-                      onClick={() => setVendorPayMethod('cash')} 
-                      className={`flex-1 py-2 text-xs font-black uppercase rounded-lg transition-colors ${
-                        vendorPayMethod === 'cash' ? 'bg-green-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'
+                      onClick={() => setVendorPayMethod('drawer')} 
+                      className={`py-2 text-[10px] font-black uppercase rounded-lg transition-colors ${
+                        vendorPayMethod === 'drawer' ? 'bg-amber-500 text-black shadow' : 'text-neutral-600 dark:text-neutral-400'
                       }`}
                     >
-                      💵 Cash (गल्ले से)
+                      💵 गल्ले से
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setVendorPayMethod('pocket')} 
+                      className={`py-2 text-[10px] font-black uppercase rounded-lg transition-colors ${
+                        vendorPayMethod === 'pocket' ? 'bg-purple-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'
+                      }`}
+                    >
+                      👛 जेब से
                     </button>
                     <button 
                       type="button" 
                       onClick={() => setVendorPayMethod('upi')} 
-                      className={`flex-1 py-2 text-xs font-black uppercase rounded-lg transition-colors ${
+                      className={`py-2 text-[10px] font-black uppercase rounded-lg transition-colors ${
                         vendorPayMethod === 'upi' ? 'bg-blue-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'
                       }`}
                     >
-                      📱 UPI / Online
+                      📱 UPI
                     </button>
                   </div>
                 </div>
