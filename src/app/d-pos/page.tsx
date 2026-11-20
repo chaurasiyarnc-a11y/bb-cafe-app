@@ -6290,6 +6290,7 @@ const isCurrentlyDark = themeMode === 'dark' || (themeMode === 'auto' && isSyste
                   { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag, roles: ['admin', 'cashier', 'captain'] },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock, roles: ['admin', 'cashier', 'delivery', 'captain'] },
                   { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt, roles: ['admin', 'cashier'] },
+                  { id: 'expenses', label: 'Expense Book (खर्च)', icon: IndianRupee, roles: ['admin', 'cashier'] },
                   { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid, roles: ['admin', 'cashier', 'captain'] },
                   { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] },
                   { id: 'inventory', label: 'Menu & Stock', icon: Layers, roles: ['admin'] },
