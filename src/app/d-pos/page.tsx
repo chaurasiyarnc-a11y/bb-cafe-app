@@ -5026,14 +5026,19 @@ const handleFinalCheckoutAndPrintBill = async () => {
     const toastId = toast.loading(editingExpenseId ? "खर्च अपडेट हो रहा है..." : "खर्च सेव हो रहा है...");
 
     const todayYMD = new Date().toISOString().split('T')[0];
-    const chosenTimestamp = expenseDateInput && expenseDateInput !== todayYMD
+   const chosenTimestamp = expenseDateInput && expenseDateInput !== todayYMD
       ? new Date(`${expenseDateInput}T12:00:00`)
       : new Date();
+      
+    // 👉 NEW: अगर नई केटेगरी टाइप की है तो उसे लें, वरना पुरानी वाली
+    const finalCategory = isAddingNewExpCat && newExpCatInput.trim()
+      ? toTitleCase(newExpCatInput.trim())
+      : expenseCategory || 'Other';
 
     const expObj: any = {
       title: toTitleCase(expenseTitle.trim()),
       amount: amt,
-      category: expenseCategory || 'Other',
+      category: finalCategory,
       source: expenseSource,
       note: expenseNote.trim(),
       staffName: expenseStaffName.trim(),
