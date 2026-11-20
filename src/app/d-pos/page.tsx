@@ -971,11 +971,13 @@ const [tableCount, setTableCount] = useState(6);
         updatedAt: new Date()
       });
 
+      const sourceLabel = vendorPayMethod === 'drawer' ? 'गल्ले से' : vendorPayMethod === 'pocket' ? 'जेब से' : 'UPI';
       const expRef = doc(collection(db, "daily_expenses"));
       batch.set(expRef, {
-        title: `Vendor Payment: ${payVendorObj.name} (${vendorPayMethod.toUpperCase()})`,
+        title: `Vendor Payment: ${payVendorObj.name} (${sourceLabel})`,
         amount: payAmt,
         category: 'Vendor Payment',
+        source: vendorPayMethod,
         timestamp: new Date(),
         enteredBy: currentUser?.name || 'Staff'
       });
