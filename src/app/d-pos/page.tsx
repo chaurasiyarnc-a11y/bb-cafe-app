@@ -5225,7 +5225,7 @@ const fetchReportData = async (forceRefresh = false) => {
           });
           localStorage.setItem("bb_pos_cached_report_orders", JSON.stringify(reportAllOrdersRef.current));
 
-          const qExpenses = query(collection(db, "daily_expenses"), orderBy("timestamp", "desc"), limit(500));
+           const qExpenses = query(collection(db, "daily_expenses"), orderBy("timestamp", "desc"), limit(1000));
           const snapExpenses = await getDocs(qExpenses);
           reportAllExpensesRef.current = snapExpenses.docs.map(d => {
             const data = d.data();
@@ -5233,6 +5233,12 @@ const fetchReportData = async (forceRefresh = false) => {
             return { ...data, id: d.id, timestamp: correctTime };
           });
           localStorage.setItem("bb_pos_cached_report_expenses", JSON.stringify(reportAllExpensesRef.current));
+
+          try {
+            const qAudits = query(collection(db, "cash_audits"), orderBy("timestamp", "desc"), limit(30));
+            const snapAudits = await getDocs(qAudits);
+            setCashAuditHistory(snapAudits.docs.map(d => ({ id: d.id, ...d.data() })));
+          } catch (e) {}
 
           try {
             const qAudit = query(collection(db, "audit_logs"), orderBy("timestamp", "desc"), limit(300));
