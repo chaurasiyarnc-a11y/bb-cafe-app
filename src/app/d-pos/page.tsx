@@ -13030,12 +13030,15 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                         }, { merge: true });
 
                         // 👉 NEW: गल्ले का खर्च (सिर्फ उतना ही कटेगा जितने नकद पैसे दिए हैं)
-                        if (paidAmt > 0) {
+                         if (paidAmt > 0) {
+                           const srcTag = purchasePaySource === 'drawer' ? 'गल्ले से' : purchasePaySource === 'pocket' ? 'जेब से' : 'UPI';
                            const expenseRef = doc(collection(db, "daily_expenses"));
                            batch.set(expenseRef, {
-                              title: `Paid to ${purchaseVendorName.trim()} (Purchase)`,
+                              title: `Paid to ${purchaseVendorName.trim()} (${srcTag})`,
                               amount: paidAmt,
                               category: 'Raw Material',
+                              source: purchasePaySource,
+                              date: purchaseDate,
                               timestamp: new Date(),
                               enteredBy: currentUser?.name || 'Staff'
                            });
