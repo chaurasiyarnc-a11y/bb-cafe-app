@@ -12958,13 +12958,23 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                      <input type="number" value={purchasePaidAmount} onChange={e => setPurchasePaidAmount(e.target.value === '' ? '' : Number(e.target.value))} placeholder="₹" className="w-full bg-white dark:bg-neutral-900 border border-green-200 dark:border-green-700/50 rounded-lg px-2 py-1.5 text-xs font-mono font-bold outline-none focus:border-green-500 text-green-700" />
                    </div>
                    
-                   <div className="w-1/4">
+                    <div className="w-1/4">
                      <label className="text-[10px] font-black uppercase text-red-500 block mb-1">कितने बाकी हैं (DUE)</label>
                      <div className="w-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg px-2 py-1.5 text-xs font-mono font-black text-red-600 text-right">
                        ₹{Math.max(0, purchaseItemList.reduce((sum, item) => sum + item.amount, 0) - (Number(purchasePaidAmount) || 0)).toFixed(2)}
                      </div>
                    </div>
                 </div>
+                {Number(purchasePaidAmount) > 0 && (
+                  <div className="flex items-center justify-between gap-2 bg-neutral-100 dark:bg-neutral-800/80 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+                    <span className="text-[10px] font-black uppercase text-neutral-500">पैसा कहाँ से दिया (Paid From):</span>
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => setPurchasePaySource('drawer')} className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${purchasePaySource === 'drawer' ? 'bg-amber-500 text-black' : 'bg-white dark:bg-neutral-900 text-neutral-500'}`}>💵 गल्ले से</button>
+                      <button type="button" onClick={() => setPurchasePaySource('pocket')} className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${purchasePaySource === 'pocket' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-neutral-900 text-neutral-500'}`}>👛 जेब से</button>
+                      <button type="button" onClick={() => setPurchasePaySource('upi')} className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${purchasePaySource === 'upi' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-neutral-900 text-neutral-500'}`}>📱 UPI</button>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-[10px] font-black uppercase text-neutral-500">Grand Total ({purchaseItemList.length} Items)</p>
