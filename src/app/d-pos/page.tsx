@@ -1351,10 +1351,36 @@ const [tableCount, setTableCount] = useState(6);
   const [recipeSearchTerm, setRecipeSearchTerm] = useState('');
   const [showRawDropdown, setShowRawDropdown] = useState(false); // 👉 NEW: Dropdown List State
 
-  // Expense Form
+ // Expense Form & Expense Book States
   const [expenseTitle, setExpenseTitle] = useState('');
   const [expenseAmount, setExpenseAmount] = useState<number | ''>('');
   const [expenseCategory, setExpenseCategory] = useState('Milk / Dairy');
+  const [expenseSource, setExpenseSource] = useState<'drawer' | 'pocket' | 'upi'>('drawer');
+  const [expenseNote, setExpenseNote] = useState('');
+  const [expenseStaffName, setExpenseStaffName] = useState('');
+  const [expenseDateInput, setExpenseDateInput] = useState(() => new Date().toISOString().split('T')[0]);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+
+  const [expenseFilterSource, setExpenseFilterSource] = useState<'all' | 'drawer' | 'pocket' | 'upi'>('all');
+  const [expenseFilterCategory, setExpenseFilterCategory] = useState<string>('All');
+  const [expenseSearchQuery, setExpenseSearchQuery] = useState('');
+  const [isSettlingPocket, setIsSettlingPocket] = useState(false);
+
+  // Purchase Payment Source + Sales Report & Audit States
+  const [purchasePaySource, setPurchasePaySource] = useState<'drawer' | 'pocket' | 'upi'>('drawer');
+  const [openingCashInput, setOpeningCashInput] = useState<number | ''>(() => {
+    if (typeof window === 'undefined') return 0;
+    const saved = localStorage.getItem(`bb_pos_opening_cash_${new Date().toISOString().split('T')[0]}`);
+    return saved ? Number(saved) : 0;
+  });
+  const [showDenomCalc, setShowDenomCalc] = useState(false);
+  const [denomCounts, setDenomCounts] = useState({ n500: 0, n200: 0, n100: 0, n50: 0, n20: 0, n10: 0, coins: 0 });
+  const [auditNoteInput, setAuditNoteInput] = useState('');
+  const [cashAuditHistory, setCashAuditHistory] = useState<any[]>([]);
+  const [isSavingCashAudit, setIsSavingCashAudit] = useState(false);
+  const [itemReportSearch, setItemReportSearch] = useState('');
+  const [itemReportSort, setItemReportSort] = useState<'qty' | 'revenue'>('qty');
+  const [includeUdhariInPnl, setIncludeUdhariInPnl] = useState<boolean>(true);
 
   // Held Carts Storage
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
