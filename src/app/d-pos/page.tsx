@@ -8060,9 +8060,9 @@ onChange={handleTitleCaseChange(setVendorSearchQuery)}
                               <button 
                                 onClick={() => {
                                   if ((vendor.totalDue || 0) <= 0) return toast.error("इनका कोई उधार बाकी नहीं है!");
-                                  setPayVendorObj(vendor);
+                                 setPayVendorObj(vendor);
                                   setVendorPayAmount(vendor.totalDue || '');
-                                  setVendorPayMethod('cash');
+                                  setVendorPayMethod('drawer');
                                 }} 
                                 disabled={(vendor.totalDue || 0) <= 0}
                                 className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm transition-all ${
