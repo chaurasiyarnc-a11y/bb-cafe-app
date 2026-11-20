@@ -10003,289 +10003,536 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                     );
                   })()
                 )}
-                {/* ========================================= */}
-                {/* 2. SALES & REPORTS VIEW */}
+                 {/* ========================================= */}
+                {/* 2. SALES & REPORTS VIEW (PRO UPGRADED)    */}
                 {/* ========================================= */}
                 {dashboardSubTab === 'sales_report' && (
-                  <div className="max-w-7xl mx-auto space-y-6 pb-10">
-                    <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-neutral-200 dark:border-neutral-800 pb-4 gap-4">
-                      <div>
-                        <h2 className="text-lg font-black uppercase text-blue-600 dark:text-blue-500 flex items-center gap-2">
-                          <SafeBarChart3 size={20} /> Sales & Item-wise Analytics
-                        </h2>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400">Total settled sales, cash drawer reconciliation and item-wise sales report.</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-2">
-                          <button onClick={handleDownloadSummaryPDF} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
-                            📥 Download PDF
-                          </button>
-                          <button onClick={handleSendOwnerSummary} className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
-                            <SafeSend size={14} /> WhatsApp
-                          </button>
-                          <div className="flex bg-neutral-200 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-300 dark:border-neutral-700 shadow-inner">
-                            <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'today' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Today</button>
-                            <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'yesterday' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Yesterday</button>
-                            <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
-                            <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1 ${reportFilter === 'custom' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>📅 Custom</button>
-                            <div className="w-px h-6 bg-neutral-300 dark:bg-neutral-600 mx-1 my-auto"></div>
-                            <button onClick={() => fetchReportData(true)} className="px-3 py-1.5 text-[10px] font-black uppercase rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1" title="Force Refresh Data">
-                              <SafeRefreshCw size={12}/> Refresh
-                            </button>
-                          </div>
-                        </div>
-                        {reportFilter === 'custom' && (
-                          <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-300 dark:border-neutral-700 shadow-sm transition-all duration-300">
-                            <span className="text-[10px] font-black uppercase text-neutral-500 px-1">From</span>
-                            <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer" />
-                            <span className="text-[10px] font-black uppercase text-neutral-500 px-1">To</span>
-                            <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                  (() => {
+                    const fmtAmt = (n: number) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                    const salesForPnl = includeUdhariInPnl ? reportSummary.totalSale : reportSummary.realizedSale;
+                    const pnlProfit = salesForPnl - reportSummary.totalExpenseAmount;
 
-                    {isReportLoading ? (
-                      <div className="flex flex-col items-center justify-center py-20">
-                        <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
-                        <p className="text-neutral-500 font-bold uppercase text-xs tracking-widest animate-pulse">Loading Reports...</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-3 xl:grid-cols-6 gap-3">
-                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                            <p className="text-[10px] font-black uppercase text-neutral-500">Settled Sales</p>
-                            <p className="text-xl font-black font-mono text-green-600 dark:text-green-400">₹{reportSummary.totalSale}</p>
-                            <p className="text-[9px] text-neutral-500">{reportSummary.totalOrdersCount} Settled Orders</p>
-                          </div>
-                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                            <p className="text-[10px] font-black uppercase text-neutral-500">Cash Received</p>
-                            <p className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">₹{reportSummary.cashSale}</p>
-                          </div>
-                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                            <p className="text-[10px] font-black uppercase text-neutral-500">UPI Received</p>
-                            <p className="text-xl font-black font-mono text-blue-600 dark:text-blue-400">₹{reportSummary.upiSale}</p>
-                          </div>
-                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                            <p className="text-[10px] font-black uppercase text-neutral-500">उधार (Due)</p>
-                            <p className="text-xl font-black font-mono text-red-600 dark:text-red-400">₹{reportSummary.dueSale}</p>
-                          </div>
-                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                            <p className="text-[10px] font-black uppercase text-neutral-500">Total Discount</p>
-                            <p className="text-xl font-black font-mono text-purple-600 dark:text-purple-400">₹{reportSummary.totalDiscount}</p>
-                          </div>
-                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                            <p className="text-[10px] font-black uppercase text-neutral-500">Net in Drawer</p>
-                            <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">₹{reportSummary.netCashInDrawer}</p>
-                          </div>
-                        </div>
+                    // Expense Category Breakdown for P&L
+                    const expCatSummary: { [cat: string]: number } = {};
+                    dailyExpenses.forEach(exp => {
+                      if (exp.entryType === 'pocket_settlement') return;
+                      const c = exp.category || 'Other';
+                      expCatSummary[c] = (expCatSummary[c] || 0) + (Number(exp.amount) || 0);
+                    });
+                    const expCatList = Object.entries(expCatSummary).sort((a, b) => b[1] - a[1]);
 
-                        {/* Profit & Loss */}
-                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 border border-green-200 dark:border-green-800/30 p-5 rounded-3xl mt-4 shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
+                    // Item-Wise Search + Sort + % Share
+                    const totalItemRev = filteredItemWiseSales.reduce((s, r) => s + r.revenue, 0);
+                    const displayedItemSales = filteredItemWiseSales
+                      .filter(r => !itemReportSearch.trim() || r.name.toLowerCase().includes(itemReportSearch.toLowerCase()))
+                      .sort((a, b) => itemReportSort === 'revenue' ? b.revenue - a.revenue : b.quantity - a.quantity);
+
+                    // Hourly Sales Data (for Today / Yesterday)
+                    const hourlyBuckets = Array.from({ length: 16 }, (_, i) => {
+                      const hr = i + 8; // 8 AM to 11 PM
+                      return { hr, label: `${hr % 12 || 12}${hr >= 12 ? 'P' : 'A'}`, total: 0, orders: 0 };
+                    });
+                    if (reportFilter === 'today' || reportFilter === 'yesterday') {
+                      reportOrders.forEach(o => {
+                        if (o.status !== 'completed') return;
+                        const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
+                        const hr = d.getHours();
+                        const b = hourlyBuckets.find(x => x.hr === hr);
+                        if (b) { b.total += Number(o.total) || 0; b.orders += 1; }
+                      });
+                    }
+
+                    return (
+                      <div className="max-w-7xl mx-auto space-y-6 pb-10">
+                        <div className="flex flex-col lg:flex-row justify-between lg:items-center border-b border-neutral-200 dark:border-neutral-800 pb-4 gap-4">
                           <div>
-                            <h3 className="text-sm font-black uppercase text-green-700 dark:text-green-500 flex items-center gap-1.5">
-                              💰 Profit & Loss Statement (मुनाफ़ा और नुकसान)
-                            </h3>
-                            <p className="text-[10px] text-green-700/70 dark:text-green-400/70 font-bold mt-1">
-                              (कुल बिक्री - आज के कुल खर्चे = आज का शुद्ध मुनाफा)
+                            <h2 className="text-lg font-black uppercase text-blue-600 dark:text-blue-500 flex items-center gap-2">
+                              <SafeBarChart3 size={20} /> Sales & Item-wise Analytics
+                            </h2>
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                              Realized Collection vs Udhari, Drawer Cash Audit, Expense Split & Excel Exports.
                             </p>
                           </div>
-                          <div className="flex gap-4 md:gap-6 items-center bg-white dark:bg-neutral-900 p-3 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-800 overflow-x-auto no-scrollbar">
-                            <div className="text-center px-2">
-                              <p className="text-[10px] font-black uppercase text-neutral-500">Gross Sales</p>
-                              <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">₹{reportSummary.totalSale}</p>
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <button onClick={handleDownloadSummaryPDF} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1 shadow">
+                                📥 PDF
+                              </button>
+                              <button onClick={handleSendOwnerSummary} className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1 shadow">
+                                <SafeSend size={12} /> WA
+                              </button>
+                              <button onClick={() => triggerCsvDownload(
+                                reportOrders.filter(o => o.status === 'completed').map(o => ({
+                                  billNumber: o.billNumber || '',
+                                  date: (o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now())).toLocaleString('en-IN'),
+                                  customer: o.customerName || 'Walk-in',
+                                  phone: o.customerPhone || '',
+                                  type: o.fulfillmentType || 'pickup',
+                                  payment: o.paymentMethod || 'cash',
+                                  discount: o.discountAmount || 0,
+                                  gst: o.gstAmount || 0,
+                                  total: o.total || 0
+                                })),
+                                `Sales_Bills_${reportFilter}_${new Date().toISOString().split('T')[0]}`,
+                                ['Bill No', 'Date', 'Customer', 'Phone', 'Type', 'Payment', 'Discount', 'GST', 'Total'],
+                                ['billNumber', 'date', 'customer', 'phone', 'type', 'payment', 'discount', 'gst', 'total']
+                              )} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase shadow">
+                                📊 Bills Excel
+                              </button>
+                              <div className="flex flex-wrap bg-neutral-200 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-300 dark:border-neutral-700 shadow-inner gap-0.5">
+                                <button onClick={() => setReportFilter('today')} className={`px-2.5 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'today' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Today</button>
+                                <button onClick={() => setReportFilter('yesterday')} className={`px-2.5 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'yesterday' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Yesterday</button>
+                                <button onClick={() => setReportFilter('last7days')} className={`px-2.5 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last7days' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>7 Days</button>
+                                <button onClick={() => setReportFilter('this_month')} className={`px-2.5 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'this_month' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>This Month</button>
+                                <button onClick={() => setReportFilter('last_month')} className={`px-2.5 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'last_month' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>Last Month</button>
+                                <button onClick={() => setReportFilter('custom')} className={`px-2.5 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${reportFilter === 'custom' ? 'bg-blue-600 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>📅 Custom</button>
+                                <button onClick={() => fetchReportData(true)} className="px-2.5 py-1.5 text-[10px] font-black uppercase rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1" title="Force Refresh Data">
+                                  <SafeRefreshCw size={12}/>
+                                </button>
+                              </div>
                             </div>
-                            <div className="text-xl font-black text-neutral-300">-</div>
-                            <div className="text-center px-2">
-                              <p className="text-[10px] font-black uppercase text-red-500">Total Expenses</p>
-                              <p className="text-lg font-black font-mono text-red-600">₹{reportSummary.totalExpenseAmount}</p>
-                            </div>
-                            <div className="text-xl font-black text-neutral-300">=</div>
-                            <div className={`text-center px-4 py-1.5 rounded-xl border ${reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800/50' : 'bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800/50'}`}>
-                              <p className={`text-[10px] font-black uppercase ${reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>Net Profit</p>
-                              <p className={`text-xl font-black font-mono ${reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? '+' : ''}₹{reportSummary.totalSale - reportSummary.totalExpenseAmount}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Cash Drawer Audit */}
-                        <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-4 shadow-sm mt-6">
-                          <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3">
-                            <div>
-                              <h3 className="text-xs font-black uppercase text-amber-600 dark:text-yellow-400">Cash Drawer Audit (गल्ला मिलान)</h3>
-                              <p className="text-[11px] text-neutral-600 dark:text-neutral-400">Expected Net Cash: <span className="font-mono text-green-600 dark:text-green-400 font-bold">₹{reportSummary.netCashInDrawer}</span></p>
-                            </div>
-                            <button onClick={() => setIsExpenseModalOpen(true)} className="px-3 py-1.5 bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30 rounded-xl text-xs font-black uppercase">
-                              + Add Expense [F6]
-                            </button>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <input type="number" placeholder="Counted Cash in Drawer (₹)" value={physicalCashInput} onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))} className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-4 py-2.5 text-sm font-mono text-neutral-900 dark:text-white outline-none font-bold" />
-                            {physicalCashInput !== '' && (
-                              <div className={`text-xs font-black px-4 py-2.5 rounded-xl border ${Number(physicalCashInput) === reportSummary.netCashInDrawer ? 'bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/40' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/40' : 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40'}`}>
-                                {Number(physicalCashInput) === reportSummary.netCashInDrawer ? '✅ Matched!' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? `⚠️ Excess: +₹${Number(physicalCashInput) - reportSummary.netCashInDrawer}` : `❌ Short: -₹${reportSummary.netCashInDrawer - Number(physicalCashInput)}`}
+                            {reportFilter === 'custom' && (
+                              <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-300 dark:border-neutral-700 shadow-sm">
+                                <span className="text-[10px] font-black uppercase text-neutral-500 px-1">From</span>
+                                <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer" />
+                                <span className="text-[10px] font-black uppercase text-neutral-500 px-1">To</span>
+                                <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer" />
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* Item-Wise Table & Chart */}
-                        <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm mt-6">
-                          <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3 mb-4">
-                            <h3 className="text-xs font-black uppercase text-blue-600 dark:text-blue-500 flex items-center gap-1.5">
-                              <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट और ग्राफ
-                            </h3>
-                            <div className="flex items-center gap-3">
-                              <select value={reportCategoryFilter} onChange={e => setReportCategoryFilter(e.target.value)} className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs font-bold text-neutral-800 dark:text-neutral-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer shadow-sm">
-                                {categories.filter(c => c !== '⭐ Top Items').map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                              </select>
-                              <span className="text-[10px] text-neutral-500 font-bold bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-2 py-1 rounded-lg">
-                                {filteredItemWiseSales.length} Items
-                              </span>
-                            </div>
+                        {isReportLoading ? (
+                          <div className="flex flex-col items-center justify-center py-20">
+                            <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
+                            <p className="text-neutral-500 font-bold uppercase text-xs tracking-widest animate-pulse">Loading Reports...</p>
                           </div>
-                          <div className="flex flex-col lg:flex-row gap-6">
-                            <div className="w-full lg:w-1/3 flex flex-col items-center bg-neutral-50 dark:bg-neutral-800/30 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800">
-                              {chartData.length === 0 || chartData.reduce((s, c) => s + c.value, 0) === 0 ? (
-                                <div className="h-48 flex items-center justify-center text-xs text-neutral-400 font-bold">चार्ट के लिए कोई डेटा नहीं है</div>
-                              ) : (
-                                <>
-                                  <div className="w-48 h-48 rounded-full flex items-center justify-center relative shadow-lg ring-4 ring-white dark:ring-neutral-900" 
-                                    style={{ background: `conic-gradient(${chartData.map((slice, i, arr) => {
-                                        const total = arr.reduce((acc, curr) => acc + curr.value, 0);
-                                        const startPercent = arr.slice(0, i).reduce((acc, curr) => acc + curr.value, 0) / total * 100;
-                                        const endPercent = startPercent + (slice.value / total * 100);
-                                        return `${CHART_COLORS[i % CHART_COLORS.length]} ${startPercent}% ${endPercent}%`;
-                                      }).join(', ')})`
-                                    }}
-                                  >
-                                    <div className="w-32 h-32 bg-white dark:bg-neutral-900 rounded-full flex flex-col items-center justify-center shadow-inner">
-                                      <span className="text-[10px] text-neutral-500 font-black uppercase">Food Items Sale</span>
-                                      <span className="text-lg font-black text-neutral-900 dark:text-white font-mono">₹{chartData.reduce((s, c) => s + c.value, 0)}</span>
-                                    </div>
-                                  </div>
-                                  <div className="mt-6 w-full max-h-36 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
-                                    {chartData.map((slice, i) => {
-                                      const total = chartData.reduce((s, c) => s + c.value, 0);
-                                      const percentage = ((slice.value / total) * 100).toFixed(1);
-                                      return (
-                                        <div key={i} className="flex justify-between items-center text-[10px]">
-                                          <div className="flex items-center gap-2 truncate pr-2">
-                                            <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}></span>
-                                            <span className="truncate font-bold text-neutral-700 dark:text-neutral-300">{slice.label}</span>
-                                          </div>
-                                          <div className="text-right shrink-0">
-                                            <span className="font-mono font-black text-neutral-900 dark:text-white mr-2">₹{slice.value}</span>
-                                            <span className="font-bold text-neutral-500 bg-neutral-200 dark:bg-neutral-800 px-1 rounded">{percentage}%</span>
-                                          </div>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                </>
-                              )}
+                        ) : (
+                          <>
+                            {/* 6 SUMMARY CARDS */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                                <p className="text-[10px] font-black uppercase text-neutral-500">Total Billing</p>
+                                <p className="text-xl font-black font-mono text-green-600 dark:text-green-400">₹{fmtAmt(reportSummary.totalSale)}</p>
+                                <p className="text-[9px] text-neutral-500 font-bold">{reportSummary.totalOrdersCount} Bills | Realized: ₹{fmtAmt(reportSummary.realizedSale)}</p>
+                              </div>
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                                <p className="text-[10px] font-black uppercase text-neutral-500">Cash Received</p>
+                                <p className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">₹{fmtAmt(reportSummary.cashSale)}</p>
+                                <p className="text-[9px] text-neutral-400 font-bold">Drawer Out: -₹{fmtAmt(reportSummary.totalDrawerCashOut)}</p>
+                              </div>
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                                <p className="text-[10px] font-black uppercase text-neutral-500">UPI Received</p>
+                                <p className="text-xl font-black font-mono text-blue-600 dark:text-blue-400">₹{fmtAmt(reportSummary.upiSale)}</p>
+                                <p className="text-[9px] text-neutral-400 font-bold">UPI Exp: -₹{fmtAmt(reportSummary.upiExpenseAmount)}</p>
+                              </div>
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                                <p className="text-[10px] font-black uppercase text-neutral-500">उधार (Due)</p>
+                                <p className="text-xl font-black font-mono text-red-600 dark:text-red-400">₹{fmtAmt(reportSummary.dueSale)}</p>
+                                <p className="text-[9px] text-neutral-400 font-bold">अभी मिलना बाकी</p>
+                              </div>
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                                <p className="text-[10px] font-black uppercase text-neutral-500">Discount + Points</p>
+                                <p className="text-xl font-black font-mono text-purple-600 dark:text-purple-400">₹{fmtAmt(reportSummary.totalDiscount + reportSummary.totalPointsRedeemed)}</p>
+                                <p className="text-[9px] text-neutral-400 font-bold">Cpn: ₹{fmtAmt(reportSummary.totalDiscount)} | Pts: ₹{fmtAmt(reportSummary.totalPointsRedeemed)}</p>
+                              </div>
+                              <div className="bg-emerald-50 dark:bg-emerald-950/20 border-2 border-emerald-400 dark:border-emerald-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                                <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">Net Cash in Drawer</p>
+                                <p className="text-xl font-black font-mono text-emerald-700 dark:text-emerald-400">₹{fmtAmt(reportSummary.netCashInDrawer)}</p>
+                                <p className="text-[9px] text-emerald-600 font-bold">Open ₹{fmtAmt(reportSummary.openingCash)} + Cash - गल्ला खर्च</p>
+                              </div>
                             </div>
-                            <div className="w-full lg:w-2/3 border border-neutral-200 dark:border-neutral-800 rounded-2xl overflow-hidden flex flex-col">
-                              {filteredItemWiseSales.length === 0 ? (
-                                <p className="text-xs text-neutral-400 py-10 text-center">कोई बिक्री रिकॉर्ड नहीं मिला।</p>
-                              ) : (
-                                <div className="max-h-80 overflow-y-auto pr-1">
-                                  <table className="w-full text-left text-xs">
-                                    <thead>
-                                      <tr className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 uppercase text-[10px] sticky top-0 z-10">
-                                        <th className="py-2.5 px-3 font-black">Item Name</th>
-                                        <th className="py-2.5 px-3 font-black">Category</th>
-                                        <th className="py-2.5 px-3 font-black text-center">Qty</th>
-                                        <th className="py-2.5 px-3 font-black text-right">Revenue (₹)</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800 bg-white dark:bg-neutral-900">
-                                      {filteredItemWiseSales.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-blue-50 dark:hover:bg-neutral-800/50 transition-colors">
-                                          <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
-                                          <td className="py-2.5 px-3 text-[10px] text-neutral-500 font-bold">{row.category}</td>
-                                          <td className="py-2.5 px-3 text-center font-mono font-black text-blue-600 bg-blue-500/5">{row.quantity}</td>
-                                          <td className="py-2.5 px-3 text-right font-mono font-black text-green-600 dark:text-green-400">₹{row.revenue}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                    <tfoot className="sticky bottom-0 bg-neutral-100 dark:bg-neutral-800 border-t-2 border-neutral-300 dark:border-neutral-700 shadow-[0_-5px_10px_-2px_rgba(0,0,0,0.05)]">
-                                      <tr>
-                                        <td colSpan={2} className="py-3 px-3 font-black text-right uppercase text-neutral-800 dark:text-neutral-200 text-[11px]">
-                                          {reportCategoryFilter === 'All' ? 'कुल बिक्री (All Items) :' : `${reportCategoryFilter} Total :`}
-                                        </td>
-                                        <td className="py-3 px-3 text-center font-mono font-black text-blue-600 text-sm">
-                                          {filteredItemWiseSales.reduce((sum, item) => sum + item.quantity, 0)}
-                                        </td>
-                                        <td className="py-3 px-3 text-right font-mono font-black text-green-600 dark:text-green-400 text-sm">
-                                          ₹{filteredItemWiseSales.reduce((sum, item) => sum + item.revenue, 0)}
-                                        </td>
-                                      </tr>
-                                    </tfoot>
-                                  </table>
+
+                            {/* EXTRA CHARGES & TAX STRIP */}
+                            <div className="flex flex-wrap justify-between items-center gap-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 px-4 py-2.5 rounded-2xl text-[11px] font-bold">
+                              <span>🏛️ GST Collected: <strong className="font-mono text-red-600">₹{fmtAmt(reportSummary.totalGst)}</strong></span>
+                              <span>📦 Packing Charge: <strong className="font-mono text-orange-600">₹{fmtAmt(reportSummary.totalPacking)}</strong></span>
+                              <span>🛵 Delivery Fee: <strong className="font-mono text-blue-600">₹{fmtAmt(reportSummary.totalDelivery)}</strong></span>
+                              <span>👛 Owner Pocket Expense (जेब से): <strong className="font-mono text-purple-600">₹{fmtAmt(reportSummary.pocketExpenseAmount)}</strong></span>
+                            </div>
+
+                            {/* PROFIT & LOSS + EXPENSE SOURCE BREAKDOWN */}
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 border border-green-200 dark:border-green-800/30 p-5 rounded-3xl shadow-sm space-y-4">
+                              <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                                <div>
+                                  <h3 className="text-sm font-black uppercase text-green-700 dark:text-green-500 flex items-center gap-1.5">
+                                    💰 Profit & Loss Statement (मुनाफ़ा और नुकसान)
+                                  </h3>
+                                  <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                                    <label className="flex items-center gap-1.5 text-[10px] font-black uppercase text-neutral-600 dark:text-neutral-300 cursor-pointer bg-white dark:bg-neutral-900 px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                                      <input type="checkbox" checked={includeUdhariInPnl} onChange={e => setIncludeUdhariInPnl(e.target.checked)} className="accent-green-600" />
+                                      Include उधार (₹{fmtAmt(reportSummary.dueSale)}) in Sales
+                                    </label>
+                                    <button onClick={() => setActiveTab('expenses')} className="text-[10px] font-black uppercase text-blue-600 hover:underline">
+                                      📒 Open Full Expense Book →
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="flex gap-4 md:gap-5 items-center bg-white dark:bg-neutral-900 p-3 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-800 overflow-x-auto no-scrollbar">
+                                  <div className="text-center px-2">
+                                    <p className="text-[10px] font-black uppercase text-neutral-500">{includeUdhariInPnl ? 'Gross Sales' : 'Realized Cash+UPI'}</p>
+                                    <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">₹{fmtAmt(salesForPnl)}</p>
+                                  </div>
+                                  <div className="text-xl font-black text-neutral-300">-</div>
+                                  <div className="text-center px-2">
+                                    <p className="text-[10px] font-black uppercase text-red-500">Total Expenses</p>
+                                    <p className="text-lg font-black font-mono text-red-600">₹{fmtAmt(reportSummary.totalExpenseAmount)}</p>
+                                  </div>
+                                  <div className="text-xl font-black text-neutral-300">=</div>
+                                  <div className={`text-center px-4 py-1.5 rounded-xl border ${pnlProfit >= 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800/50' : 'bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800/50'}`}>
+                                    <p className={`text-[10px] font-black uppercase ${pnlProfit >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>Net Profit</p>
+                                    <p className={`text-xl font-black font-mono ${pnlProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                      {pnlProfit >= 0 ? '+' : ''}₹{fmtAmt(pnlProfit)}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Expense Source & Category Breakdown Pills */}
+                              <div className="pt-3 border-t border-green-200/70 dark:border-green-800/40 flex flex-wrap items-center justify-between gap-2 text-[10px]">
+                                <div className="flex flex-wrap gap-2 font-black">
+                                  <span className="bg-white dark:bg-neutral-900 px-2.5 py-1 rounded-lg border border-amber-300 text-amber-700">💵 गल्ले से: ₹{fmtAmt(reportSummary.drawerExpenseAmount)}</span>
+                                  <span className="bg-white dark:bg-neutral-900 px-2.5 py-1 rounded-lg border border-purple-300 text-purple-700">👛 जेब से: ₹{fmtAmt(reportSummary.pocketExpenseAmount)}</span>
+                                  <span className="bg-white dark:bg-neutral-900 px-2.5 py-1 rounded-lg border border-blue-300 text-blue-700">📱 UPI/Bank: ₹{fmtAmt(reportSummary.upiExpenseAmount)}</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {expCatList.slice(0, 5).map(([cat, amt]) => (
+                                    <span key={cat} className="bg-red-500/10 text-red-700 dark:text-red-300 px-2 py-0.5 rounded font-bold">{cat}: ₹{fmtAmt(amt)}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* PRO CASH DRAWER AUDIT (OPENING CASH + NOTE COUNTER + SAVE LOG) */}
+                            <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-4 shadow-sm">
+                              <div className="flex flex-wrap justify-between items-center gap-3 border-b border-neutral-300 dark:border-neutral-800 pb-3">
+                                <div>
+                                  <h3 className="text-xs font-black uppercase text-amber-600 dark:text-yellow-400">💵 Pro Cash Drawer Audit (गल्ला मिलान)</h3>
+                                  <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
+                                    Opening (₹{fmtAmt(reportSummary.openingCash)}) + Cash Sale (₹{fmtAmt(reportSummary.cashSale)}) - गल्ला खर्च (₹{fmtAmt(reportSummary.totalDrawerCashOut)}) = Expected: <span className="font-mono text-green-600 dark:text-green-400 font-black">₹{fmtAmt(reportSummary.netCashInDrawer)}</span>
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" onClick={() => setShowDenomCalc(!showDenomCalc)} className="px-3 py-1.5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded-xl text-[10px] font-black uppercase">
+                                    🧮 {showDenomCalc ? 'Hide Note Counter' : 'Note Counter (नोट गिनें)'}
+                                  </button>
+                                  <button onClick={() => {
+                                    setEditingExpenseId(null); setExpenseTitle(''); setExpenseAmount(''); setExpenseSource('drawer'); setIsExpenseModalOpen(true);
+                                  }} className="px-3 py-1.5 bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30 rounded-xl text-[10px] font-black uppercase">
+                                    + Add Expense
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Denomination Counter */}
+                              {showDenomCalc && (
+                                <div className="bg-amber-50/70 dark:bg-amber-950/20 p-3 rounded-2xl border border-amber-200 dark:border-amber-800/40 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                                  {[
+                                    { key: 'n500', label: '₹500 x', mult: 500 },
+                                    { key: 'n200', label: '₹200 x', mult: 200 },
+                                    { key: 'n100', label: '₹100 x', mult: 100 },
+                                    { key: 'n50', label: '₹50 x', mult: 50 },
+                                    { key: 'n20', label: '₹20 x', mult: 20 },
+                                    { key: 'n10', label: '₹10 x', mult: 10 },
+                                    { key: 'coins', label: 'Coins ₹', mult: 1 },
+                                  ].map(d => (
+                                    <div key={d.key} className="bg-white dark:bg-neutral-900 p-2 rounded-xl border border-amber-200 dark:border-neutral-700">
+                                      <label className="text-[10px] font-black text-neutral-500 block">{d.label}</label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={(denomCounts as any)[d.key] || ''}
+                                        onChange={e => {
+                                          const val = Math.max(0, Number(e.target.value) || 0);
+                                          const next = { ...denomCounts, [d.key]: val };
+                                          setDenomCounts(next);
+                                          const total = next.n500 * 500 + next.n200 * 200 + next.n100 * 100 + next.n50 * 50 + next.n20 * 20 + next.n10 * 10 + next.coins;
+                                          setPhysicalCashInput(total);
+                                        }}
+                                        placeholder="0"
+                                        className="w-full font-mono font-black text-xs outline-none bg-transparent mt-0.5"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                                <div className="md:col-span-3">
+                                  <label className="text-[9px] font-black uppercase text-neutral-500 block mb-1">सुबह का गल्ला (Opening Cash ₹)</label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={openingCashInput}
+                                    onChange={e => {
+                                      const v = e.target.value === '' ? '' : Number(e.target.value);
+                                      setOpeningCashInput(v);
+                                      localStorage.setItem(`bb_pos_opening_cash_${new Date().toISOString().split('T')[0]}`, String(v || 0));
+                                    }}
+                                    placeholder="0"
+                                    className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none"
+                                  />
+                                </div>
+                                <div className="md:col-span-4">
+                                  <label className="text-[9px] font-black uppercase text-neutral-500 block mb-1">गिना हुआ कैश (Counted Cash ₹)</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Counted Cash in Drawer (₹)"
+                                    value={physicalCashInput}
+                                    onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))}
+                                    className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm font-mono text-neutral-900 dark:text-white outline-none font-bold"
+                                  />
+                                </div>
+                                <div className="md:col-span-3">
+                                  <label className="text-[9px] font-black uppercase text-neutral-500 block mb-1">नोट (Optional Note)</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Shift Close"
+                                    value={auditNoteInput}
+                                    onChange={handleTitleCaseChange(setAuditNoteInput)}
+                                    className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                  />
+                                </div>
+                                <div className="md:col-span-2 pt-4">
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveCashAudit}
+                                    disabled={isSavingCashAudit}
+                                    className="w-full py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase shadow"
+                                  >
+                                    {isSavingCashAudit ? 'Saving...' : '🔒 Save Audit'}
+                                  </button>
+                                </div>
+                              </div>
+
+                              {physicalCashInput !== '' && (
+                                <div className={`text-xs font-black px-4 py-2.5 rounded-xl border ${Number(physicalCashInput) === reportSummary.netCashInDrawer ? 'bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/40' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/40' : 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40'}`}>
+                                  {Number(physicalCashInput) === reportSummary.netCashInDrawer ? '✅ Matched! गल्ला बिल्कुल सही है।' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? `⚠️ Excess: +₹${Number(physicalCashInput) - reportSummary.netCashInDrawer}` : `❌ Short: -₹${reportSummary.netCashInDrawer - Number(physicalCashInput)}`}
+                                </div>
+                              )}
+
+                              {cashAuditHistory.length > 0 && (
+                                <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                                  <p className="text-[10px] font-black uppercase text-neutral-500 mb-1.5">📜 Recent Saved Drawer Audits</p>
+                                  <div className="flex gap-2 overflow-x-auto pb-1">
+                                    {cashAuditHistory.slice(0, 6).map((a: any, idx: number) => (
+                                      <div key={a.id || idx} className="bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 rounded-xl text-[10px] shrink-0">
+                                        <p className="font-mono font-bold text-neutral-700 dark:text-neutral-300">{a.date} • {a.staffName}</p>
+                                        <p className={`font-mono font-black ${a.difference === 0 ? 'text-green-600' : a.difference > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                          Counted: ₹{a.countedCash} ({a.difference === 0 ? 'OK ✓' : a.difference > 0 ? `+₹${a.difference}` : `-₹${Math.abs(a.difference)}`})
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
-                          </div>
-                        </div>
 
-                        {/* Graph */}
-                        {(reportFilter === 'last7days' || reportFilter === 'last30days' || reportFilter === 'custom') && dailyTrendData.length > 0 && (
-                          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-sm mt-6 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
-                            <div className="flex justify-between items-center mb-8 relative z-10">
-                               <div>
-                                 <h3 className="text-sm font-black uppercase text-blue-600 dark:text-blue-500 flex items-center gap-2">
-                                   <SafeBarChart3 size={18} /> Sales Trend (बिक्री ग्राफ)
-                                 </h3>
-                                 <p className="text-[10px] text-neutral-500 font-bold mt-1">
-                                   {reportFilter === 'custom' ? 'चुनी गई तारीखों की बिक्री' : reportFilter === 'last30days' ? 'पिछले 30 दिनों की बिक्री का ग्राफ' : 'पिछले 7 दिनों की बिक्री का ग्राफ'}
-                                 </p>
-                               </div>
-                               <div className="text-right">
-                                 <p className="text-[9px] font-black uppercase text-neutral-500">Highest Sale</p>
-                                 <span className="text-sm font-mono font-black text-green-600 dark:text-green-400 bg-green-500/10 px-2 py-1 rounded-lg border border-green-500/20 shadow-sm">
-                                   ₹{Math.max(...dailyTrendData.map(d => d.total))}
-                                 </span>
-                               </div>
+                            {/* ITEM-WISE SALES TABLE & PIE CHART */}
+                            <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm">
+                              <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-neutral-300 dark:border-neutral-800 pb-3 mb-4 gap-2">
+                                <h3 className="text-xs font-black uppercase text-blue-600 dark:text-blue-500 flex items-center gap-1.5">
+                                  <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट और ग्राफ ({displayedItemSales.length})
+                                </h3>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="🔍 आइटम खोजें..."
+                                    value={itemReportSearch}
+                                    onChange={handleTitleCaseChange(setItemReportSearch)}
+                                    className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs font-bold outline-none w-40"
+                                  />
+                                  <select value={itemReportSort} onChange={e => setItemReportSort(e.target.value as any)} className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs font-bold rounded-lg px-2 py-1 outline-none cursor-pointer">
+                                    <option value="qty">Sort: Highest Qty</option>
+                                    <option value="revenue">Sort: Highest ₹</option>
+                                  </select>
+                                  <select value={reportCategoryFilter} onChange={e => setReportCategoryFilter(e.target.value)} className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs font-bold text-neutral-800 dark:text-neutral-200 rounded-lg px-2.5 py-1 outline-none cursor-pointer shadow-sm">
+                                    {categories.filter(c => c !== '⭐ Top Items').map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                  </select>
+                                  <button onClick={() => triggerCsvDownload(
+                                    displayedItemSales.map(i => ({ name: i.name, category: i.category, qty: i.quantity, revenue: i.revenue, share: totalItemRev > 0 ? ((i.revenue / totalItemRev) * 100).toFixed(1) + '%' : '0%' })),
+                                    `Item_Sales_${reportFilter}_${new Date().toISOString().split('T')[0]}`,
+                                    ['Item Name', 'Category', 'Qty Sold', 'Revenue', 'Share %'],
+                                    ['name', 'category', 'qty', 'revenue', 'share']
+                                  )} className="bg-green-600 hover:bg-green-500 text-white px-2.5 py-1 rounded-lg text-[10px] font-black uppercase">
+                                    📥 Items Excel
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex flex-col lg:flex-row gap-6">
+                                <div className="w-full lg:w-1/3 flex flex-col items-center bg-neutral-50 dark:bg-neutral-800/30 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                                  {chartData.length === 0 || chartData.reduce((s, c) => s + c.value, 0) === 0 ? (
+                                    <div className="h-48 flex items-center justify-center text-xs text-neutral-400 font-bold">चार्ट के लिए कोई डेटा नहीं है</div>
+                                  ) : (
+                                    <>
+                                      <div className="w-48 h-48 rounded-full flex items-center justify-center relative shadow-lg ring-4 ring-white dark:ring-neutral-900" 
+                                        style={{ background: `conic-gradient(${chartData.map((slice, i, arr) => {
+                                            const total = arr.reduce((acc, curr) => acc + curr.value, 0);
+                                            const startPercent = arr.slice(0, i).reduce((acc, curr) => acc + curr.value, 0) / total * 100;
+                                            const endPercent = startPercent + (slice.value / total * 100);
+                                            return `${CHART_COLORS[i % CHART_COLORS.length]} ${startPercent}% ${endPercent}%`;
+                                          }).join(', ')})`
+                                        }}
+                                      >
+                                        <div className="w-32 h-32 bg-white dark:bg-neutral-900 rounded-full flex flex-col items-center justify-center shadow-inner">
+                                          <span className="text-[10px] text-neutral-500 font-black uppercase">Food Items Sale</span>
+                                          <span className="text-lg font-black text-neutral-900 dark:text-white font-mono">₹{fmtAmt(chartData.reduce((s, c) => s + c.value, 0))}</span>
+                                        </div>
+                                      </div>
+                                      <div className="mt-6 w-full max-h-36 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
+                                        {chartData.map((slice, i) => {
+                                          const total = chartData.reduce((s, c) => s + c.value, 0);
+                                          const percentage = ((slice.value / total) * 100).toFixed(1);
+                                          return (
+                                            <div key={i} className="flex justify-between items-center text-[10px]">
+                                              <div className="flex items-center gap-2 truncate pr-2">
+                                                <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}></span>
+                                                <span className="truncate font-bold text-neutral-700 dark:text-neutral-300">{slice.label}</span>
+                                              </div>
+                                              <div className="text-right shrink-0">
+                                                <span className="font-mono font-black text-neutral-900 dark:text-white mr-2">₹{slice.value}</span>
+                                                <span className="font-bold text-neutral-500 bg-neutral-200 dark:bg-neutral-800 px-1 rounded">{percentage}%</span>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                                <div className="w-full lg:w-2/3 border border-neutral-200 dark:border-neutral-800 rounded-2xl overflow-hidden flex flex-col">
+                                  {displayedItemSales.length === 0 ? (
+                                    <p className="text-xs text-neutral-400 py-10 text-center">कोई बिक्री रिकॉर्ड नहीं मिला।</p>
+                                  ) : (
+                                    <div className="max-h-80 overflow-y-auto pr-1">
+                                      <table className="w-full text-left text-xs">
+                                        <thead>
+                                          <tr className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 uppercase text-[10px] sticky top-0 z-10">
+                                            <th className="py-2.5 px-3 font-black">Item Name</th>
+                                            <th className="py-2.5 px-3 font-black">Category</th>
+                                            <th className="py-2.5 px-3 font-black text-center">Qty</th>
+                                            <th className="py-2.5 px-3 font-black text-center">Share %</th>
+                                            <th className="py-2.5 px-3 font-black text-right">Revenue (₹)</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800 bg-white dark:bg-neutral-900">
+                                          {displayedItemSales.map((row, idx) => {
+                                            const share = totalItemRev > 0 ? ((row.revenue / totalItemRev) * 100).toFixed(1) : '0.0';
+                                            return (
+                                              <tr key={idx} className="hover:bg-blue-50 dark:hover:bg-neutral-800/50 transition-colors">
+                                                <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
+                                                <td className="py-2.5 px-3 text-[10px] text-neutral-500 font-bold">{row.category}</td>
+                                                <td className="py-2.5 px-3 text-center font-mono font-black text-blue-600 bg-blue-500/5">{row.quantity}</td>
+                                                <td className="py-2.5 px-3 text-center font-mono text-[10px] font-bold text-neutral-500">{share}%</td>
+                                                <td className="py-2.5 px-3 text-right font-mono font-black text-green-600 dark:text-green-400">₹{row.revenue}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                        <tfoot className="sticky bottom-0 bg-neutral-100 dark:bg-neutral-800 border-t-2 border-neutral-300 dark:border-neutral-700">
+                                          <tr>
+                                            <td colSpan={2} className="py-3 px-3 font-black text-right uppercase text-neutral-800 dark:text-neutral-200 text-[11px]">
+                                              {reportCategoryFilter === 'All' ? 'कुल बिक्री (All Items) :' : `${reportCategoryFilter} Total :`}
+                                            </td>
+                                            <td className="py-3 px-3 text-center font-mono font-black text-blue-600 text-sm">
+                                              {displayedItemSales.reduce((sum, item) => sum + item.quantity, 0)}
+                                            </td>
+                                            <td className="py-3 px-3 text-center text-[10px] font-black text-neutral-500">100%</td>
+                                            <td className="py-3 px-3 text-right font-mono font-black text-green-600 dark:text-green-400 text-sm">
+                                              ₹{fmtAmt(displayedItemSales.reduce((sum, item) => sum + item.revenue, 0))}
+                                            </td>
+                                          </tr>
+                                        </tfoot>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-end gap-2 sm:gap-4 h-56 relative z-10 pt-12 border-b border-neutral-200 dark:border-neutral-800 pb-2 overflow-x-auto scrollbar-hide">
-                              {dailyTrendData.map((day, idx) => {
-                                const maxVal = Math.max(...dailyTrendData.map(d => d.total));
-                                const barHeight = maxVal > 0 && day.total > 0 ? Math.max((day.total / maxVal) * 100, 3) : 0;
-                                const todayDateStr = `${String(new Date().getDate()).padStart(2, '0')} ${new Date().toLocaleString('default', { month: 'short' })}`;
-                                const isToday = day.date === todayDateStr; 
-                                return (
-                                  <div key={idx} className="flex flex-col items-center gap-2 group h-full justify-end min-w-[32px] sm:min-w-[48px] relative">
-                                    <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:-translate-y-1 flex flex-col items-center pointer-events-none absolute -top-8 z-20">
-                                      <span className="bg-neutral-900 dark:bg-white text-white dark:text-black text-[10px] font-mono font-black px-2 py-1 rounded-lg shadow-lg whitespace-nowrap">
-                                        ₹{day.total}
-                                      </span>
-                                      <div className="w-2 h-2 bg-neutral-900 dark:bg-white rotate-45 -mt-1.5"></div>
-                                    </div>
-                                    <div className="w-full h-full bg-neutral-100 dark:bg-neutral-800/60 rounded-t-xl relative flex items-end justify-center overflow-hidden border border-neutral-200 dark:border-neutral-700/50">
-                                       {day.total > 0 ? (
-                                         <div className={`w-full rounded-t-lg transition-all duration-1000 ease-out shadow-[inset_0_4px_4px_rgba(255,255,255,0.3)] ${isToday ? 'bg-gradient-to-t from-green-600 to-emerald-400' : 'bg-gradient-to-t from-blue-600 to-cyan-400'}`} style={{ height: `${barHeight}%` }}></div>
-                                       ) : (
-                                         <div className="text-[8px] text-neutral-400 font-bold mb-2">₹0</div>
-                                       )}
-                                    </div>
-                                    <span className={`text-[10px] font-bold whitespace-nowrap ${isToday ? 'text-green-600 dark:text-green-400 font-black' : 'text-neutral-600 dark:text-neutral-400'}`}>
-                                      {isToday ? 'Today' : day.date}
+
+                            {/* SMART SALES GRAPH: HOURLY FOR TODAY/YESTERDAY, DAILY FOR MULTI-DAY */}
+                            {(reportFilter === 'today' || reportFilter === 'yesterday') ? (
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-sm">
+                                <div className="flex justify-between items-center mb-6">
+                                  <div>
+                                    <h3 className="text-sm font-black uppercase text-blue-600 flex items-center gap-2">
+                                      <Clock size={18} /> Hourly Sales Graph (सुबह 8 से रात 11 बजे तक)
+                                    </h3>
+                                    <p className="text-[10px] text-neutral-500 font-bold mt-1">किस घंटे में कितनी सेल हुई</p>
+                                  </div>
+                                  <span className="text-xs font-mono font-black text-green-600 bg-green-500/10 px-2.5 py-1 rounded-lg">
+                                    Peak: ₹{Math.max(...hourlyBuckets.map(b => b.total))}
+                                  </span>
+                                </div>
+                                <div className="flex items-end gap-1.5 sm:gap-3 h-48 pt-8 border-b border-neutral-200 dark:border-neutral-800 pb-2 overflow-x-auto">
+                                  {hourlyBuckets.map(b => {
+                                    const maxH = Math.max(...hourlyBuckets.map(x => x.total));
+                                    const hPct = maxH > 0 && b.total > 0 ? Math.max((b.total / maxH) * 100, 5) : 0;
+                                    return (
+                                      <div key={b.hr} className="flex-1 min-w-[26px] flex flex-col items-center gap-1.5 h-full justify-end group relative">
+                                        <div className="opacity-0 group-hover:opacity-100 absolute -top-7 bg-black text-white text-[9px] font-mono font-black px-1.5 py-0.5 rounded whitespace-nowrap z-20">
+                                          ₹{b.total} ({b.orders})
+                                        </div>
+                                        <div className="w-full h-full bg-neutral-100 dark:bg-neutral-800/60 rounded-t-lg flex items-end overflow-hidden">
+                                          {b.total > 0 && <div className="w-full bg-gradient-to-t from-orange-600 to-amber-400 rounded-t-md" style={{ height: `${hPct}%` }} />}
+                                        </div>
+                                        <span className="text-[9px] font-bold text-neutral-500">{b.label}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ) : dailyTrendData.length > 0 && (
+                              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-sm relative overflow-hidden">
+                                <div className="flex justify-between items-center mb-8 relative z-10">
+                                  <div>
+                                    <h3 className="text-sm font-black uppercase text-blue-600 dark:text-blue-500 flex items-center gap-2">
+                                      <SafeBarChart3 size={18} /> Sales Trend (बिक्री ग्राफ)
+                                    </h3>
+                                    <p className="text-[10px] text-neutral-500 font-bold mt-1">तारीख-वार कुल बिक्री</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-[9px] font-black uppercase text-neutral-500">Highest Day</p>
+                                    <span className="text-sm font-mono font-black text-green-600 dark:text-green-400 bg-green-500/10 px-2 py-1 rounded-lg border border-green-500/20 shadow-sm">
+                                      ₹{Math.max(...dailyTrendData.map(d => d.total))}
                                     </span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </div>
+                                </div>
+                                <div className="flex items-end gap-2 sm:gap-3 h-56 relative z-10 pt-12 border-b border-neutral-200 dark:border-neutral-800 pb-2 overflow-x-auto scrollbar-hide">
+                                  {dailyTrendData.map((day, idx) => {
+                                    const maxVal = Math.max(...dailyTrendData.map(d => d.total));
+                                    const barHeight = maxVal > 0 && day.total > 0 ? Math.max((day.total / maxVal) * 100, 3) : 0;
+                                    const todayDateStr = `${String(new Date().getDate()).padStart(2, '0')} ${new Date().toLocaleString('default', { month: 'short' })}`;
+                                    const isToday = day.date === todayDateStr;
+                                    return (
+                                      <div key={idx} className="flex flex-col items-center gap-2 group h-full justify-end min-w-[32px] sm:min-w-[44px] relative">
+                                        <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center pointer-events-none absolute -top-8 z-20">
+                                          <span className="bg-neutral-900 dark:bg-white text-white dark:text-black text-[10px] font-mono font-black px-2 py-1 rounded-lg shadow-lg whitespace-nowrap">
+                                            ₹{day.total}
+                                          </span>
+                                        </div>
+                                        <div className="w-full h-full bg-neutral-100 dark:bg-neutral-800/60 rounded-t-xl relative flex items-end justify-center overflow-hidden border border-neutral-200 dark:border-neutral-700/50">
+                                          {day.total > 0 ? (
+                                            <div className={`w-full rounded-t-lg transition-all duration-1000 ${isToday ? 'bg-gradient-to-t from-green-600 to-emerald-400' : 'bg-gradient-to-t from-blue-600 to-cyan-400'}`} style={{ height: `${barHeight}%` }}></div>
+                                          ) : (
+                                            <div className="text-[8px] text-neutral-400 font-bold mb-2">₹0</div>
+                                          )}
+                                        </div>
+                                        <span className={`text-[10px] font-bold whitespace-nowrap ${isToday ? 'text-green-600 dark:text-green-400 font-black' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                                          {isToday ? 'Today' : day.date}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                  </div>
+                      </div>
+                    );
+                  })()
                 )}
-
                 {/* ========================================= */}
                 {/* 3. CRM ANALYTICS VIEW */}
                 {/* ========================================= */}
