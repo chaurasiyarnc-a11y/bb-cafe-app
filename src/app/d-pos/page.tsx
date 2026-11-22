@@ -11648,99 +11648,112 @@ onChange={e => handleTitleCaseInput(e, (val) => {
       <AnimatePresence>
         {isAddEditCustModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
-              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-2xl w-full rounded-3xl p-6 shadow-2xl flex flex-col max-h-[90vh]">
+              
+              {/* Header */}
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
                 <h3 className="font-black text-sm uppercase text-orange-600 flex items-center gap-2">
-                  <SafeUserPlus size={18} /> {editingCustProfile ? 'Edit Customer' : 'Add New Customer'}
+                  <SafeUserPlus size={18} /> {editingCustProfile ? 'Edit Customer Profile' : 'Add New Customer'}
                 </h3>
-                <button onClick={() => setIsAddEditCustModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+                <button onClick={() => setIsAddEditCustModalOpen(false)} className="text-neutral-500 hover:text-red-500 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full transition-colors"><X size={18} /></button>
               </div>
-              <form onSubmit={handleSaveCustomerProfile} className="space-y-3">
+
+              <form onSubmit={handleSaveCustomerProfile} className="flex-1 overflow-y-auto pr-2 space-y-4 mt-4">
                 
-               <div className="space-y-1">
-                   <label className="text-[10px] font-black uppercase text-neutral-500">Customer Name *</label>
-                   <input type="text" required placeholder="e.g. Rahul Kumar" value={custFormName} onChange={handleTitleCaseChange(setCustFormName)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" autoFocus />
-                </div>
-                <div className="space-y-1">
-                   <label className="text-[10px] font-black uppercase text-neutral-500">Phone Number (10 Digits) *</label>
-                   <input type="tel" maxLength={10} required disabled={!!editingCustProfile} placeholder="e.g. 9876543210" value={custFormPhone} onChange={e => setCustFormPhone(e.target.value.replace(/\D/g, ''))} className={`w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none text-xs ${editingCustProfile ? 'opacity-60 cursor-not-allowed' : 'focus:border-orange-500'}`} />
-                   {editingCustProfile && <p className="text-[9px] text-red-500 italic">फ़ोन नंबर एडिट नहीं किया जा सकता, क्योंकि यह प्राइमरी ID है।</p>}
+                {/* 2-Column Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  
+                  {/* Left Column: Basic Info */}
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-black uppercase text-neutral-500">Customer Name *</label>
+                       <input type="text" required placeholder="e.g. Rahul Kumar" value={custFormName} onChange={handleTitleCaseChange(setCustFormName)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" autoFocus />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-black uppercase text-neutral-500">Phone Number (10 Digits) *</label>
+                       <input type="tel" maxLength={10} required disabled={!!editingCustProfile} placeholder="e.g. 9876543210" value={custFormPhone} onChange={e => setCustFormPhone(e.target.value.replace(/\D/g, ''))} className={`w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none text-xs ${editingCustProfile ? 'opacity-60 cursor-not-allowed' : 'focus:border-orange-500'}`} />
+                       {editingCustProfile && <p className="text-[9px] text-red-500 italic">फ़ोन नंबर एडिट नहीं किया जा सकता, क्योंकि यह प्राइमरी ID है।</p>}
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-black uppercase text-neutral-500">Address (Optional)</label>
+                       <textarea rows={2} placeholder="Full Delivery Address..." value={custFormAddress} onChange={handleTitleCaseChange(setCustFormAddress)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs resize-none" />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-black uppercase text-neutral-500">📝 Customer Note (Preference)</label>
+                       <input type="text" placeholder="e.g. Jain Food, Less Spicy..." value={custFormNote} onChange={handleTitleCaseChange(setCustFormNote)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" />
+                    </div>
+                  </div>
+
+                  {/* Right Column: Financials & Security */}
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <div className="space-y-1 flex-1">
+                         <label className="text-[10px] font-black uppercase text-amber-600">⭐ Loyalty Points</label>
+                         <input type="number" min={0} placeholder="e.g. 150" value={custFormPoints} onChange={e => setCustFormPoints(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-amber-50 dark:bg-amber-900/10 border border-amber-300 dark:border-amber-800 rounded-xl p-2.5 font-mono font-black outline-none focus:border-amber-500 text-xs text-amber-700 dark:text-amber-400" />
+                      </div>
+                      <div className="space-y-1 flex-1">
+                         <label className="text-[10px] font-black uppercase text-green-600">💳 Wallet (₹)</label>
+                         <input type="number" min={0} placeholder="e.g. 1200" value={custFormWalletBalance} onChange={e => setCustFormWalletBalance(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-green-50 dark:bg-green-900/10 border border-green-300 dark:border-green-800 rounded-xl p-2.5 font-mono font-black outline-none focus:border-green-500 text-xs text-green-700 dark:text-green-400" />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-black uppercase text-neutral-500">Security PIN (4 Digits)</label>
+                       <input type="text" maxLength={4} placeholder="e.g. 1234" value={custFormPin} onChange={e => setCustFormPin(e.target.value.replace(/\D/g, ''))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-black outline-none focus:border-orange-500 text-xs tracking-widest" />
+                       <p className="text-[9px] text-neutral-500 font-bold">यह ग्राहक का ऐप में पॉइंट्स गिफ्ट करने वाला पासवर्ड है।</p>
+                    </div>
+
+                    {/* ACCOUNT LOCK TOGGLE */}
+                    <div className="space-y-1 pt-2 border-t border-neutral-200 dark:border-neutral-800 mt-2">
+                       <label className="text-[10px] font-black uppercase text-red-600">
+                         🚫 Freeze / Lock Account
+                       </label>
+                       <label className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 rounded-xl p-3 flex flex-col gap-1.5 cursor-pointer hover:border-red-400 transition-colors">
+                         <div className="flex items-center gap-2">
+                           <input 
+                             type="checkbox" 
+                             checked={custFormIsLocked} 
+                             onChange={e => setCustFormIsLocked(e.target.checked)} 
+                             className="w-4 h-4 accent-red-600 cursor-pointer"
+                           />
+                           <span className="text-xs font-bold text-red-700 dark:text-red-400">Lock This Account (चीटिंग रोकें)</span>
+                         </div>
+                         <p className="text-[9px] font-bold text-red-500 leading-tight">
+                           इसे चालू करने पर ग्राहक पॉइंट्स रिडीम, ट्रान्सफर या कमा नहीं पाएगा।
+                         </p>
+                       </label>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                   <label className="text-[10px] font-black uppercase text-neutral-500">Loyalty Points (Edit/Add)</label>
-                   <input type="number" min={0} placeholder="e.g. 150" value={custFormPoints} onChange={e => setCustFormPoints(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none focus:border-orange-500 text-xs" />
-                </div>
-
-              <div className="space-y-1">
-                   <label className="text-[10px] font-black uppercase text-green-600">💳 Wallet Balance (₹)</label>
-                   <input type="number" min={0} placeholder="e.g. 1200" value={custFormWalletBalance} onChange={e => setCustFormWalletBalance(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-green-50 dark:bg-green-900/10 border border-green-300 dark:border-green-800 rounded-xl p-2.5 font-mono font-black outline-none focus:border-green-500 text-xs text-green-700 dark:text-green-400" />
-                </div>
-
-                {/* 👉 NEW: SECURITY PIN INPUT */}
-                <div className="space-y-1">
-                   <label className="text-[10px] font-black uppercase text-neutral-500">Security PIN (4 Digits)</label>
-                   <input type="text" maxLength={4} placeholder="e.g. 1234" value={custFormPin} onChange={e => setCustFormPin(e.target.value.replace(/\D/g, ''))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-black outline-none focus:border-orange-500 text-xs tracking-widest" />
-                </div>
-
-               {/* 👉 NEW: ACCOUNT LOCK TOGGLE (Vertical Layout) */}
-                <div className="space-y-1 pt-2 border-t border-neutral-200 dark:border-neutral-800 mt-2">
-                   <label className="text-[10px] font-black uppercase text-red-600">
-                     🚫 Freeze / Lock Account (चीटिंग रोकें)
-                   </label>
-                   <label className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 rounded-xl p-3 flex flex-col gap-2 cursor-pointer hover:border-red-400 transition-colors">
-                     <div className="flex items-center gap-2">
-                       <input 
-                         type="checkbox" 
-                         checked={custFormIsLocked} 
-                         onChange={e => setCustFormIsLocked(e.target.checked)} 
-                         className="w-4 h-4 accent-red-600 cursor-pointer"
-                       />
-                       <span className="text-xs font-bold text-red-700 dark:text-red-400">Lock This Account</span>
-                     </div>
-                     <p className="text-[9px] font-bold text-red-500 leading-tight">
-                       इसे चालू करने पर ग्राहक पॉइंट्स रिडीम, ट्रान्सफर या कमा नहीं पाएगा।
-                     </p>
-                   </label>
-                </div>
-
-
-                <div className="space-y-1">
-                   <label className="text-[10px] font-black uppercase text-neutral-500">Address (Optional)</label>
-                   <textarea rows={2} placeholder="Full Delivery Address..." value={custFormAddress} onChange={handleTitleCaseChange(setCustFormAddress)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs resize-none" />
-                </div>
-
-                {/* 👉 NEW: CUSTOMER NOTES & SPECIAL DATES */}
-                <div className="space-y-1 pt-2 border-t border-neutral-200 dark:border-neutral-800">
-                   <label className="text-[10px] font-black uppercase text-neutral-500">📝 Customer Note (Preference)</label>
-                   <input type="text" placeholder="e.g. Jain Food, Less Spicy, No Mayo..." value={custFormNote} onChange={handleTitleCaseChange(setCustFormNote)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" />
-                </div>
-
-                <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                {/* Special Dates (Full Width) */}
+                <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
                    <div className="flex justify-between items-center">
                      <label className="text-[10px] font-black uppercase text-neutral-500">📅 Special Dates (Birthdays)</label>
-                     <button type="button" onClick={() => setCustFormSpecialDates([...custFormSpecialDates, {type: 'Birthday', name: '', date: ''}])} className="text-[9px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-1 rounded-md font-black uppercase">+ Add Date</button>
+                     <button type="button" onClick={() => setCustFormSpecialDates([...custFormSpecialDates, {type: 'Birthday', name: '', date: ''}])} className="text-[9px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-1 rounded-md font-black uppercase shadow-sm border border-orange-200 dark:border-orange-800">+ Add Date</button>
                    </div>
                    <div className="max-h-24 overflow-y-auto space-y-1.5 pr-1">
                      {custFormSpecialDates.map((item, index) => (
-                       <div key={index} className="flex gap-1.5 items-center bg-neutral-50 dark:bg-neutral-900/50 p-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                          <select value={item.type} onChange={e => { const newArr = [...custFormSpecialDates]; newArr[index].type = e.target.value; setCustFormSpecialDates(newArr); }} className="w-20 bg-transparent text-[10px] outline-none font-bold text-neutral-700 dark:text-neutral-300">
+                       <div key={index} className="flex gap-1.5 items-center bg-neutral-50 dark:bg-neutral-900/50 p-2 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                          <select value={item.type} onChange={e => { const newArr = [...custFormSpecialDates]; newArr[index].type = e.target.value; setCustFormSpecialDates(newArr); }} className="w-24 bg-transparent text-[10px] outline-none font-bold text-neutral-700 dark:text-neutral-300">
                             <option value="Birthday">Birthday</option>
                             <option value="Anniversary">Anniversary</option>
                           </select>
-                          <input type="text" placeholder="Name (Self/Kid)" value={item.name} onChange={e => handleTitleCaseInput(e, (val) => { const newArr = [...custFormSpecialDates]; newArr[index].name = val; setCustFormSpecialDates(newArr); })} className="w-20 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded p-1 text-[10px] outline-none" />
-                          <input type="date" value={item.date} onChange={e => { const newArr = [...custFormSpecialDates]; newArr[index].date = e.target.value; setCustFormSpecialDates(newArr); }} className="flex-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded p-1 text-[10px] outline-none" />
-                          <button type="button" onClick={() => setCustFormSpecialDates(custFormSpecialDates.filter((_, i) => i !== index))} className="text-red-500 hover:bg-red-100 p-1 rounded"><X size={14}/></button>
+                          <input type="text" placeholder="Name (Self/Kid)" value={item.name} onChange={e => handleTitleCaseInput(e, (val) => { const newArr = [...custFormSpecialDates]; newArr[index].name = val; setCustFormSpecialDates(newArr); })} className="w-32 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-md p-1.5 text-xs outline-none focus:border-orange-500" />
+                          <input type="date" value={item.date} onChange={e => { const newArr = [...custFormSpecialDates]; newArr[index].date = e.target.value; setCustFormSpecialDates(newArr); }} className="flex-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-md p-1.5 text-xs outline-none focus:border-orange-500 cursor-pointer" />
+                          <button type="button" onClick={() => setCustFormSpecialDates(custFormSpecialDates.filter((_, i) => i !== index))} className="text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 p-1.5 rounded-md transition-colors"><X size={16}/></button>
                        </div>
                      ))}
                    </div>
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setIsAddEditCustModalOpen(false)} className="flex-1 py-2.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase text-xs rounded-xl hover:bg-neutral-300 transition-colors">Cancel</button>
-                  <button type="submit" className="flex-1 py-2.5 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg">Save Profile</button>
+                {/* Footer Buttons */}
+                <div className="flex gap-3 pt-4 shrink-0 border-t border-neutral-200 dark:border-neutral-800 mt-6 pb-2">
+                  <button type="button" onClick={() => setIsAddEditCustModalOpen(false)} className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase text-xs rounded-xl hover:bg-neutral-300 transition-colors">Cancel</button>
+                  <button type="submit" className="flex-[2] py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg">Save Profile</button>
                 </div>
               </form>
+
             </motion.div>
           </div>
         )}
