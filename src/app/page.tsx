@@ -2878,6 +2878,19 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
                     )}
                   </div>
 
+                 {/* 👉 NEW: BANNED ALERT BANNER */}
+                  {isAccountLocked && (
+                    <div className="bg-red-500/10 border-2 border-red-500/50 p-4 rounded-2xl flex items-center gap-3 shadow-lg animate-pulse mb-4">
+                      <span className="text-3xl">🚫</span>
+                      <div>
+                        <h4 className="text-red-500 font-black text-sm uppercase">Account Suspended</h4>
+                        <p className="text-red-400 text-[10px] font-bold mt-0.5">
+                          {isHindi ? "सुरक्षा कारणों से आपका खाता लॉक कर दिया गया है। आपके पॉइंट्स फ्रीज हो गए हैं।" : "Your account is locked for security reasons. Points are frozen."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-300 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 shadow-md">
                     <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
                       <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase"><Gift size={12}/> <span>{isHindi ? `${storeName} लॉयल्टी क्लब` : `${storeName} Loyalty Club`}</span></div>
