@@ -1782,8 +1782,9 @@ const handleSendUdhariReminder = (targetOrder: any) => {
         name: toTitleCase(custFormName.trim()),
         phone: cleanPhone,
         address: toTitleCase(custFormAddress.trim()),
-        points: Number(custFormPoints) || 0,
+       points: Number(custFormPoints) || 0,
         walletBalance: Number(custFormWalletBalance) || 0, // 👉 NEW: Save Wallet Balance
+        isLocked: custFormIsLocked, // 👉 NEW: Save Lock Status to DB
         note: toTitleCase(custFormNote.trim()), // 👉 NEW: कस्टमर की पसंद का नोट
         specialDates: custFormSpecialDates, // 👉 NEW: बच्चों या फॅमिली के बर्थडे
         lastActive: editingCustProfile ? editingCustProfile.lastActive : new Date()
