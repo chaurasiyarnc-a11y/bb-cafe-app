@@ -813,18 +813,37 @@ const handleGoogleLogin = async () => {
     const customerObj = {
       name: tempName.trim() || googleUser.name,
       phone: formattedPhone,
-      pin: tempPin, // PIN रखा गया है ताकि गिफ्टिंग काम करे
+      pin: tempPin,
       googleUid: googleUser.uid,
       email: googleUser.email,
       refCode: tempRefCode.trim() || undefined
     };
 
-    const toastId = toast.loading(isHindi ? "प्रोफाइल सहेज रहा है..." : "Saving profile...");
+    const toastId = toast.loading(isHindi ? "प्रोफाइल वेरीफाई हो रही है..." : "Verifying profile...");
+    
     try {
+      // 👇 🚨 सिक्योरिटी चेक 1: क्या इस Gmail से पहले ही कोई दूसरा नंबर जुड़ा है? 
+      const emailQuery = query(collection(db, "customer_points"), where("googleUid", "==", customerObj.googleUid));
+      const emailQuerySnap = await getDocs(emailQuery);
+
+      if (!emailQuerySnap.empty) {
+        // मतलब इस Gmail से एक अकाउंट पहले से है
+        const linkedPhone = emailQuerySnap.docs[0].id; // पहले से जुड़ा हुआ नंबर
+        
+        // अगर कस्टमर ने कोई दूसरा (नया) नंबर डाला है, तो उसे रोक दें!
+        if (linkedPhone !== phoneClean) {
+          toast.dismiss(toastId);
+          toast.error(isHindi ? `❌ यह Gmail पहले से नंबर ${linkedPhone} के साथ जुड़ी है! कृपया वही नंबर डालें।` : `❌ This Gmail is already linked to ${linkedPhone}!`);
+          return;
+        }
+      }
+      // 👆 ---------------------------------------------------------------------
+
       const userDocRef = doc(db, "customer_points", phoneClean);
       const userSnap = await getDoc(userDocRef);
 
       if (!userSnap.exists()) {
+        // नया अकाउंट बनाएं
         await setDoc(userDocRef, {
           name: customerObj.name,
           phone: phoneClean,
@@ -838,14 +857,18 @@ const handleGoogleLogin = async () => {
         });
       } else {
         const existingData = userSnap.data();
+        
+        // 👇 🚨 सिक्योरिटी चेक 2: क्या इस नंबर पर कोई दूसरी Gmail जुड़ी है?
         if (existingData?.googleUid && existingData.googleUid !== customerObj.googleUid) {
           toast.dismiss(toastId);
-          toast.error(isHindi ? "❌ यह नंबर किसी दूसरे अकाउंट से जुड़ा है!" : "❌ Number linked to another account!");
+          toast.error(isHindi ? "❌ यह नंबर किसी दूसरे Google अकाउंट से जुड़ा है!" : "❌ Number linked to another Google account!");
           return;
         }
+        
+        // अगर सब सही है, तो डेटा अपडेट करें
         await setDoc(userDocRef, {
           name: customerObj.name,
-          pin: customerObj.pin,
+          pin: customerObj.pin, // नया पिन सेव करें (अगर बदला है)
           googleUid: customerObj.googleUid,
           email: customerObj.email,
           lastActive: new Date()
@@ -860,7 +883,8 @@ const handleGoogleLogin = async () => {
       toast.success(isHindi ? "✅ सफलता! प्रोफ़ाइल लॉगिन हो गई।" : "✅ Profile saved successfully!");
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error(isHindi ? "प्रोफाइल लॉगिन में त्रुटि आई!" : "Error saving profile!");
+      toast.error(isHindi ? "प्रोफाइल लॉगिन में सर्वर एरर आई!" : "Server error during login!");
+      console.error(err);
     }
   };
   const handleClaimSubmit = async (e: React.FormEvent) => {
