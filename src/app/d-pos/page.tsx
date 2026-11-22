@@ -1955,6 +1955,7 @@ const handleSendUdhariReminder = (targetOrder: any) => {
    setCustFormPoints(0);
     setCustFormWalletBalance(0); // 👉 NEW
     setCustFormIsLocked(false); // 👉 NEW
+    setCustFormPin(''); // 👉 NEW
     setCustFormNote('');
     setCustFormSpecialDates([]); 
     setIsAddEditCustModalOpen(true);
