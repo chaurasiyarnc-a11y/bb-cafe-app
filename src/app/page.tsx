@@ -1045,10 +1045,16 @@ const handleGoogleLogin = async () => {
 
       const senderDocRef = doc(db, "customer_points", senderPhoneClean);
 
-      await runTransaction(db, async (transaction) => {
+     await runTransaction(db, async (transaction) => {
         const senderSnap = await transaction.get(senderDocRef);
         if (!senderSnap.exists()) throw new Error("Sender records not found.");
         
+        // 👉 NEW: Receiver का लॉक चेक
+        const receiverSnapInTx = await transaction.get(receiverDocRef);
+        if (receiverSnapInTx.exists() && receiverSnapInTx.data().isLocked) {
+           throw new Error(isHindi ? "प्राप्तकर्ता का खाता लॉक है!" : "Receiver account is banned!");
+        }
+
        const senderData = senderSnap.data();
         if (senderData.pin && senderData.pin !== giftSenderPin) throw new Error("Invalid security PIN.");
         const currentSenderPoints = senderData.points || 0;
