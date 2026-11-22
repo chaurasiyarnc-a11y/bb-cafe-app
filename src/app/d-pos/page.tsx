@@ -9209,7 +9209,8 @@ onChange={handleTitleCaseChange(setCustomerTabSearch)}
                                       const visits = cust.totalVisits || 0;
                                       const daysSinceActive = cust.lastActive ? Math.floor((Date.now() - (cust.lastActive.toDate ? cust.lastActive.toDate().getTime() : new Date(cust.lastActive).getTime())) / (1000 * 3600 * 24)) : 0;
                                       
-                                      if (daysSinceActive > 30) { tag = '😴 Sleeping'; tagClass = 'bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-300 dark:border-neutral-700'; }
+                                      if (cust.isLocked) { tag = '🚫 BANNED'; tagClass = 'bg-red-200 dark:bg-red-900/50 text-red-700 dark:text-red-400 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'; } // 👉 NEW
+                                      else if (daysSinceActive > 30) { tag = '😴 Sleeping'; tagClass = 'bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border-neutral-300 dark:border-neutral-700'; }
                                       else if (spent >= 5000 || visits >= 10) { tag = '👑 VIP Guest'; tagClass = 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700/50'; }
                                       else if (spent >= 2000) { tag = '🌟 Regular'; tagClass = 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700/50'; }
                                       
