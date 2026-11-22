@@ -1639,12 +1639,12 @@ const handleGoogleLogin = async () => {
     const phoneClean = customerDetails.phone.replace("+91", "").trim();
     
     const unsubPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
-      if (snap.exists()) {
+     if (snap.exists()) {
         const data = snap.data();
         setCustomerPoints(data.points || 0);
         setWalletBalance(data.walletBalance || 0);
         setShareCount(data.shareCount || 0);
-
+        setIsAccountLocked(data.isLocked || false); // 👉 NEW
         const rawRewardAt = data.lastShareRewardAt;
         if (rawRewardAt) {
           setLastShareRewardAt(rawRewardAt.toMillis ? rawRewardAt.toMillis() : (Number(rawRewardAt) || 0));
