@@ -780,59 +780,87 @@ export default function BbCafeHome() {
     });
   };
 
- const handleSaveDetails = async (e: React.FormEvent) => {
+const handleGoogleLogin = async () => {
+    triggerHaptic();
+    const toastId = toast.loading(isHindi ? "Google से कनेक्ट हो रहा है..." : "Connecting to Google...");
+    try {
+      const auth = getAuth();
+      const googleProvider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      setGoogleUser({ uid: user.uid, email: user.email, name: user.displayName });
+      setTempName(user.displayName || "");
+      toast.dismiss(toastId);
+      toast.success(isHindi ? "अकाउंट वेरीफाई हो गया! अब अपना नंबर और PIN डालें।" : "Account verified! Enter details.");
+    } catch (error) {
+      console.error("Google Auth Error:", error);
+      toast.dismiss(toastId);
+      toast.error(isHindi ? "Google लॉगिन फेल हो गया!" : "Google Login Failed!");
+    }
+  };
+
+  const handleCompleteGoogleProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
     const phoneClean = tempPhone.trim();
-    if (!tempName.trim() || !/^\d{10}$/.test(phoneClean) || !/^\d{4}$/.test(tempPin)) {
-      toast.error(isHindi ? "कृपया सही नाम, 10 अंकों का नंबर और 4 अंकों का PIN दर्ज करें!" : "Please enter valid name, 10-digit phone & 4-digit PIN!");
+
+    if (!/^\d{10}$/.test(phoneClean) || !/^\d{4}$/.test(tempPin)) {
+      toast.error(isHindi ? "कृपया सही 10 अंकों का नंबर और 4-अंकों का PIN डालें!" : "Please enter valid 10-digit number and 4-digit PIN!");
       return;
     }
-    const formattedPhone = `+91${phoneClean}`;
     
+    const formattedPhone = `+91${phoneClean}`;
     const customerObj = {
-      name: tempName.trim(),
+      name: tempName.trim() || googleUser.name,
       phone: formattedPhone,
-      pin: tempPin,
+      pin: tempPin, // PIN रखा गया है ताकि गिफ्टिंग काम करे
+      googleUid: googleUser.uid,
+      email: googleUser.email,
       refCode: tempRefCode.trim() || undefined
     };
-    
+
     const toastId = toast.loading(isHindi ? "प्रोफाइल सहेज रहा है..." : "Saving profile...");
     try {
       const userDocRef = doc(db, "customer_points", phoneClean);
       const userSnap = await getDoc(userDocRef);
-      
+
       if (!userSnap.exists()) {
         await setDoc(userDocRef, {
           name: customerObj.name,
           phone: phoneClean,
           pin: customerObj.pin,
+          email: customerObj.email,
+          googleUid: customerObj.googleUid,
           points: 0,
+          walletBalance: 0,
           referredBy: tempRefCode.trim().toUpperCase(),
           lastActive: new Date()
         });
       } else {
         const existingData = userSnap.data();
-        if (existingData?.pin && existingData.pin !== tempPin) {
+        if (existingData?.googleUid && existingData.googleUid !== customerObj.googleUid) {
           toast.dismiss(toastId);
-          toast.error(isHindi ? "यह नंबर पहले से रजिस्टर्ड है! अपना सही 4-अंकों का PIN डालें।" : "Number already registered! Enter your correct 4-digit PIN.");
+          toast.error(isHindi ? "❌ यह नंबर किसी दूसरे अकाउंट से जुड़ा है!" : "❌ Number linked to another account!");
           return;
         }
         await setDoc(userDocRef, {
           name: customerObj.name,
-          pin: existingData?.pin || customerObj.pin,
+          pin: customerObj.pin,
+          googleUid: customerObj.googleUid,
+          email: customerObj.email,
           lastActive: new Date()
         }, { merge: true });
       }
-      
+
       localStorage.setItem('bb_cafe_customer', JSON.stringify(customerObj));
       setCustomerDetails(customerObj);
       setIsProfileOpen(false);
+      setGoogleUser(null);
       toast.dismiss(toastId);
-      toast.success(isHindi ? "प्रोफ़ाइल सफलतापूर्वक सहेजी गई!" : "Profile saved successfully!");
+      toast.success(isHindi ? "✅ सफलता! प्रोफ़ाइल लॉगिन हो गई।" : "✅ Profile saved successfully!");
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error(isHindi ? "प्रोफाइल सहेजने में त्रुटि आई!" : "Error saving profile!");
+      toast.error(isHindi ? "प्रोफाइल लॉगिन में त्रुटि आई!" : "Error saving profile!");
     }
   };
   const handleClaimSubmit = async (e: React.FormEvent) => {
