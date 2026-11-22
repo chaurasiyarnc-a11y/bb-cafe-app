@@ -1965,7 +1965,8 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     setCustFormAddress(cust.address || '');
     setCustFormPoints(cust.points || 0);
     setCustFormWalletBalance(cust.walletBalance || 0); // 👉 NEW
-    setCustFormNote(cust.note || ''); 
+    setCustFormIsLocked(cust.isLocked || false); // 👉 NEW
+    setCustFormNote(cust.note || '');
     setCustFormSpecialDates(cust.specialDates || []); 
     setIsAddEditCustModalOpen(true);
   };
