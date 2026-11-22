@@ -2736,34 +2736,60 @@ const isShareCooldownActive = lastShareRewardAt > 0 && (Date.now() - lastShareRe
                 </div>
               </div>
 
-              {!customerDetails ? (
-                <form onSubmit={handleSaveDetails} className="space-y-4">
+             {!customerDetails ? (
+                <div className="space-y-4">
                   <div className="text-center space-y-1.5 pb-2">
                     <User className="mx-auto text-orange-500" size={32} />
-                    <h3 className="text-sm font-black dark:text-white text-neutral-900">{isHindi ? "प्रोफाइल सेटअप करें" : "Set Up Profile"}</h3>
-                    <p className="text-[10px] text-neutral-600 dark:text-gray-400 font-semibold leading-normal">{isHindi ? "लॉयल्टी पॉइंट्स कमाने, सुरक्षित पिन सेटअप करने और आसान चेकआउट करने के लिए प्रोफाइल बनाएं!" : "Build your profile to unlock free loyalty codes, safety PIN checkout and fast orders!"}</p>
+                    <h3 className="text-sm font-black dark:text-white text-neutral-900">
+                      {isHindi ? "सुरक्षित लॉगिन करें" : "Secure Login"}
+                    </h3>
+                    <p className="text-[10px] text-neutral-600 dark:text-gray-400 font-semibold leading-normal">
+                      {isHindi ? "अपने पॉइंट्स और वॉलेट को सुरक्षित रखने के लिए अपनी Email से लॉगिन करें।" : "Login with Google to secure your loyalty points and wallet."}
+                    </p>
                   </div>
-                  
-                  <div className="space-y-3 text-left">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-neutral-600 uppercase">{isHindi ? "आपका नाम" : "Your Name"}</label>
-                      <input autoComplete="name" type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-neutral-600 uppercase">{isHindi ? "मोबाइल नंबर" : "Mobile Number"}</label>
-                      <input autoComplete="tel" type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-neutral-600 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
-                      <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest font-mono" required />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-neutral-600 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
-                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">{isHindi ? "खाता बनाएं ➔" : "Create Account ➔"}</button>
-                </form>
+
+                  {!googleUser ? (
+                    <button
+                      onClick={handleGoogleLogin}
+                      className="w-full bg-white dark:bg-neutral-800 text-black dark:text-white border dark:border-neutral-700 border-neutral-300 p-3.5 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-3"
+                    >
+                      <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
+                      Sign in with Google
+                    </button>
+                  ) : (
+                    <form onSubmit={handleCompleteGoogleProfile} className="space-y-3 text-left">
+                      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl mb-2 text-center">
+                         <p className="text-xs font-bold text-green-700 dark:text-green-400">✅ Verified: {googleUser.name}</p>
+                         <p className="text-[10px] text-green-600 dark:text-green-500">{googleUser.email}</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-neutral-600 uppercase">{isHindi ? "आपका नाम" : "Your Name"}</label>
+                        <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-neutral-600 uppercase">{isHindi ? "मोबाइल नंबर" : "Mobile Number"}</label>
+                        <input type="tel" maxLength={10} placeholder="10-digit number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-neutral-600 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
+                        <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest font-mono" required />
+                        <p className="text-[8px] text-neutral-500">{isHindi ? "*यह पिन दोस्तों को पॉइंट्स गिफ्ट करने के काम आएगा।" : "*Used for gifting points to friends."}</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-neutral-600 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
+                        <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
+                      </div>
+
+                      <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">
+                        {isHindi ? "लॉगिन पूरा करें ➔" : "Complete Login ➔"}
+                      </button>
+                    </form>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-6">
                   {/* USER ACCOUNT VIEW */}
