@@ -1950,9 +1950,10 @@ const handleSendUdhariReminder = (targetOrder: any) => {
     setCustFormName('');
     setCustFormPhone('');
     setCustFormAddress('');
-    setCustFormPoints(0);
+   setCustFormPoints(0);
     setCustFormWalletBalance(0); // 👉 NEW
-    setCustFormNote(''); 
+    setCustFormIsLocked(false); // 👉 NEW
+    setCustFormNote('');
     setCustFormSpecialDates([]); 
     setIsAddEditCustModalOpen(true);
   };
