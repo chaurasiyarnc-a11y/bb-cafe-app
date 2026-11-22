@@ -1246,7 +1246,9 @@ const handleGoogleLogin = async () => {
         // 2. ट्रांज़ैक्शन पास होने के बाद ही आर्डर सेव करें
         await addDoc(collection(db, "orders"), orderObj);
       } catch(dbError: any) {
-        if (dbError?.message === "INSUFFICIENT_POINTS") {
+        if (dbError?.message === "ACCOUNT_LOCKED") {
+          toast.error(isHindi ? "सुरक्षा कारणों से आपका खाता लॉक है। कृपया कार्ट से रिवॉर्ड आइटम हटा दें!" : "Account banned! Please remove reward items from cart.");
+        } else if (dbError?.message === "INSUFFICIENT_POINTS") {
           toast.error(isHindi ? "आपके पास इन रिवॉर्ड आइटम्स के लिए पर्याप्त पॉइंट्स नहीं हैं!" : "Insufficient loyalty points for reward items!");
         } else if (dbError?.message === "INSUFFICIENT_WALLET") {
           toast.error(isHindi ? "आपके वॉलेट में पर्याप्त बैलेंस नहीं है!" : "Insufficient wallet balance!");
