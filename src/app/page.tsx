@@ -1444,6 +1444,10 @@ const handleGoogleLogin = async () => {
 
  const updateShareCount = async () => {
     if (!customerDetails?.phone) return;
+    if (isAccountLocked) {
+      toast.error(isHindi ? "अकाउंट लॉक है, आप नए पॉइंट्स नहीं कमा सकते।" : "Account locked, cannot earn new points.");
+      return;
+    }
 
    const now = Date.now();
     if (lastShareRewardAt > 0 && (now - lastShareRewardAt) < THREE_HOURS_MS) {
