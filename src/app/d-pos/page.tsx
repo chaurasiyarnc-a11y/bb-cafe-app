@@ -11683,18 +11683,25 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                    <input type="text" maxLength={4} placeholder="e.g. 1234" value={custFormPin} onChange={e => setCustFormPin(e.target.value.replace(/\D/g, ''))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-black outline-none focus:border-orange-500 text-xs tracking-widest" />
                 </div>
 
-                {/* 👉 NEW: ACCOUNT LOCK TOGGLE */}
-                <div className="space-y-1 pt-2 border-t border-neutral-200 dark:border-neutral-800 bg-red-50 dark:bg-red-900/10 p-2 rounded-lg border border-red-200 dark:border-red-900/50 mt-2">
-                   <label className="flex items-center gap-2 cursor-pointer">
-                     <input 
-                       type="checkbox" 
-                       checked={custFormIsLocked} 
-                       onChange={e => setCustFormIsLocked(e.target.checked)} 
-                       className="w-4 h-4 accent-red-600 cursor-pointer"
-                     />
-                     <span className="text-[11px] font-black uppercase text-red-600">🚫 Freeze / Lock Account (चीटिंग रोकें)</span>
+               {/* 👉 NEW: ACCOUNT LOCK TOGGLE (Vertical Layout) */}
+                <div className="space-y-1 pt-2 border-t border-neutral-200 dark:border-neutral-800 mt-2">
+                   <label className="text-[10px] font-black uppercase text-red-600">
+                     🚫 Freeze / Lock Account (चीटिंग रोकें)
                    </label>
-                   <p className="text-[9px] font-bold text-red-500 ml-6">इसे चालू करने पर ग्राहक पॉइंट्स रिडीम, ट्रान्सफर या कमा नहीं पाएगा।</p>
+                   <label className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 rounded-xl p-3 flex flex-col gap-2 cursor-pointer hover:border-red-400 transition-colors">
+                     <div className="flex items-center gap-2">
+                       <input 
+                         type="checkbox" 
+                         checked={custFormIsLocked} 
+                         onChange={e => setCustFormIsLocked(e.target.checked)} 
+                         className="w-4 h-4 accent-red-600 cursor-pointer"
+                       />
+                       <span className="text-xs font-bold text-red-700 dark:text-red-400">Lock This Account</span>
+                     </div>
+                     <p className="text-[9px] font-bold text-red-500 leading-tight">
+                       इसे चालू करने पर ग्राहक पॉइंट्स रिडीम, ट्रान्सफर या कमा नहीं पाएगा।
+                     </p>
+                   </label>
                 </div>
 
 
