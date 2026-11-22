@@ -1514,8 +1514,11 @@ const handleGoogleLogin = async () => {
       console.error(err);
     }
   };
- const handleCustomerRedeem = (ruleId: string, rewardName: string, pointsCost: number) => {
+const handleCustomerRedeem = (ruleId: string, rewardName: string, pointsCost: number) => {
     triggerHaptic();
+    if (isAccountLocked) {
+      return toast.error(isHindi ? "आपका खाता लॉक है! आप पॉइंट्स का इस्तेमाल नहीं कर सकते।" : "Account locked! Cannot redeem points.");
+    }
     if (!customerDetails?.phone) {
       toast.error(isHindi ? "कृपया पहले प्रोफाइल बनाएं!" : "Please create profile first!");
       return;
