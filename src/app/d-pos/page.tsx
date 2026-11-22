@@ -11672,9 +11672,15 @@ onChange={e => handleTitleCaseInput(e, (val) => {
                    <input type="number" min={0} placeholder="e.g. 150" value={custFormPoints} onChange={e => setCustFormPoints(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none focus:border-orange-500 text-xs" />
                 </div>
 
-               <div className="space-y-1">
+              <div className="space-y-1">
                    <label className="text-[10px] font-black uppercase text-green-600">💳 Wallet Balance (₹)</label>
                    <input type="number" min={0} placeholder="e.g. 1200" value={custFormWalletBalance} onChange={e => setCustFormWalletBalance(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-green-50 dark:bg-green-900/10 border border-green-300 dark:border-green-800 rounded-xl p-2.5 font-mono font-black outline-none focus:border-green-500 text-xs text-green-700 dark:text-green-400" />
+                </div>
+
+                {/* 👉 NEW: SECURITY PIN INPUT */}
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-neutral-500">Security PIN (4 Digits)</label>
+                   <input type="text" maxLength={4} placeholder="e.g. 1234" value={custFormPin} onChange={e => setCustFormPin(e.target.value.replace(/\D/g, ''))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-black outline-none focus:border-orange-500 text-xs tracking-widest" />
                 </div>
 
                 {/* 👉 NEW: ACCOUNT LOCK TOGGLE */}
