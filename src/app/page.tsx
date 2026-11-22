@@ -1217,6 +1217,9 @@ const handleGoogleLogin = async () => {
             const prevVisits = Number(data.totalVisits) || 0;
             const prevWalletBalance = Number(data.walletBalance) || 0;
 
+            if (data.isLocked && totalPointsCost > 0) {
+              throw new Error("ACCOUNT_LOCKED");
+            }
             if (totalPointsCost > 0 && prevPoints < totalPointsCost) {
               throw new Error("INSUFFICIENT_POINTS");
             }
