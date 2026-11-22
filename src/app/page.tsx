@@ -788,10 +788,36 @@ const handleGoogleLogin = async () => {
       const googleProvider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      setGoogleUser({ uid: user.uid, email: user.email, name: user.displayName });
-      setTempName(user.displayName || "");
-      toast.dismiss(toastId);
-      toast.success(isHindi ? "अकाउंट वेरीफाई हो गया! अब अपना नंबर और PIN डालें।" : "Account verified! Enter details.");
+
+      // 👉 NEW: चेक करें कि क्या यह ग्राहक पहले से हमारे डेटाबेस में है?
+      const emailQuery = query(collection(db, "customer_points"), where("googleUid", "==", user.uid));
+      const emailSnap = await getDocs(emailQuery);
+
+      if (!emailSnap.empty) {
+        // 🟢 OLD CUSTOMER (पुराना ग्राहक) - डायरेक्ट लॉगिन (बिना फॉर्म दिखाए)
+        const existingDoc = emailSnap.docs[0];
+        const existingData = existingDoc.data();
+        
+        const customerObj = {
+          name: existingData.name,
+          phone: existingDoc.id, // ID ही फ़ोन नंबर है
+          pin: existingData.pin,
+          googleUid: existingData.googleUid,
+          email: existingData.email,
+        };
+
+        localStorage.setItem('bb_cafe_customer', JSON.stringify(customerObj));
+        setCustomerDetails(customerObj);
+        setIsProfileOpen(false); // मॉडल बंद करें
+        toast.dismiss(toastId);
+        toast.success(isHindi ? `वापसी पर स्वागत है, ${customerObj.name}! 👋` : `Welcome back, ${customerObj.name}! 👋`);
+      } else {
+        // 🟡 NEW CUSTOMER (नया ग्राहक) - फॉर्म दिखाएं (नंबर और पिन सेट करने के लिए)
+        setGoogleUser({ uid: user.uid, email: user.email, name: user.displayName });
+        setTempName(user.displayName || "");
+        toast.dismiss(toastId);
+        toast.success(isHindi ? "Google वेरीफाई! कृपया अपना नंबर और नया PIN सेट करें।" : "Google verified! Set your number & PIN.");
+      }
     } catch (error) {
       console.error("Google Auth Error:", error);
       toast.dismiss(toastId);
