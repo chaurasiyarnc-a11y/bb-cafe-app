@@ -128,7 +128,8 @@ export default function BbCafeHome() {
   // History Ledger Tracker Collapse States
   const [dismissedHistoryOrders, setDismissedHistoryOrders] = useState<number[]>([]);
 
-  const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string, refCode?: string, pin?: string } | null>(null);
+ const [googleUser, setGoogleUser] = useState<any>(null);
+  const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string, refCode?: string, pin?: string, googleUid?: string, email?: string } | null>(null);
   const [tempName, setTempName] = useState("");
   const [tempPhone, setTempPhone] = useState("");
   const [tempPin, setTempPin] = useState(""); 
