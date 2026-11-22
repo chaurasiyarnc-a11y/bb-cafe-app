@@ -991,9 +991,13 @@ const handleGoogleLogin = async () => {
     }
   };
 
-  const handleGiftPoints = async (e: React.FormEvent) => {
+ const handleGiftPoints = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
+    
+    if (isAccountLocked) {
+      return toast.error(isHindi ? "सुरक्षा कारणों से आपका अकाउंट लॉक (Banned) कर दिया गया है!" : "Your account is banned for security reasons!");
+    }
     
     if (!customerDetails?.phone) {
       toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
