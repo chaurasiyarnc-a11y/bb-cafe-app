@@ -1,6 +1,9 @@
 'use client';
 import React, { useMemo } from 'react';
-import { BarChart3, Download, Calendar, MapPin, Phone } from 'lucide-react';
+import { 
+  IndianRupee, ShoppingBag, CreditCard, Activity, 
+  Download, Calendar, TrendingUp, Send, FileText, AlertOctagon 
+} from 'lucide-react';
 import { formatBillNumber } from '../../lib/utils'; 
 
 interface DashboardStatsProps {
@@ -31,265 +34,261 @@ export default function DashboardStats({
   setSelectedCustomerHistory
 }: DashboardStatsProps) {
 
-  // तारीख के अनुसार रेवेन्यू और ऑडिट कैलकुलेशन
-  const auditStats = useMemo(() => {
-    const startObj = new Date(startDate);
-    startObj.setHours(0, 0, 0, 0);
-    const endObj = new Date(endDate);
-    endObj.setHours(23, 59, 59, 999);
-
-    const rangeOrders = orders.filter(o => {
+  // 1. Date के हिसाब से ऑर्डर्स को फ़िल्टर करना
+  const filteredOrders = useMemo(() => {
+    return orders.filter(o => {
       if (!o.timestamp) return false;
-      const orderDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
-      return orderDate >= startObj && orderDate <= endObj;
+      const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
+      // टाइम को हटाकर सिर्फ YYYY-MM-DD लेना ताकि सही से मैच हो
+      const dStr = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      return dStr >= startDate && dStr <= endDate;
     });
-
-    const validRangeOrders = rangeOrders.filter(o => o.status !== "rejected" && o.status !== "fake");
-
-    const todayStr = new Date().toDateString();
-    const todayRejectedCount = orders.filter(o => {
-      if (!o.timestamp) return false;
-      const oDate = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
-      return o.status === "rejected" && oDate === todayStr;
-    }).length;
-
-    const rangeRevenue = validRangeOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-    const activeCount = orders.filter(o => o.status === 'pending' || o.status === 'preparing').length;
-
-    let cashSales = 0;
-    let upiSales = 0;
-    validRangeOrders.forEach(o => {
-      const amt = Number(o.total) || 0;
-      if (o.paymentMethod === 'cod' || o.paymentMethod === 'Cash' || o.billNumber % 2 === 0) {
-        cashSales += amt;
-      } else {
-        upiSales += amt;
-      }
-    });
-
-    return {
-      rangeRevenue,
-      rangeCount: rangeOrders.length,
-      rejectedCount: rangeOrders.filter(o => o.status === "rejected").length,
-      todayRejectedCount,
-      active: activeCount,
-      cashSales,
-      upiSales,
-      rangeOrders
-    };
   }, [orders, startDate, endDate]);
 
-  // टॉप 5 बेस्ट-सेलिंग डिशेज की गणना
-  const topSellingDishes = useMemo(() => {
-    const countsMap: any = {};
-    orders.forEach(o => {
-      o.items?.forEach((item: any) => {
-        if (!item.name) return;
-        countsMap[item.name] = (countsMap[item.name] || 0) + (Number(item.quantity) || 1);
-      });
-    });
+  // 2. बिज़नेस के मुख्य आँकड़े (Metrics) निकालना
+  const stats = useMemo(() => {
+    let grossSales = 0;
+    let completedOrders = 0;
+    let cashCollected = 0;
+    let upiCollected = 0;
+    let pendingDue = 0;
+    let totalDiscount = 0;
+    let rejectedOrdersCount = 0;
+    
+    // Top Items के लिए
+    const itemMap: { [name: string]: { qty: number; rev: number } } = {};
 
-    return Object.entries(countsMap)
-      .map(([name, qty]: any) => ({ name, qty }))
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5);
-  }, [orders]);
+    filteredOrders.forEach(o => {
+      const amt = Number(o.total) || 0;
+      
+      if (o.status === 'rejected' || o.status === 'cancelled') {
+        rejectedOrdersCount++;
+        return;
+      }
+      
+      // सिर्फ सेटल हुए (Completed) ऑर्डर्स की सेल जोड़ें
+      if (o.status === 'completed') {
+        grossSales += amt;
+        completedOrders += 1;
+        totalDiscount += (Number(o.discountAmount) || 0);
 
-  // पिछले 7 दिनों का सेल्स ग्राफ कैलकुलेशन
-  const last7DaysChartData = useMemo(() => {
-    const days: any[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      days.push({
-        dateStr: d.toDateString(),
-        label: d.toLocaleDateString('en-IN', { weekday: 'short' }),
-        sales: 0
-      });
-    }
+        if (o.paymentMethod === 'upi') upiCollected += amt;
+        else if (o.paymentMethod === 'cash') cashCollected += amt;
+        else if (o.paymentMethod === 'split') {
+          cashCollected += (Number(o.splitCashAmount) || 0);
+          upiCollected += (Number(o.splitUpiAmount) || 0);
+        }
 
-    orders.forEach(o => {
-      if (!o.timestamp) return;
-      const orderDateStr = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
-      const match = days.find(day => day.dateStr === orderDateStr);
-      if (match) {
-        match.sales += (Number(o.total) || 0);
+        // आइटम की गिनती
+        o.items?.forEach((it: any) => {
+          const name = (it.name || 'Unknown').split('(')[0].trim();
+          if (!itemMap[name]) itemMap[name] = { qty: 0, rev: 0 };
+          itemMap[name].qty += (Number(it.quantity) || 1);
+          itemMap[name].rev += (Number(it.price) * (Number(it.quantity) || 1));
+        });
+      }
+      
+      // उधार (Due) का हिसाब (जो रिजेक्ट नहीं हुए हैं)
+      if (o.paymentMethod === 'due' && o.status !== 'rejected') {
+        pendingDue += amt;
       }
     });
 
-    const maxSales = Math.max(...days.map(d => d.sales), 100);
+    const aov = completedOrders > 0 ? Math.round(grossSales / completedOrders) : 0;
+    const topItems = Object.values(itemMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
 
-    return days.map(day => ({
-      ...day,
-      percentage: (day.sales / maxSales) * 100
-    }));
-  }, [orders]);
+    return { grossSales, completedOrders, cashCollected, upiCollected, pendingDue, totalDiscount, rejectedOrdersCount, aov, topItems };
+  }, [filteredOrders]);
+
+  // पेमेंट का प्रतिशत (Progress Bar के लिए)
+  const totalCollected = stats.cashCollected + stats.upiCollected;
+  const cashPct = totalCollected > 0 ? Math.round((stats.cashCollected / totalCollected) * 100) : 0;
+  const upiPct = totalCollected > 0 ? Math.round((stats.upiCollected / totalCollected) * 100) : 0;
 
   return (
-    <div className="space-y-6 transition-colors duration-300">
-      <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">
-        <BarChart3 size={20}/> Sales Dashboard
-      </h3>
+    <div className="space-y-6 pb-10 transition-colors duration-300">
       
-      {/* त्वरित फ़िल्टर बटन्स (English Labels के साथ) */}
-      <div className="grid grid-cols-4 gap-2 bg-white dark:bg-[#111] p-3 rounded-2xl border border-neutral-200 dark:border-white/5 font-sans shadow-sm transition-colors duration-300">
-        <button onClick={() => applyQuickSalesFilter('today')} className="py-2.5 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-sm">Today's Sale</button>
-        <button onClick={() => applyQuickSalesFilter('yesterday')} className="py-2.5 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-sm">Yesterday's Sale</button>
-        <button onClick={() => applyQuickSalesFilter('week')} className="py-2.5 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-sm">Weekly Sale</button>
-        <button onClick={() => applyQuickSalesFilter('month')} className="py-2.5 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-sm">Monthly Sale</button>
-      </div>
-
-      {/* कस्टम डेट ऑडिट बॉक्स */}
-      <div className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-5 rounded-3xl space-y-4 shadow-sm transition-colors duration-300">
-        <div className="flex flex-col gap-3">
-          <p className="text-[10px] font-black uppercase text-orange-500 dark:text-orange-400 tracking-wider">🎯 Custom Date-Range Auditor</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Start Date</label>
-              <input 
-                type="date" 
-                value={startDate} 
-                onChange={(e) => setStartDate(e.target.value)} 
-                className="bg-neutral-50 dark:bg-black/60 border border-neutral-200 dark:border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-600 dark:text-orange-500 outline-none cursor-pointer transition-colors duration-300"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">End Date</label>
-              <input 
-                type="date" 
-                value={endDate} 
-                onChange={(e) => setEndDate(e.target.value)} 
-                className="bg-neutral-50 dark:bg-black/60 border border-neutral-200 dark:border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-600 dark:text-orange-500 outline-none cursor-pointer transition-colors duration-300"
-              />
-            </div>
-          </div>
+      {/* --- HEADER & DATE FILTER --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-[#111] p-4 rounded-3xl shadow-sm border border-neutral-200 dark:border-white/10 gap-4">
+        <div>
+          <h2 className="text-xl font-black uppercase text-neutral-900 dark:text-white flex items-center gap-2">
+            <TrendingUp className="text-orange-500" size={24} /> Admin Dashboard
+          </h2>
+          <p className="text-[11px] text-neutral-500 font-bold mt-1 tracking-widest uppercase">Overview & Analytics</p>
         </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Quick Filters */}
+          <div className="flex bg-neutral-100 dark:bg-white/5 p-1 rounded-xl">
+            <button onClick={() => applyQuickSalesFilter('today')} className="px-3 py-1.5 text-[10px] font-black uppercase text-neutral-600 dark:text-neutral-400 hover:text-orange-600 dark:hover:text-orange-500 rounded-lg">Today</button>
+            <button onClick={() => applyQuickSalesFilter('yesterday')} className="px-3 py-1.5 text-[10px] font-black uppercase text-neutral-600 dark:text-neutral-400 hover:text-orange-600 dark:hover:text-orange-500 rounded-lg">Yesterday</button>
+            <button onClick={() => applyQuickSalesFilter('month')} className="px-3 py-1.5 text-[10px] font-black uppercase text-neutral-600 dark:text-neutral-400 hover:text-orange-600 dark:hover:text-orange-500 rounded-lg">Month</button>
+          </div>
 
-        {/* स्टेट्स ग्रिड */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-neutral-100 dark:border-white/5 pt-4">
-          <div className="bg-neutral-50 dark:bg-white/[0.01] border border-neutral-200 dark:border-white/5 p-3 rounded-2xl text-center shadow-sm">
-            <p className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Range Sales</p>
-            <h3 className="text-base font-black text-green-600 dark:text-green-400 mt-1">₹{auditStats.rangeRevenue}</h3>
-          </div>
-          <div className="bg-neutral-50 dark:bg-white/[0.01] border border-neutral-200 dark:border-white/5 p-3 rounded-2xl text-center shadow-sm">
-            <p className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Range Orders</p>
-            <h3 className="text-base font-black text-yellow-600 dark:text-yellow-400 mt-1">{auditStats.rangeCount}</h3>
-          </div>
-          <div className="bg-neutral-50 dark:bg-white/[0.01] border border-neutral-200 dark:border-white/5 p-3 rounded-2xl text-center shadow-sm">
-            <p className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase">Active Kitchen</p>
-            <h3 className="text-base font-black text-orange-600 dark:text-orange-500 mt-1">{auditStats.active}</h3>
-          </div>
-          <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3 rounded-2xl text-center shadow-sm">
-            <p className="text-[9px] font-bold text-red-500 dark:text-red-400 uppercase">Today's Rejected 🚫</p>
-            <h3 className="text-base font-black text-red-600 dark:text-red-500 mt-1">{auditStats.todayRejectedCount}</h3>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <div className="bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 p-3.5 rounded-2xl flex justify-between items-center shadow-sm">
-            <span className="text-[10px] font-black text-neutral-500 dark:text-gray-500 uppercase">Cash Collected:</span>
-            <span className="text-xs font-black text-green-600 dark:text-green-400">₹{auditStats.cashSales}</span>
-          </div>
-          <div className="bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 p-3.5 rounded-2xl flex justify-between items-center shadow-sm">
-            <span className="text-[10px] font-black text-neutral-500 dark:text-gray-500 uppercase">Online (UPI):</span>
-            <span className="text-xs font-black text-blue-600 dark:text-blue-400">₹{auditStats.upiSales}</span>
+          {/* Custom Date Range */}
+          <div className="flex items-center gap-2 bg-orange-50 dark:bg-orange-500/10 p-1.5 rounded-xl border border-orange-200 dark:border-orange-500/20">
+            <Calendar size={14} className="text-orange-600 ml-1 shrink-0" />
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={e => setStartDate(e.target.value)} 
+              className="bg-transparent text-[11px] font-bold text-orange-800 dark:text-orange-400 outline-none cursor-pointer"
+            />
+            <span className="text-orange-400 font-black text-[10px]">TO</span>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={e => setEndDate(e.target.value)} 
+              className="bg-transparent text-[11px] font-bold text-orange-800 dark:text-orange-400 outline-none cursor-pointer"
+            />
           </div>
         </div>
       </div>
 
-      {/* चार्ट ग्राफ़ */}
-      <div className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-5 rounded-3xl space-y-3 shadow-sm transition-colors duration-300">
-        <p className="text-[10px] font-black uppercase text-orange-500 dark:text-orange-400 tracking-wider">📈 Last 7 Days Sales Trend</p>
-        <div className="h-44 w-full flex items-end justify-between gap-2 pt-6 pb-2 px-1">
-          {last7DaysChartData.map((day, idx) => (
-            <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
-              <span className="text-[8px] font-bold text-green-600 dark:text-green-400 opacity-0 group-hover:opacity-100 transition-opacity">₹{day.sales}</span>
-              <div 
-                style={{ height: `${day.percentage}%` }} 
-                className="w-full bg-gradient-to-t from-orange-500 to-yellow-400 dark:from-orange-600 dark:to-orange-400 rounded-t-lg min-h-[4px] relative"
-              ></div>
-              <span className="text-[9px] font-bold text-neutral-500 dark:text-gray-500 uppercase mt-1">{day.label}</span>
-            </div>
-          ))}
+      {/* --- 4 MAIN METRIC CARDS --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Sales Card */}
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/10 p-5 rounded-3xl border border-emerald-200 dark:border-emerald-800/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+          <IndianRupee className="absolute -right-4 -bottom-4 text-emerald-500/20 group-hover:scale-110 transition-transform" size={100} />
+          <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 relative z-10">Gross Sales (कुल बिक्री)</p>
+          <p className="text-3xl font-black font-mono text-emerald-700 dark:text-emerald-400 mt-1 relative z-10">₹{stats.grossSales.toLocaleString('en-IN')}</p>
+        </div>
+
+        {/* Orders Card */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/10 p-5 rounded-3xl border border-blue-200 dark:border-blue-800/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+          <ShoppingBag className="absolute -right-4 -bottom-4 text-blue-500/20 group-hover:scale-110 transition-transform" size={100} />
+          <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400 relative z-10">Total Bills (बिल बने)</p>
+          <p className="text-3xl font-black font-mono text-blue-700 dark:text-blue-400 mt-1 relative z-10">{stats.completedOrders}</p>
+        </div>
+
+        {/* AOV Card */}
+        <div className="bg-gradient-to-br from-purple-50 to-fuchsia-100 dark:from-purple-900/20 dark:to-fuchsia-900/10 p-5 rounded-3xl border border-purple-200 dark:border-purple-800/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+          <Activity className="absolute -right-4 -bottom-4 text-purple-500/20 group-hover:scale-110 transition-transform" size={100} />
+          <p className="text-[10px] font-black uppercase text-purple-700 dark:text-purple-400 relative z-10">Avg Order Value (औसत बिल)</p>
+          <p className="text-3xl font-black font-mono text-purple-700 dark:text-purple-400 mt-1 relative z-10">₹{stats.aov}</p>
+        </div>
+
+        {/* Udhari Card */}
+        <div className="bg-gradient-to-br from-rose-50 to-red-100 dark:from-rose-900/20 dark:to-red-900/10 p-5 rounded-3xl border border-rose-200 dark:border-rose-800/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+          <CreditCard className="absolute -right-4 -bottom-4 text-rose-500/20 group-hover:scale-110 transition-transform" size={100} />
+          <p className="text-[10px] font-black uppercase text-rose-700 dark:text-rose-400 relative z-10">Market Due (बाज़ार में उधार)</p>
+          <p className="text-3xl font-black font-mono text-rose-700 dark:text-rose-400 mt-1 relative z-10">₹{stats.pendingDue.toLocaleString('en-IN')}</p>
         </div>
       </div>
 
-      {/* बेस्ट सेलिंग डिशेज */}
-      <div className="bg-white dark:bg-[#111] border border-neutral-200 dark:border-white/5 p-5 rounded-3xl space-y-3 shadow-sm transition-colors duration-300">
-        <p className="text-[10px] font-black uppercase text-orange-500 dark:text-orange-400 tracking-wider">🔥 Top 5 Best Selling Dishes</p>
-        <div className="space-y-2">
-          {topSellingDishes.map((dish, idx) => (
-            <div key={idx} className="flex justify-between items-center bg-neutral-50 dark:bg-white/[0.01] border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs font-bold shadow-sm">
-              <span className="text-neutral-800 dark:text-gray-300">{idx + 1}. {dish.name}</span>
-              <span className="bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-500 px-3 py-1 rounded-full text-[10px] font-black">{dish.qty} times</span>
+      {/* --- MIDDLE SECTION: PAYMENT SPLIT & TOP ITEMS --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Payment Breakdown */}
+        <div className="bg-white dark:bg-[#111] p-6 rounded-3xl border border-neutral-200 dark:border-white/5 shadow-sm flex flex-col justify-center">
+          <h3 className="text-sm font-black uppercase text-neutral-800 dark:text-neutral-200 border-b border-neutral-100 dark:border-white/10 pb-3 mb-5">
+            💳 Payment Collection Source
+          </h3>
+          
+          <div className="space-y-5">
+            {/* Cash */}
+            <div>
+              <div className="flex justify-between text-xs font-bold mb-1.5">
+                <span className="text-amber-600 dark:text-amber-500">💵 Cash (गल्ला)</span>
+                <span className="text-neutral-900 dark:text-white font-mono font-black">₹{stats.cashCollected.toLocaleString('en-IN')} <span className="text-neutral-400 font-normal">({cashPct}%)</span></span>
+              </div>
+              <div className="w-full bg-neutral-100 dark:bg-white/5 rounded-full h-3 overflow-hidden border border-neutral-200 dark:border-transparent">
+                <div className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-1000" style={{ width: `${cashPct}%` }}></div>
+              </div>
             </div>
-          ))}
-          {topSellingDishes.length === 0 && (
-            <p className="text-center text-[10px] text-neutral-500 dark:text-gray-500 uppercase font-bold py-2">No sales logged yet...</p>
+
+            {/* UPI */}
+            <div>
+              <div className="flex justify-between text-xs font-bold mb-1.5">
+                <span className="text-blue-600 dark:text-blue-400">📱 UPI / Online</span>
+                <span className="text-neutral-900 dark:text-white font-mono font-black">₹{stats.upiCollected.toLocaleString('en-IN')} <span className="text-neutral-400 font-normal">({upiPct}%)</span></span>
+              </div>
+              <div className="w-full bg-neutral-100 dark:bg-white/5 rounded-full h-3 overflow-hidden border border-neutral-200 dark:border-transparent">
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-1000" style={{ width: `${upiPct}%` }}></div>
+              </div>
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-dashed border-neutral-200 dark:border-white/10 grid grid-cols-2 gap-4">
+               <div className="p-3 bg-orange-50 dark:bg-orange-500/10 rounded-xl border border-orange-100 dark:border-orange-500/20 text-center">
+                 <p className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400">Discounts Given</p>
+                 <p className="text-lg font-black font-mono text-orange-600 dark:text-orange-500 mt-0.5">- ₹{stats.totalDiscount}</p>
+               </div>
+               <div className="p-3 bg-red-50 dark:bg-red-500/10 rounded-xl border border-red-100 dark:border-red-500/20 text-center">
+                 <p className="text-[10px] font-black uppercase text-red-600 dark:text-red-400">Rejected / Fake</p>
+                 <p className="text-lg font-black font-mono text-red-600 dark:text-red-500 mt-0.5">{stats.rejectedOrdersCount} Bills</p>
+               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Top Selling Items */}
+        <div className="bg-white dark:bg-[#111] p-6 rounded-3xl border border-neutral-200 dark:border-white/5 shadow-sm flex flex-col">
+          <h3 className="text-sm font-black uppercase text-neutral-800 dark:text-neutral-200 border-b border-neutral-100 dark:border-white/10 pb-3 mb-5">
+            🔥 Top 5 Best Selling Items
+          </h3>
+          
+          {stats.topItems.length === 0 ? (
+             <div className="flex-1 flex items-center justify-center">
+               <p className="text-xs text-neutral-400 font-bold uppercase tracking-widest">No Sales Data Found.</p>
+             </div>
+          ) : (
+            <div className="space-y-3 flex-1 overflow-y-auto pr-1">
+              {stats.topItems.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center p-3.5 bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 rounded-2xl hover:border-orange-500 dark:hover:border-orange-500 transition-colors">
+                   <div className="flex items-center gap-3">
+                      <span className="text-xs font-black text-orange-500 opacity-80">#{idx + 1}</span>
+                      <span className="text-xs font-bold text-neutral-900 dark:text-gray-200">{item.name}</span>
+                   </div>
+                   <div className="flex items-center gap-4 text-right">
+                     <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-md">{item.qty} Qty</span>
+                     <span className="text-sm font-black font-mono text-green-600 dark:text-green-400 w-16">₹{item.rev}</span>
+                   </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
+
       </div>
 
-      {/* डेटा मैनेजमेंट एक्शन्स */}
-      <div className="grid grid-cols-2 gap-3 bg-white dark:bg-[#111]/30 border border-neutral-200 dark:border-white/5 p-4 rounded-[2rem] shadow-sm transition-colors duration-300">
-        <button onClick={handleResetSalesData} className="bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-500 border border-red-200 dark:border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase font-mono shadow-sm">
-          Reset All Sales Data 🚫
-        </button>
-        <button onClick={handleSendDailyClosingReport} className="bg-green-600 hover:bg-green-500 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10 font-mono">
-          📲 Send Report to Owner
+      {/* --- BOTTOM SECTION: EXPORT ACTIONS --- */}
+      <div className="bg-white dark:bg-[#111] p-5 rounded-3xl border border-neutral-200 dark:border-white/5 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+         <div>
+           <p className="text-sm font-black uppercase text-neutral-800 dark:text-neutral-100">📥 Export & Reports</p>
+           <p className="text-[10px] text-neutral-500 font-bold mt-1">अपने सीए (CA) को डेटा भेजें या WhatsApp पर रिपोर्ट मंगाएं।</p>
+         </div>
+         <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <button 
+              onClick={handleExportOrders}
+              className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-xl text-[10px] font-black uppercase shadow-sm flex justify-center items-center gap-1.5 transition-all"
+            >
+              <FileText size={14} /> Sales Ledger (Excel)
+            </button>
+            <button 
+              onClick={handleExportCustomers}
+              className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-xl text-[10px] font-black uppercase shadow-sm flex justify-center items-center gap-1.5 transition-all"
+            >
+              <Download size={14} /> Customers (Excel)
+            </button>
+            <button 
+              onClick={handleSendDailyClosingReport}
+              className="w-full md:w-auto bg-green-600 hover:bg-green-500 text-white px-5 py-3 rounded-xl text-[10px] font-black uppercase shadow-sm flex justify-center items-center gap-1.5 transition-all"
+            >
+              <Send size={14} /> Send WhatsApp Report
+            </button>
+         </div>
+      </div>
+      
+      {/* Danger Zone */}
+      <div className="text-right">
+        <button 
+          onClick={handleResetSalesData}
+          className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-red-500 hover:text-white bg-transparent hover:bg-red-500 border border-red-500/30 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          <AlertOctagon size={12} /> Reset All Sales Data
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 bg-white dark:bg-[#111]/30 border border-neutral-200 dark:border-white/5 p-4 rounded-[2rem] shadow-sm transition-colors duration-300">
-        <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-500 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10 font-mono">
-          <Download size={14}/> Sales Ledger Excel
-        </button>
-        <button onClick={handleExportCustomers} className="bg-orange-500 hover:bg-orange-600 text-white dark:text-black font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-orange-500/10">
-          <Download size={14}/> Customer List Excel
-        </button>
-      </div>
-
-      {/* स्थाई ट्रांजेक्शन लेजर (Permanent Ledger) */}
-      <div className="space-y-4 font-mono">
-        <h4 className="text-sm font-black text-neutral-500 dark:text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
-        {orders.length === 0 ? (
-          <p className="text-center text-neutral-500 dark:text-gray-500 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
-        ) : (
-          orders.map((o) => (
-            <div key={o.id} className={`p-5 rounded-3xl flex justify-between items-center relative overflow-hidden text-xs border transition-colors duration-300 shadow-sm ${o.status === 'rejected' ? 'bg-red-50 dark:bg-red-500/[0.02] border-red-200 dark:border-red-500/20' : 'bg-white dark:bg-[#111] border-neutral-200 dark:border-white/5'}`}>
-              <div className="space-y-1 pr-4">
-                {o.status === 'rejected' && (
-                  <div className="mb-2 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 border border-red-200 dark:border-red-500/20 text-[8px] font-black uppercase px-2.5 py-1 rounded-md w-max">
-                    🚫 Rejected / Fake Order
-                  </div>
-                )}
-                <div className="flex gap-2.5">
-                  <span className="text-[10px] font-black uppercase text-neutral-500 dark:text-gray-500">Bill No: #{formatBillNumber(o.billNumber || 0)}</span>
-                  <span className="text-[10px] font-black uppercase text-yellow-600 dark:text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
-                </div>
-                <h4 className="font-extrabold text-sm text-neutral-900 dark:text-gray-300">Name: {o.customerName || "Customer"}</h4>
-                <p className="text-[11px] font-bold text-orange-600 dark:text-orange-500 font-sans">Mobile: {o.customerPhone || "N/A"}</p>
-                <p className="text-[10px] text-neutral-500 dark:text-gray-400 font-medium">Address: {o.address || "N/A"}</p>
-                
-                <div className="border-t border-neutral-200 dark:border-white/5 pt-2 mt-2 space-y-0.5">
-                  {o.items?.map((item: any, idx: number) => (
-                    <p key={idx} className="text-[11px] font-bold text-neutral-600 dark:text-gray-400 font-sans">
-                      <span className="text-orange-600 dark:text-orange-500">×{item.quantity}</span> {item.name}
-                    </p>
-                  ))}
-                </div>
-                <p className="text-[9px] font-semibold text-neutral-400 dark:text-gray-500 mt-2 font-sans">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className={`font-black text-lg leading-none ${o.status === 'rejected' ? 'line-through text-red-500' : 'text-green-600 dark:text-green-400'}`}>₹{o.total}</p>
-                <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-md mt-2 inline-block ${o.status === 'rejected' ? 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500' : 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400'}`}>
-                  {o.status === 'rejected' ? 'REJECTED' : 'PAID'}
-                </span>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
     </div>
   );
 }
