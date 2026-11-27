@@ -57,8 +57,8 @@ export default function DashboardStats({
     let totalDiscount = 0;
     let rejectedOrdersCount = 0;
     
-    // Top Items के लिए
-    const itemMap: { [name: string]: { qty: number; rev: number } } = {};
+    // Top Items के लिए (यहाँ name को टाइप में जोड़ दिया गया है)
+    const itemMap: { [name: string]: { name: string; qty: number; rev: number } } = {};
 
     filteredOrders.forEach(o => {
       const amt = Number(o.total) || 0;
@@ -84,7 +84,8 @@ export default function DashboardStats({
         // ऑनलाइन बिकने वाले आइटम की गिनती
         o.items?.forEach((it: any) => {
           const name = (it.name || 'Unknown').split('(')[0].trim();
-          if (!itemMap[name]) itemMap[name] = { qty: 0, rev: 0 };
+          // यहाँ name को ऑब्जेक्ट के अंदर सेव कर दिया
+          if (!itemMap[name]) itemMap[name] = { name: name, qty: 0, rev: 0 };
           itemMap[name].qty += (Number(it.quantity) || 1);
           itemMap[name].rev += (Number(it.price) * (Number(it.quantity) || 1));
         });
