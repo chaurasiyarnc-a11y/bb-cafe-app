@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Printer, Search, Trash2, User, Phone, Tag, Shirt, ScanBarcode, Menu, Users, Truck, PackagePlus, Settings, X, QrCode, Bluetooth } from 'lucide-react';
+import { ShoppingBag, Printer, Search, Trash2, User, Phone, Tag, Shirt, ScanBarcode, Menu, Users, Truck, PackagePlus, Settings, X, QrCode, Bluetooth, BarChart3, Calendar } from 'lucide-react';
 
-// --- DEFAULT DUMMY DATA ---
+// --- DEFAULT DUMMY INVENTORY ---
 const INITIAL_INVENTORY = [
   { id: '101', barcode: '123456789012', name: 'Nike Running Shoes', category: 'Sports', size: 'UK 8', color: 'Black', price: 1500, stock: 10, vendor: 'Nike India' },
   { id: '102', barcode: '890123456789', name: 'Adidas Trackpant', category: 'Clothing', size: 'L', color: 'Blue', price: 800, stock: 5, vendor: 'Delhi Traders' },
@@ -16,22 +16,19 @@ export default function RetailPos() {
     name: 'MY CLOTHING & SPORTS', 
     phone: '9876543210', 
     address: 'Main Market, Your City',
-    upiId: 'yourname@upi', // Naya: UPI ID
-    enableScanner: true,   // Naya: BT Scanner Toggle
-    printerType: 'system'  // Naya: BT/USB System Printer
+    upiId: 'yourname@upi',
+    enableScanner: true,
   });
 
   // --- DYNAMIC SIZES & COLORS ---
   const [sizes, setSizes] = useState(['S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34', 'UK 7', 'UK 8', 'UK 9']);
   const [colors, setColors] = useState(['Black', 'White', 'Blue', 'Red', 'Grey', 'Green', 'Yellow', 'Pink', 'Mixed']);
 
-  // --- NEW ITEM FORM STATES ---
-  const [newItem, setNewItem] = useState({ name: '', barcode: '', size: '', color: '', price: '', stock: '', vendor: '' });
-
   // --- DATABASE STATES ---
   const [inventory, setInventory] = useState<any[]>(INITIAL_INVENTORY);
   const [customers, setCustomers] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([{ id: 'v1', name: 'Delhi Traders', phone: '9988776655', supplied: 'Clothes' }]);
+  const [orders, setOrders] = useState<any[]>([]); // NAYA: Orders History Save Karne ke liye
   
   // --- BILLING STATES ---
   const [cart, setCart] = useState<any[]>([]);
@@ -40,25 +37,37 @@ export default function RetailPos() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [discountType, setDiscountType] = useState<'flat' | 'percent'>('flat');
   const [discountValue, setDiscountValue] = useState<number | ''>('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // --- REAL BLUETOOTH BARCODE SCANNER LOGIC ---
+  // --- REPORT STATES ---
+  const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'month' | 'custom'>('today');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
+  // --- REAL BLUETOOTH BARCODE SCANNER LOGIC (SUPER FAST) ---
   const barcodeBuffer = useRef('');
   const lastKeyTime = useRef(Date.now());
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (activeTab !== 'billing' || !storeSettings.enableScanner) return; 
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+      
+      // Agar user search bar mein hai, tab bhi scanner chalna chahiye, isliye input block hataya
+      // Lekin sirf tab jab input type "number" ya "tel" na ho
+      if (document.activeElement?.tagName === 'INPUT' && (document.activeElement as HTMLInputElement).type !== 'text') return;
+      if (document.activeElement?.tagName === 'TEXTAREA') return;
 
       const currentTime = Date.now();
-      if (currentTime - lastKeyTime.current > 50) { barcodeBuffer.current = ''; } 
+      // Scanner bahut tezi se type karta hai (100ms se kam gap mein)
+      if (currentTime - lastKeyTime.current > 100) { 
+        barcodeBuffer.current = ''; 
+      } 
       lastKeyTime.current = currentTime;
 
       if (e.key === 'Enter') {
         if (barcodeBuffer.current.length >= 3) {
           processBarcode(barcodeBuffer.current);
           barcodeBuffer.current = ''; 
+          e.preventDefault(); // Default enter rokne ke liye
         }
       } else if (e.key.length === 1) { 
         barcodeBuffer.current += e.key;
@@ -72,8 +81,18 @@ export default function RetailPos() {
     const product = inventory.find(item => item.barcode === scannedCode);
     if (product) {
       addToCart(product);
-    } else {
-      alert(`❌ Item not found for Barcode: ${scannedCode}`);
+      setSearchQuery(''); // Scan hote hi search box khali kar do
+    }
+  };
+
+  // Agar search box mein barcode scan ho jaye tab bhi add ho jayega
+  const handleSearchEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchQuery.trim() !== '') {
+      const product = inventory.find(item => item.barcode === searchQuery.trim() || item.name.toLowerCase() === searchQuery.trim().toLowerCase());
+      if (product) {
+        addToCart(product);
+        setSearchQuery('');
+      }
     }
   };
 
@@ -96,7 +115,7 @@ export default function RetailPos() {
   const discountAmount = discountType === 'flat' ? Math.min(dVal, subtotal) : (subtotal * dVal) / 100;
   const grandTotal = Math.max(0, subtotal - discountAmount);
 
-  // --- CHECKOUT & THERMAL PRINT LOGIC (WITH UPI QR) ---
+  // --- CHECKOUT & THERMAL PRINT LOGIC (WITH UPI QR & SALE SAVING) ---
   const handleCheckout = () => {
     if (cart.length === 0) return alert('Cart khali hai!');
 
@@ -108,11 +127,35 @@ export default function RetailPos() {
     });
     setInventory(newInventory);
 
-    // 2. Generate UPI QR Code Link
+    // 2. Save Order to Sales Report
+    const newOrder = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(), // Date aur time save kiya
+      customerName: customerName || 'Walk-in Guest',
+      customerPhone: customerPhone || 'N/A',
+      items: [...cart],
+      subtotal,
+      discountAmount,
+      grandTotal
+    };
+    setOrders(prev => [newOrder, ...prev]);
+
+    // 3. Customer History update
+    if (customerPhone) {
+      setCustomers(prev => {
+        const existing = prev.find(c => c.phone === customerPhone);
+        if (existing) {
+          return prev.map(c => c.phone === customerPhone ? { ...c, totalSpent: c.totalSpent + grandTotal, lastVisit: new Date().toLocaleDateString() } : c);
+        }
+        return [...prev, { name: customerName || 'Guest', phone: customerPhone, totalSpent: grandTotal, lastVisit: new Date().toLocaleDateString() }];
+      });
+    }
+
+    // 4. Generate UPI QR Code Link
     const upiUri = `upi://pay?pa=${storeSettings.upiId}&pn=${encodeURIComponent(storeSettings.name)}&am=${grandTotal.toFixed(2)}&cu=INR`;
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUri)}`;
 
-    // 3. Thermal Print Window
+    // 5. Thermal Print Window
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -140,13 +183,12 @@ export default function RetailPos() {
           <p>Mob: ${storeSettings.phone}</p>
           <p>---------------------------------</p>
           
-          ${customerPhone ? `
-            <div class="left-text">
-              Customer: ${customerName || 'Guest'}<br>
-              Phone: ${customerPhone}
-            </div>
-            <p>---------------------------------</p>
-          ` : ''}
+          <div class="left-text">
+            Customer: ${customerName || 'Guest'}<br>
+            Phone: ${customerPhone || 'N/A'}<br>
+            Date: ${new Date().toLocaleString()}
+          </div>
+          <p>---------------------------------</p>
 
           <table>
             <tr><th>Item</th><th>Qty</th><th>Total</th></tr>
@@ -165,7 +207,6 @@ export default function RetailPos() {
             <div class="grand-total"><span>TOTAL:</span> <span>Rs. ${grandTotal.toFixed(2)}</span></div>
           </div>
 
-          <!-- DYNAMIC UPI QR CODE SECTION -->
           ${storeSettings.upiId ? `
             <div class="qr-section">
               <p>Scan to Pay: Rs. ${grandTotal.toFixed(2)}</p>
@@ -183,32 +224,64 @@ export default function RetailPos() {
     printWindow.document.write(htmlContent);
     printWindow.document.close();
     
-    // QR Code load hone ka thoda wait karke print trigger karenge
     setTimeout(() => {
-      printWindow.focus(); 
-      printWindow.print(); 
-      printWindow.close();
+      printWindow.focus(); printWindow.print(); printWindow.close();
       setCart([]); setCustomerName(''); setCustomerPhone(''); setDiscountValue('');
-    }, 1500); 
+    }, 1000); 
   };
+
+  // --- REPORT FILTERING LOGIC ---
+  const getFilteredOrders = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return orders.filter(order => {
+      const orderDate = new Date(order.timestamp);
+      orderDate.setHours(0,0,0,0);
+
+      if (reportFilter === 'today') {
+        return orderDate.getTime() === today.getTime();
+      } else if (reportFilter === 'yesterday') {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return orderDate.getTime() === yesterday.getTime();
+      } else if (reportFilter === 'month') {
+        return orderDate.getMonth() === today.getMonth() && orderDate.getFullYear() === today.getFullYear();
+      } else if (reportFilter === 'custom') {
+        if (!customStartDate || !customEndDate) return true;
+        const start = new Date(customStartDate);
+        start.setHours(0,0,0,0);
+        const end = new Date(customEndDate);
+        end.setHours(23,59,59,999);
+        const orderTime = new Date(order.timestamp).getTime();
+        return orderTime >= start.getTime() && orderTime <= end.getTime();
+      }
+      return true;
+    });
+  };
+
+  const filteredOrders = getFilteredOrders();
+  const totalReportSales = filteredOrders.reduce((sum, o) => sum + o.grandTotal, 0);
+  const totalReportItems = filteredOrders.reduce((sum, o) => sum + o.items.reduce((iSum:number, i:any) => iSum + i.qty, 0), 0);
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans text-gray-900 overflow-hidden">
       
       {/* --- SIDEBAR --- */}
-      <div className={`bg-gray-900 text-white flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-16'}`}>
-        <div className="p-4 flex items-center justify-between border-b border-gray-800">
+      <div className={`bg-gray-900 text-white flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-16'} z-20`}>
+        <div className="p-4 flex items-center justify-between border-b border-gray-800 h-16">
           {isSidebarOpen && <span className="font-black text-lg tracking-widest text-blue-400">RETAIL POS</span>}
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-gray-800 rounded">
             {isSidebarOpen ? <X size={20} /> : <Menu size={24} />}
           </button>
         </div>
         
-        <div className="flex-1 py-4 space-y-2">
+        <div className="flex-1 py-4 space-y-2 overflow-y-auto">
           <SidebarBtn icon={<ShoppingBag/>} label="Billing (POS)" isActive={activeTab==='billing'} onClick={()=>setActiveTab('billing')} open={isSidebarOpen} />
+          <SidebarBtn icon={<BarChart3/>} label="Sales Report" isActive={activeTab==='reports'} onClick={()=>setActiveTab('reports')} open={isSidebarOpen} />
           <SidebarBtn icon={<PackagePlus/>} label="Inventory & Stock" isActive={activeTab==='inventory'} onClick={()=>setActiveTab('inventory')} open={isSidebarOpen} />
           <SidebarBtn icon={<Users/>} label="Customers" isActive={activeTab==='customers'} onClick={()=>setActiveTab('customers')} open={isSidebarOpen} />
-          <SidebarBtn icon={<Truck/>} label="Vendors (Suppliers)" isActive={activeTab==='vendors'} onClick={()=>setActiveTab('vendors')} open={isSidebarOpen} />
+          <SidebarBtn icon={<Truck/>} label="Vendors" isActive={activeTab==='vendors'} onClick={()=>setActiveTab('vendors')} open={isSidebarOpen} />
         </div>
 
         <div className="p-4 border-t border-gray-800">
@@ -222,18 +295,26 @@ export default function RetailPos() {
         {/* TAB 1: BILLING (POS) */}
         {activeTab === 'billing' && (
           <>
+            {/* LEFT AREA: SEARCH & ITEMS */}
             <div className="w-[60%] p-6 flex flex-col h-full bg-gray-50 border-r">
               <h1 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2"><Shirt className="text-blue-600"/> Checkout Counter</h1>
               <div className="relative mb-6">
                 <Search className="absolute left-3 top-3.5 text-gray-400" size={18} />
-                <input type="text" ref={searchInputRef} placeholder="Search Item Name manually..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 shadow-sm outline-none focus:border-blue-500 font-bold" />
+                <input 
+                  type="text" 
+                  placeholder="Scan Barcode or Search Item Name..." 
+                  value={searchQuery} 
+                  onChange={e => setSearchQuery(e.target.value)} 
+                  onKeyDown={handleSearchEnter}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 shadow-sm outline-none focus:border-blue-500 font-bold" 
+                />
               </div>
               <div className="grid grid-cols-3 gap-4 overflow-y-auto pr-2 pb-4">
-                {inventory.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase())).map(item => (
+                {inventory.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.barcode.includes(searchQuery)).map(item => (
                   <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-4 rounded-2xl shadow-sm hover:shadow-md border border-gray-200 hover:border-blue-500 text-left flex flex-col justify-between h-32 transition-all active:scale-95">
                     <div>
                       <p className="font-bold text-gray-800 text-sm leading-tight">{item.name}</p>
-                      <div className="flex gap-1 mt-1.5">
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
                         {item.size && <span className="bg-blue-50 text-blue-600 text-[10px] px-2 py-0.5 rounded border border-blue-200 font-bold">Size: {item.size}</span>}
                         {item.color && <span className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded font-bold">{item.color}</span>}
                       </div>
@@ -247,7 +328,7 @@ export default function RetailPos() {
               </div>
             </div>
 
-            {/* CART SIDE */}
+            {/* RIGHT AREA: CART */}
             <div className="w-[40%] bg-white flex flex-col h-full shadow-xl z-10">
               <div className="p-4 bg-gray-50 border-b flex justify-between items-center shrink-0">
                 <h2 className="font-black text-lg flex items-center gap-2 text-gray-800"><ShoppingBag className="text-orange-500"/> Cart ({cart.length})</h2>
@@ -258,7 +339,6 @@ export default function RetailPos() {
                 )}
               </div>
               
-              {/* Customer Info Box */}
               <div className="p-4 bg-white border-b space-y-3 shrink-0">
                 <div className="flex gap-3">
                   <div className="relative flex-1">
@@ -272,7 +352,6 @@ export default function RetailPos() {
                 </div>
               </div>
 
-              {/* Cart List */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
                 {cart.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full opacity-50">
@@ -297,7 +376,6 @@ export default function RetailPos() {
                 )}
               </div>
               
-              {/* Checkout Footer */}
               <div className="bg-white border-t p-5 shrink-0">
                 <div className="flex justify-between items-center mb-4 bg-gray-50 p-3 rounded-xl border">
                   <span className="text-sm font-bold flex items-center gap-1.5 text-gray-700"><Tag size={16} className="text-orange-500"/> Discount:</span>
@@ -317,7 +395,7 @@ export default function RetailPos() {
                     <span>Grand Total:</span> <span>₹{grandTotal.toFixed(2)}</span>
                   </div>
                 </div>
-                <button onClick={handleCheckout} disabled={cart.length === 0} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg">
+                <button onClick={handleCheckout} disabled={cart.length === 0} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg transition-all">
                   <Printer /> Checkout & Print Bill
                 </button>
               </div>
@@ -325,7 +403,81 @@ export default function RetailPos() {
           </>
         )}
 
-        {/* TAB 2: INVENTORY & STOCK */}
+        {/* TAB 2: SALES REPORT (NAYA JADU) */}
+        {activeTab === 'reports' && (
+          <div className="p-8 w-full h-full overflow-y-auto bg-gray-50">
+            <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2"><BarChart3 className="text-blue-600"/> Sales & Orders Report</h2>
+            
+            {/* Filters */}
+            <div className="bg-white p-5 rounded-xl border mb-6 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+              <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+                <button onClick={() => setReportFilter('today')} className={`px-4 py-2 rounded font-bold text-sm ${reportFilter === 'today' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Today (आज)</button>
+                <button onClick={() => setReportFilter('yesterday')} className={`px-4 py-2 rounded font-bold text-sm ${reportFilter === 'yesterday' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Yesterday (कल)</button>
+                <button onClick={() => setReportFilter('month')} className={`px-4 py-2 rounded font-bold text-sm ${reportFilter === 'month' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>This Month</button>
+                <button onClick={() => setReportFilter('custom')} className={`px-4 py-2 rounded font-bold text-sm ${reportFilter === 'custom' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Custom Date</button>
+              </div>
+              
+              {reportFilter === 'custom' && (
+                <div className="flex items-center gap-3 bg-blue-50 p-2 rounded-lg border border-blue-100">
+                  <Calendar size={18} className="text-blue-500" />
+                  <input type="date" value={customStartDate} onChange={e=>setCustomStartDate(e.target.value)} className="p-1.5 rounded border outline-none text-sm" />
+                  <span className="font-bold text-gray-500">To</span>
+                  <input type="date" value={customEndDate} onChange={e=>setCustomEndDate(e.target.value)} className="p-1.5 rounded border outline-none text-sm" />
+                </div>
+              )}
+            </div>
+
+            {/* Dashboard Cards */}
+            <div className="grid grid-cols-3 gap-6 mb-6">
+              <div className="bg-white border rounded-xl p-6 shadow-sm border-l-4 border-l-green-500">
+                <p className="text-sm font-bold text-gray-500 uppercase">Total Sales (कुल बिक्री)</p>
+                <p className="text-3xl font-black text-green-600 mt-2">₹{totalReportSales.toFixed(2)}</p>
+              </div>
+              <div className="bg-white border rounded-xl p-6 shadow-sm border-l-4 border-l-blue-500">
+                <p className="text-sm font-bold text-gray-500 uppercase">Total Orders (बिल बने)</p>
+                <p className="text-3xl font-black text-blue-600 mt-2">{filteredOrders.length}</p>
+              </div>
+              <div className="bg-white border rounded-xl p-6 shadow-sm border-l-4 border-l-orange-500">
+                <p className="text-sm font-bold text-gray-500 uppercase">Items Sold (कपड़े बिके)</p>
+                <p className="text-3xl font-black text-orange-600 mt-2">{totalReportItems}</p>
+              </div>
+            </div>
+
+            {/* Orders List Table */}
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-800 text-white">
+                    <th className="p-4 font-bold text-sm">Date & Time</th>
+                    <th className="p-4 font-bold text-sm">Customer</th>
+                    <th className="p-4 font-bold text-sm">Items Bought</th>
+                    <th className="p-4 font-bold text-sm">Discount</th>
+                    <th className="p-4 font-bold text-sm text-right">Bill Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredOrders.length === 0 ? (
+                    <tr><td colSpan={5} className="p-8 text-center text-gray-500 font-bold">Koi sale nahi hui is time par.</td></tr>
+                  ) : (
+                    filteredOrders.map(order => (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="p-4 text-sm font-mono text-gray-600">{new Date(order.timestamp).toLocaleString()}</td>
+                        <td className="p-4 font-bold">{order.customerName} <br/><span className="text-xs text-gray-400">{order.customerPhone}</span></td>
+                        <td className="p-4 text-xs text-gray-600">
+                          {order.items.map((i:any) => `${i.name} (x${i.qty})`).join(', ')}
+                        </td>
+                        <td className="p-4 text-orange-500 text-sm font-bold">{order.discountAmount > 0 ? `- ₹${order.discountAmount}` : '-'}</td>
+                        <td className="p-4 text-right font-black text-green-600 text-lg">₹{order.grandTotal}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: INVENTORY */}
         {activeTab === 'inventory' && (
           <div className="p-8 w-full h-full overflow-y-auto bg-white">
             <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2"><PackagePlus/> Manage Inventory & Stock</h2>
@@ -336,56 +488,49 @@ export default function RetailPos() {
                 className="grid grid-cols-4 gap-4" 
                 onSubmit={(e) => {
                   e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
                   const item = {
                     id: Date.now().toString(),
-                    barcode: newItem.barcode || Math.floor(Math.random()*1000000000).toString(),
-                    name: newItem.name, size: newItem.size, color: newItem.color,
-                    price: Number(newItem.price), stock: Number(newItem.stock), vendor: newItem.vendor
+                    barcode: (fd.get('barcode') as string) || Math.floor(Math.random()*1000000000).toString(),
+                    name: fd.get('name'), size: fd.get('size'), color: fd.get('color'),
+                    price: Number(fd.get('price')), stock: Number(fd.get('stock')), vendor: fd.get('vendor')
                   };
                   setInventory([item, ...inventory]);
-                  setNewItem({ name: '', barcode: '', size: '', color: '', price: '', stock: '', vendor: '' });
+                  e.currentTarget.reset();
                   alert('Item Added Successfully!');
                 }}
               >
-                <input required value={newItem.name} onChange={e=>setNewItem({...newItem, name: e.target.value})} type="text" placeholder="Item Name (e.g. Shirt) *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
-                <input value={newItem.barcode} onChange={e=>setNewItem({...newItem, barcode: e.target.value})} type="text" placeholder="Barcode (Scan / Blank for auto)" className="border p-2 rounded outline-none focus:border-blue-500" />
+                <input required name="name" type="text" placeholder="Item Name (e.g. Shirt) *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
+                <input name="barcode" type="text" placeholder="Barcode (Scan / Blank for auto)" className="border p-2 rounded outline-none focus:border-blue-500" />
                 
                 {/* DYNAMIC SIZES */}
-                <select 
-                  value={newItem.size} 
-                  onChange={e => {
-                    if (e.target.value === 'ADD_NEW') {
-                      const newSz = prompt("Naya Size likhein (e.g. XXL, 38):");
-                      if (newSz) { setSizes([...sizes, newSz]); setNewItem({...newItem, size: newSz}); }
-                    } else { setNewItem({...newItem, size: e.target.value}); }
-                  }} 
-                  className="border p-2 rounded outline-none bg-white focus:border-blue-500 cursor-pointer"
-                >
+                <select name="size" onChange={e => {
+                  if (e.target.value === 'ADD_NEW') {
+                    const newSz = prompt("Naya Size likhein (e.g. XXL, 38):");
+                    if (newSz) { setSizes([...sizes, newSz]); e.target.value = newSz; } else { e.target.value = ''; }
+                  }
+                }} className="border p-2 rounded outline-none bg-white focus:border-blue-500 cursor-pointer">
                   <option value="">Select Size...</option>
                   {sizes.map(s => <option key={s} value={s}>{s}</option>)}
                   <option value="ADD_NEW" className="text-blue-600 font-bold">+ Add New...</option>
                 </select>
 
                 {/* DYNAMIC COLORS */}
-                <select 
-                  value={newItem.color} 
-                  onChange={e => {
-                    if (e.target.value === 'ADD_NEW') {
-                      const newCol = prompt("Naya Color likhein (e.g. Maroon, Olive):");
-                      if (newCol) { setColors([...colors, newCol]); setNewItem({...newItem, color: newCol}); }
-                    } else { setNewItem({...newItem, color: e.target.value}); }
-                  }} 
-                  className="border p-2 rounded outline-none bg-white focus:border-blue-500 cursor-pointer"
-                >
+                <select name="color" onChange={e => {
+                  if (e.target.value === 'ADD_NEW') {
+                    const newCol = prompt("Naya Color likhein (e.g. Maroon, Olive):");
+                    if (newCol) { setColors([...colors, newCol]); e.target.value = newCol; } else { e.target.value = ''; }
+                  }
+                }} className="border p-2 rounded outline-none bg-white focus:border-blue-500 cursor-pointer">
                   <option value="">Select Color...</option>
                   {colors.map(c => <option key={c} value={c}>{c}</option>)}
                   <option value="ADD_NEW" className="text-blue-600 font-bold">+ Add New...</option>
                 </select>
 
-                <input required value={newItem.price} onChange={e=>setNewItem({...newItem, price: e.target.value})} type="number" placeholder="Price (₹) *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
-                <input required value={newItem.stock} onChange={e=>setNewItem({...newItem, stock: e.target.value})} type="number" placeholder="Total Stock Qty *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
+                <input required name="price" type="number" placeholder="Price (₹) *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
+                <input required name="stock" type="number" placeholder="Total Stock Qty *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
                 
-                <select value={newItem.vendor} onChange={e=>setNewItem({...newItem, vendor: e.target.value})} className="border p-2 rounded outline-none bg-white cursor-pointer">
+                <select name="vendor" className="border p-2 rounded outline-none bg-white cursor-pointer">
                   <option value="">Select Vendor...</option>
                   {vendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
                 </select>
@@ -411,7 +556,7 @@ export default function RetailPos() {
           </div>
         )}
 
-        {/* TAB 3: CUSTOMERS & TAB 4: VENDORS ... Same as before ... */}
+        {/* TAB 4: CUSTOMERS & TAB 5: VENDORS ... */}
         {activeTab === 'customers' && (
           <div className="p-8 w-full h-full overflow-y-auto bg-white">
             <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2"><Users/> Customer Profiles</h2>
@@ -428,7 +573,6 @@ export default function RetailPos() {
         {activeTab === 'vendors' && (
           <div className="p-8 w-full h-full overflow-y-auto bg-white">
             <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2"><Truck/> Vendors</h2>
-            {/* Same Vendor code */}
             <div className="grid grid-cols-3 gap-4">
               {vendors.map(v => (
                 <div key={v.id} className="border p-4 rounded-xl shadow-sm bg-white"><p className="font-black text-lg uppercase">{v.name}</p><p className="font-mono text-gray-600 mt-1">📞 {v.phone}</p></div>
@@ -437,18 +581,21 @@ export default function RetailPos() {
           </div>
         )}
 
-        {/* TAB 5: HARDWARE & STORE SETTINGS */}
+        {/* TAB 6: SETTINGS */}
         {activeTab === 'settings' && (
           <div className="p-8 w-full h-full overflow-y-auto bg-white">
-            <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2"><Settings/> System & Hardware Settings</h2>
+            <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2"><Settings/> System Settings</h2>
             
             <div className="grid grid-cols-2 gap-6">
-              {/* Store & UPI Settings */}
               <div className="bg-gray-50 p-6 rounded-xl border space-y-4">
                 <h3 className="font-black text-gray-700 flex items-center gap-2"><User size={18}/> Store Details</h3>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase">Store Name</label>
                   <input type="text" value={storeSettings.name} onChange={e=>setStoreSettings({...storeSettings, name: e.target.value})} className="w-full p-2 border rounded mt-1 font-bold" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Store Phone</label>
+                  <input type="text" value={storeSettings.phone} onChange={e=>setStoreSettings({...storeSettings, phone: e.target.value})} className="w-full p-2 border rounded mt-1" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase">Store Address</label>
@@ -457,31 +604,18 @@ export default function RetailPos() {
                 <div className="border-t pt-4">
                   <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><QrCode size={14}/> UPI ID (For Bill QR Code)</label>
                   <input type="text" placeholder="e.g. 9876543210@paytm" value={storeSettings.upiId} onChange={e=>setStoreSettings({...storeSettings, upiId: e.target.value})} className="w-full p-2 border border-blue-300 bg-blue-50 rounded mt-1 font-mono font-bold" />
-                  <p className="text-[10px] text-gray-500 mt-1">Is UPI ID se bill par QR code generate hoga.</p>
                 </div>
               </div>
 
-              {/* Hardware Settings */}
               <div className="bg-gray-50 p-6 rounded-xl border space-y-6">
-                <h3 className="font-black text-gray-700 flex items-center gap-2"><Bluetooth size={18}/> BT Hardware Settings</h3>
-                
+                <h3 className="font-black text-gray-700 flex items-center gap-2"><Bluetooth size={18}/> Hardware Settings</h3>
                 <div className="bg-white p-4 border rounded-lg">
                   <div className="flex justify-between items-center mb-2">
-                    <label className="font-bold text-gray-700 flex items-center gap-2"><ScanBarcode size={16}/> BT Barcode Scanner</label>
+                    <label className="font-bold text-gray-700 flex items-center gap-2"><ScanBarcode size={16}/> Barcode Scanner (USB/BT)</label>
                     <input type="checkbox" checked={storeSettings.enableScanner} onChange={e => setStoreSettings({...storeSettings, enableScanner: e.target.checked})} className="w-4 h-4 cursor-pointer" />
                   </div>
-                  <p className="text-[10px] text-gray-500">Enable this to allow Bluetooth or USB Barcode scanners to auto-add items to the cart in the Billing tab.</p>
+                  <p className="text-[10px] text-gray-500">Enable this to allow scanners to auto-add items to the cart without clicking.</p>
                 </div>
-
-                <div className="bg-white p-4 border rounded-lg">
-                  <label className="font-bold text-gray-700 flex items-center gap-2 mb-2"><Printer size={16}/> BT Thermal Printer Mode</label>
-                  <select value={storeSettings.printerType} onChange={e=>setStoreSettings({...storeSettings, printerType: e.target.value})} className="w-full p-2 border rounded text-sm font-bold bg-gray-50 cursor-pointer">
-                    <option value="system">Standard BT/USB System Print (Recommended)</option>
-                    <option value="escpos">Raw ESC/POS Web Bluetooth (Beta)</option>
-                  </select>
-                  <p className="text-[10px] text-gray-500 mt-2">Mobile me BT printer pair karein aur "Standard Print" use karein.</p>
-                </div>
-
                 <button onClick={()=>alert('Hardware & Store Settings Saved Successfully!')} className="w-full bg-green-600 text-white font-black py-3 rounded shadow hover:bg-green-500">Save All Settings</button>
               </div>
             </div>
