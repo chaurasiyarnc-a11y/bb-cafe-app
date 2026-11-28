@@ -48,15 +48,26 @@ export default function RetailPos() {
   // --- REAL BLUETOOTH BARCODE SCANNER LOGIC ---
   const barcodeBuffer = useRef('');
   const lastKeyTime = useRef(Date.now());
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (activeTab !== 'billing' || !storeSettings.enableScanner) return; 
-      if (document.activeElement?.tagName === 'INPUT' && (document.activeElement as HTMLInputElement).type !== 'text') return;
+      
+      // Ignore if typing in text inputs OTHER than the search box (like phone/name inputs)
+      if (document.activeElement?.tagName === 'INPUT') {
+        const inputType = (document.activeElement as HTMLInputElement).type;
+        if (inputType !== 'text') return; // Ignore tel, number etc.
+        if ((document.activeElement as HTMLInputElement).placeholder.includes('Customer')) return; // Ignore Customer Name box
+      }
       if (document.activeElement?.tagName === 'TEXTAREA') return;
 
       const currentTime = Date.now();
-      if (currentTime - lastKeyTime.current > 100) { barcodeBuffer.current = ''; } 
+      
+      // SPEED LIMIT INCREASED TO 250ms FOR SLOW BLUETOOTH SCANNERS
+      if (currentTime - lastKeyTime.current > 250) { 
+        barcodeBuffer.current = ''; 
+      } 
       lastKeyTime.current = currentTime;
 
       if (e.key === 'Enter') {
@@ -69,6 +80,7 @@ export default function RetailPos() {
         barcodeBuffer.current += e.key;
       }
     };
+    
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, inventory, storeSettings.enableScanner]);
@@ -77,16 +89,24 @@ export default function RetailPos() {
     const product = inventory.find(item => item.barcode === scannedCode);
     if (product) {
       addToCart(product);
-      setSearchQuery('');
+      setSearchQuery(''); // Taki agar search box me type ho gaya ho to clear ho jaye
+    } else {
+      alert(`❌ Item not found for Barcode: ${scannedCode}`);
     }
   };
 
   const handleSearchEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Agar scanner chal raha hai (buffer mein data hai), toh ise ignore karo taaki DOUBLE add na ho
+    if (barcodeBuffer.current.length >= 3) return;
+
     if (e.key === 'Enter' && searchQuery.trim() !== '') {
-      const product = inventory.find(item => item.barcode === searchQuery.trim() || item.name.toLowerCase() === searchQuery.trim().toLowerCase());
+      const query = searchQuery.trim().toLowerCase();
+      const product = inventory.find(item => item.barcode === query || item.name.toLowerCase() === query);
       if (product) {
         addToCart(product);
         setSearchQuery('');
+      } else {
+        alert('Item not found in inventory!');
       }
     }
   };
@@ -323,10 +343,9 @@ export default function RetailPos() {
               </div>
             </div>
 
-            {/* RIGHT AREA: CART (Mobile par absolute full screen) */}
+            {/* RIGHT AREA: CART */}
             <div className={`w-full md:w-[40%] bg-white flex-col h-full shadow-xl z-30 absolute inset-0 md:relative md:inset-auto ${showMobileCart ? 'flex' : 'hidden md:flex'}`}>
               
-              {/* Mobile Back Button */}
               <div className="md:hidden bg-gray-900 text-white p-3 flex items-center gap-2 shrink-0">
                 <button onClick={() => setShowMobileCart(false)} className="p-1 bg-gray-800 rounded-full"><ArrowLeft size={20}/></button>
                 <span className="font-bold">Back to Products</span>
@@ -567,7 +586,7 @@ export default function RetailPos() {
           </div>
         )}
 
-        {/* TAB 4: CUSTOMERS & TAB 5: VENDORS ... */}
+        {/* TAB 4: CUSTOMERS */}
         {activeTab === 'customers' && (
           <div className="p-4 md:p-8 w-full h-full overflow-y-auto bg-white">
             <h2 className="text-xl md:text-2xl font-black text-gray-800 mb-4 md:mb-6 flex items-center gap-2"><Users/> Customer Profiles</h2>
@@ -584,6 +603,7 @@ export default function RetailPos() {
           </div>
         )}
         
+        {/* TAB 5: VENDORS */}
         {activeTab === 'vendors' && (
           <div className="p-4 md:p-8 w-full h-full overflow-y-auto bg-white">
             <h2 className="text-xl md:text-2xl font-black text-gray-800 mb-4 md:mb-6 flex items-center gap-2"><Truck/> Vendors</h2>
