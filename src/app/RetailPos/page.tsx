@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingBag, Printer, Search, Trash2, User, Phone, Tag, Shirt, ScanBarcode, Menu, Users, Truck, PackagePlus, Settings, X } from 'lucide-react';
 
-// Default Data
+// --- DEFAULT DUMMY DATA ---
 const INITIAL_INVENTORY = [
-  { id: '101', barcode: '123456789012', name: 'Nike Running Shoes', category: 'Sports', size: 'UK 8', price: 1500, stock: 10, vendor: 'Nike India' },
-  { id: '102', barcode: '890123456789', name: 'Adidas Trackpant', category: 'Clothing', size: 'L', color: 'Black', price: 800, stock: 5, vendor: 'Delhi Traders' },
+  { id: '101', barcode: '123456789012', name: 'Nike Running Shoes', category: 'Sports', size: 'UK 8', color: 'Black', price: 1500, stock: 10, vendor: 'Nike India' },
+  { id: '102', barcode: '890123456789', name: 'Adidas Trackpant', category: 'Clothing', size: 'L', color: 'Blue', price: 800, stock: 5, vendor: 'Delhi Traders' },
 ];
 
 export default function RetailPos() {
@@ -14,7 +14,7 @@ export default function RetailPos() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [storeSettings, setStoreSettings] = useState({ name: 'MY CLOTHING & SPORTS', phone: '9876543210', address: 'Main Market, Your City' });
 
-  // --- DATABASE STATES (Aage chal kar inhe Firebase/DB se connect karein) ---
+  // --- DATABASE STATES ---
   const [inventory, setInventory] = useState<any[]>(INITIAL_INVENTORY);
   const [customers, setCustomers] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([{ id: 'v1', name: 'Delhi Traders', phone: '9988776655', supplied: 'Clothes' }]);
@@ -28,17 +28,17 @@ export default function RetailPos() {
   const [discountValue, setDiscountValue] = useState<number | ''>('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // --- BARCODE SCANNER LOGIC (Sirf Billing Tab mein chalega) ---
+  // --- REAL BARCODE SCANNER LOGIC ---
   const barcodeBuffer = useRef('');
   const lastKeyTime = useRef(Date.now());
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeTab !== 'billing') return; // Agar billing tab nahi hai toh scanner band rakho
+      if (activeTab !== 'billing') return; // Sirf billing tab mein scanner chalega
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
       const currentTime = Date.now();
-      if (currentTime - lastKeyTime.current > 50) { barcodeBuffer.current = ''; }
+      if (currentTime - lastKeyTime.current > 50) { barcodeBuffer.current = ''; } // 50ms se zyada gap yani scanner nahi hai
       lastKeyTime.current = currentTime;
 
       if (e.key === 'Enter') {
@@ -76,13 +76,13 @@ export default function RetailPos() {
 
   const removeFromCart = (id: string) => setCart(prev => prev.filter(item => item.id !== id));
 
-  // BILLING CALCULATIONS
+  // --- BILLING CALCULATIONS ---
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const dVal = Number(discountValue) || 0;
   const discountAmount = discountType === 'flat' ? Math.min(dVal, subtotal) : (subtotal * dVal) / 100;
   const grandTotal = Math.max(0, subtotal - discountAmount);
 
-  // CHECKOUT & PRINT LOGIC
+  // --- CHECKOUT & PRINT LOGIC ---
   const handleCheckout = () => {
     if (cart.length === 0) return alert('Cart khali hai!');
 
@@ -105,7 +105,7 @@ export default function RetailPos() {
       });
     }
 
-    // 3. Print Window
+    // 3. Thermal Print Window
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -117,10 +117,13 @@ export default function RetailPos() {
             body { font-family: monospace; padding: 5mm; width: 70mm; margin: 0 auto; color: black; }
             h2 { text-align: center; margin: 0; font-size: 18px; font-weight: bold; }
             p { text-align: center; margin: 2px 0; font-size: 12px; }
+            .left-text { text-align: left; margin-top: 10px; font-size: 12px; font-weight: bold; }
             table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
             th, td { text-align: left; padding: 4px 0; border-bottom: 1px dashed black; }
             th:last-child, td:last-child { text-align: right; }
-            .grand-total { font-size: 16px; border-top: 2px solid black; border-bottom: 2px solid black; padding: 5px 0; font-weight: bold; margin-top:10px; display:flex; justify-content:space-between; }
+            .totals { margin-top: 10px; font-size: 13px; font-weight: bold; }
+            .totals div { display: flex; justify-content: space-between; margin-bottom: 3px; }
+            .grand-total { font-size: 16px; border-top: 2px solid black; border-bottom: 2px solid black; padding: 5px 0; }
           </style>
         </head>
         <body>
@@ -128,7 +131,15 @@ export default function RetailPos() {
           <p>${storeSettings.address}</p>
           <p>Mob: ${storeSettings.phone}</p>
           <p>---------------------------------</p>
-          ${customerPhone ? `<p style="text-align:left;">Cust: ${customerName} (${customerPhone})</p>` : ''}
+          
+          ${customerPhone ? `
+            <div class="left-text">
+              Customer: ${customerName || 'Guest'}<br>
+              Phone: ${customerPhone || 'N/A'}
+            </div>
+            <p>---------------------------------</p>
+          ` : ''}
+
           <table>
             <tr><th>Item</th><th>Qty</th><th>Total</th></tr>
             ${cart.map(item => `
@@ -139,12 +150,15 @@ export default function RetailPos() {
               </tr>
             `).join('')}
           </table>
-          <div style="margin-top:5px; text-align:right; font-size:12px; font-weight:bold;">
-            Subtotal: Rs. ${subtotal} <br>
-            ${discountAmount > 0 ? `Discount: - Rs. ${discountAmount.toFixed(2)}` : ''}
+
+          <div class="totals">
+            <div><span>Subtotal:</span> <span>Rs. ${subtotal}</span></div>
+            ${discountAmount > 0 ? `<div><span>Discount:</span> <span>- Rs. ${discountAmount.toFixed(2)}</span></div>` : ''}
+            <div class="grand-total"><span>GRAND TOTAL:</span> <span>Rs. ${grandTotal.toFixed(2)}</span></div>
           </div>
-          <div class="grand-total"><span>TOTAL:</span> <span>Rs. ${grandTotal.toFixed(2)}</span></div>
-          <p style="margin-top: 20px;">No Exchange without Bill.</p>
+          
+          <p style="margin-top: 20px;">Thank You for Shopping!</p>
+          <p>No Exchange without Bill.</p>
         </body>
       </html>
     `;
@@ -160,10 +174,10 @@ export default function RetailPos() {
   return (
     <div className="flex h-screen bg-gray-100 font-sans text-gray-900 overflow-hidden">
       
-      {/* SIDEBAR (Hidable) */}
+      {/* --- SIDEBAR --- */}
       <div className={`bg-gray-900 text-white flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-16'}`}>
         <div className="p-4 flex items-center justify-between border-b border-gray-800">
-          {isSidebarOpen && <span className="font-black text-lg tracking-widest text-blue-400">ERP POS</span>}
+          {isSidebarOpen && <span className="font-black text-lg tracking-widest text-blue-400">RETAIL POS</span>}
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-gray-800 rounded">
             {isSidebarOpen ? <X size={20} /> : <Menu size={24} />}
           </button>
@@ -181,17 +195,17 @@ export default function RetailPos() {
         </div>
       </div>
 
-      {/* MAIN CONTENT AREA */}
+      {/* --- MAIN CONTENT AREA --- */}
       <div className="flex-1 flex h-full">
         
-        {/* TAB 1: BILLING */}
+        {/* TAB 1: BILLING (POS) */}
         {activeTab === 'billing' && (
           <>
             <div className="w-[60%] p-6 flex flex-col h-full bg-gray-50 border-r">
               <h1 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2"><Shirt className="text-blue-600"/> Checkout Counter</h1>
               <div className="relative mb-6">
                 <Search className="absolute left-3 top-3.5 text-gray-400" size={18} />
-                <input type="text" placeholder="Search Item Name manually..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 shadow-sm outline-none focus:border-blue-500 font-bold" />
+                <input type="text" ref={searchInputRef} placeholder="Search Item Name manually..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 shadow-sm outline-none focus:border-blue-500 font-bold" />
               </div>
               <div className="grid grid-cols-3 gap-4 overflow-y-auto pr-2 pb-4">
                 {inventory.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase())).map(item => (
@@ -213,11 +227,13 @@ export default function RetailPos() {
             </div>
 
             {/* CART SIDE */}
-            <div className="w-[40%] bg-white flex flex-col h-full shadow-xl">
+            <div className="w-[40%] bg-white flex flex-col h-full shadow-xl z-10">
               <div className="p-4 bg-gray-50 border-b flex justify-between items-center shrink-0">
-                <h2 className="font-black text-lg flex items-center gap-2 text-gray-800"><ShoppingBag className="text-orange-500"/> Cart</h2>
+                <h2 className="font-black text-lg flex items-center gap-2 text-gray-800"><ShoppingBag className="text-orange-500"/> Cart ({cart.length})</h2>
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-green-600 bg-green-100 px-2 py-1 rounded-full"><ScanBarcode size={14} /> Scanner Active</span>
               </div>
+              
+              {/* Customer Info Box */}
               <div className="p-4 bg-white border-b space-y-3 shrink-0">
                 <div className="flex gap-3">
                   <div className="relative flex-1">
@@ -230,37 +246,52 @@ export default function RetailPos() {
                   </div>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+              {/* Cart List */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
                 {cart.length === 0 ? (
-                  <p className="text-center font-bold text-gray-400 mt-10">Cart is empty. Scan barcode.</p>
+                  <div className="flex flex-col items-center justify-center h-full opacity-50">
+                    <ShoppingBag size={40} className="mb-2" />
+                    <p className="text-center font-bold">Cart is empty.</p>
+                    <p className="text-xs mt-1">Use barcode scanner to add items.</p>
+                  </div>
                 ) : (
                   cart.map(item => (
-                    <div key={item.id} className="flex justify-between items-center border bg-gray-50 p-3 rounded-xl shadow-sm">
+                    <div key={item.id} className="flex justify-between items-center border bg-white p-3 rounded-xl shadow-sm">
                       <div>
                         <p className="font-bold text-sm text-gray-800">{item.name}</p>
-                        <p className="text-xs text-gray-500 font-mono mt-0.5">{item.size && `Size: ${item.size}`} | ₹{item.price} <span className="text-orange-500 font-bold">x {item.qty}</span></p>
+                        <p className="text-xs text-gray-500 font-mono mt-0.5">
+                          {item.size && `${item.size}`} {item.color && `| ${item.color}`} | ₹{item.price} <span className="text-orange-500 font-bold">x {item.qty}</span>
+                        </p>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="font-black text-green-600 text-base">₹{item.price * item.qty}</span>
-                        <button onClick={() => removeFromCart(item.id)} className="text-red-500 bg-red-100 p-1.5 rounded"><Trash2 size={16}/></button>
+                        <button onClick={() => removeFromCart(item.id)} className="text-red-500 bg-red-50 p-1.5 rounded hover:bg-red-500 hover:text-white"><Trash2 size={16}/></button>
                       </div>
                     </div>
                   ))
                 )}
               </div>
+              
+              {/* Checkout Footer */}
               <div className="bg-white border-t p-5 shrink-0">
-                <div className="flex justify-between items-center mb-4 bg-gray-50 p-2 rounded-lg border">
-                  <span className="text-sm font-bold text-gray-700">Discount:</span>
+                <div className="flex justify-between items-center mb-4 bg-gray-50 p-3 rounded-xl border">
+                  <span className="text-sm font-bold flex items-center gap-1.5 text-gray-700"><Tag size={16} className="text-orange-500"/> Discount:</span>
                   <div className="flex items-center gap-2">
-                    <div className="flex bg-gray-200 p-1 rounded-md">
-                      <button onClick={() => setDiscountType('flat')} className={`px-2 py-1 rounded text-[10px] font-black uppercase ${discountType === 'flat' ? 'bg-orange-500 text-white shadow' : 'text-gray-500'}`}>₹ Flat</button>
-                      <button onClick={() => setDiscountType('percent')} className={`px-2 py-1 rounded text-[10px] font-black uppercase ${discountType === 'percent' ? 'bg-orange-500 text-white shadow' : 'text-gray-500'}`}>% Off</button>
+                    <div className="flex bg-gray-200 p-1 rounded-lg">
+                      <button onClick={() => setDiscountType('flat')} className={`px-3 py-1 rounded text-[10px] font-black uppercase ${discountType === 'flat' ? 'bg-orange-500 text-white shadow' : 'text-gray-500'}`}>₹ Flat</button>
+                      <button onClick={() => setDiscountType('percent')} className={`px-3 py-1 rounded text-[10px] font-black uppercase ${discountType === 'percent' ? 'bg-orange-500 text-white shadow' : 'text-gray-500'}`}>% Off</button>
                     </div>
-                    <input type="number" min="0" placeholder="Value" value={discountValue} onChange={e => setDiscountValue(e.target.value === '' ? '' : Number(e.target.value))} className="w-20 bg-white border rounded px-2 py-1 outline-none font-bold text-sm focus:border-blue-500" />
+                    <input type="number" min="0" placeholder={discountType === 'flat' ? "Amount (₹)" : "Percent (%)"} value={discountValue} onChange={e => setDiscountValue(e.target.value === '' ? '' : Number(e.target.value))} className="w-24 bg-white border rounded-lg px-2 py-1.5 outline-none font-bold text-sm focus:border-blue-500" />
                   </div>
                 </div>
-                <div className="flex justify-between text-2xl font-black text-green-600 mb-4 border-t pt-2">
-                  <span>Grand Total:</span> <span>₹{grandTotal.toFixed(2)}</span>
+
+                <div className="space-y-1 mb-4 text-sm font-bold text-gray-600">
+                  <div className="flex justify-between"><span>Subtotal:</span> <span>₹{subtotal}</span></div>
+                  {discountAmount > 0 && <div className="flex justify-between text-orange-500"><span>Discount:</span> <span>- ₹{discountAmount.toFixed(2)}</span></div>}
+                  <div className="flex justify-between text-2xl font-black text-green-600 mt-2 pt-2 border-t border-dashed">
+                    <span>Grand Total:</span> <span>₹{grandTotal.toFixed(2)}</span>
+                  </div>
                 </div>
                 <button onClick={handleCheckout} disabled={cart.length === 0} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg">
                   <Printer /> Checkout & Print
@@ -276,41 +307,77 @@ export default function RetailPos() {
             <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2"><PackagePlus/> Manage Inventory & Stock</h2>
             <div className="bg-gray-50 p-5 rounded-xl border mb-6 shadow-sm">
               <h3 className="font-bold text-gray-600 mb-3 uppercase text-sm">Add New Item</h3>
-              <form className="grid grid-cols-4 gap-4" onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                const newItem = {
-                  id: Date.now().toString(),
-                  barcode: fd.get('barcode') || Math.floor(Math.random()*1000000000000).toString(),
-                  name: fd.get('name'), category: fd.get('category'), size: fd.get('size'), color: fd.get('color'),
-                  price: Number(fd.get('price')), stock: Number(fd.get('stock')), vendor: fd.get('vendor')
-                };
-                setInventory([newItem, ...inventory]);
-                e.currentTarget.reset();
-                alert('Item Added Successfully!');
-              }}>
-                <input required name="name" type="text" placeholder="Item Name *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
-                <input required name="barcode" type="text" placeholder="Barcode (Scan here) *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
-                <input name="size" type="text" placeholder="Size (S/M/L/UK8)" className="border p-2 rounded outline-none focus:border-blue-500" />
-                <input name="color" type="text" placeholder="Color" className="border p-2 rounded outline-none focus:border-blue-500" />
+              <form 
+                className="grid grid-cols-4 gap-4" 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  const newItem = {
+                    id: Date.now().toString(),
+                    barcode: fd.get('barcode') || Math.floor(Math.random()*1000000000000).toString(), // Auto barcode if blank
+                    name: fd.get('name'), 
+                    category: fd.get('category'), 
+                    size: fd.get('size'), 
+                    color: fd.get('color'),
+                    price: Number(fd.get('price')), 
+                    stock: Number(fd.get('stock')), 
+                    vendor: fd.get('vendor')
+                  };
+                  setInventory([newItem, ...inventory]);
+                  e.currentTarget.reset();
+                  alert('Item Added Successfully!');
+                }}
+              >
+                <input required name="name" type="text" placeholder="Item Name (e.g. Cotton Shirt) *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
+                <input name="barcode" type="text" placeholder="Barcode (Leave blank for auto)" className="border p-2 rounded outline-none focus:border-blue-500" />
+                
+                {/* PRO SIZE DROPDOWN */}
+                <select name="size" className="border p-2 rounded outline-none bg-white focus:border-blue-500 cursor-pointer">
+                  <option value="">Select Size...</option>
+                  <optgroup label="T-Shirts / Shirts">
+                    <option value="S">S (Small)</option><option value="M">M (Medium)</option><option value="L">L (Large)</option><option value="XL">XL</option><option value="XXL">XXL</option>
+                  </optgroup>
+                  <optgroup label="Jeans / Lowers">
+                    <option value="28">28</option><option value="30">30</option><option value="32">32</option><option value="34">34</option><option value="36">36</option>
+                  </optgroup>
+                  <optgroup label="Shoes (Joote)">
+                    <option value="UK 7">UK 7</option><option value="UK 8">UK 8</option><option value="UK 9">UK 9</option><option value="UK 10">UK 10</option>
+                  </optgroup>
+                  <option value="Free Size">Free Size</option>
+                </select>
+
+                {/* PRO COLOR DROPDOWN */}
+                <select name="color" className="border p-2 rounded outline-none bg-white focus:border-blue-500 cursor-pointer">
+                  <option value="">Select Color...</option>
+                  <option value="Black">⚫ Black (काला)</option>
+                  <option value="White">⚪ White (सफेद)</option>
+                  <option value="Blue">🔵 Blue (नीला)</option>
+                  <option value="Red">🔴 Red (लाल)</option>
+                  <option value="Grey">🔘 Grey (ग्रे)</option>
+                  <option value="Green">🟢 Green (हरा)</option>
+                  <option value="Yellow">🟡 Yellow (पीला)</option>
+                  <option value="Pink">🌸 Pink (गुलाबी)</option>
+                  <option value="Mixed/Print">🎨 Mixed/Printed</option>
+                </select>
+
                 <input required name="price" type="number" placeholder="Price (₹) *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
                 <input required name="stock" type="number" placeholder="Total Stock Qty *" className="border p-2 rounded outline-none focus:border-blue-500 font-bold" />
-                <select name="vendor" className="border p-2 rounded outline-none bg-white">
+                <select name="vendor" className="border p-2 rounded outline-none bg-white cursor-pointer">
                   <option value="">Select Vendor...</option>
                   {vendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
                 </select>
-                <button type="submit" className="bg-green-600 text-white font-black rounded hover:bg-green-500">Save Item</button>
+                <button type="submit" className="bg-green-600 text-white font-black rounded hover:bg-green-500 shadow">Save Item</button>
               </form>
             </div>
             
             <table className="w-full text-left border-collapse">
-              <thead><tr className="bg-gray-800 text-white"><th className="p-3">Barcode</th><th className="p-3">Name</th><th className="p-3">Size/Color</th><th className="p-3">Vendor</th><th className="p-3">Price</th><th className="p-3">Stock</th></tr></thead>
+              <thead><tr className="bg-gray-800 text-white"><th className="p-3">Barcode</th><th className="p-3">Name</th><th className="p-3">Size & Color</th><th className="p-3">Vendor</th><th className="p-3">Price</th><th className="p-3">Stock</th></tr></thead>
               <tbody>
                 {inventory.map(item => (
                   <tr key={item.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 font-mono text-sm">{item.barcode}</td>
                     <td className="p-3 font-bold">{item.name}</td>
-                    <td className="p-3 text-xs">{item.size} {item.color}</td>
+                    <td className="p-3 text-xs">{item.size || '-'} {item.color ? `| ${item.color}` : ''}</td>
                     <td className="p-3 text-xs text-gray-500">{item.vendor || '-'}</td>
                     <td className="p-3 font-bold text-green-600">₹{item.price}</td>
                     <td className={`p-3 font-black ${item.stock < 5 ? 'text-red-500' : 'text-gray-800'}`}>{item.stock}</td>
@@ -326,7 +393,7 @@ export default function RetailPos() {
           <div className="p-8 w-full h-full overflow-y-auto bg-white">
             <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2"><Users/> Customer Profiles</h2>
             {customers.length === 0 ? (
-              <p className="text-gray-500">Koi customer save nahi hua abhi. Billing ke waqt number daalein.</p>
+              <p className="text-gray-500">No customers yet. Unki details checkout par daaliye.</p>
             ) : (
               <table className="w-full text-left border-collapse border">
                 <thead><tr className="bg-gray-100"><th className="p-3">Name</th><th className="p-3">Phone</th><th className="p-3">Total Spent (₹)</th><th className="p-3">Last Visit</th></tr></thead>
